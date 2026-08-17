@@ -1,0 +1,321 @@
+/* Foundation. Fonts, reset, base elements, layout primitives, and the two
+   classes BUILD-ORDER step 1 names.
+
+   tokens.css is imported here rather than alongside this file at each call
+   site, so importing global.css can never leave the custom properties
+   undefined. Vite inlines it at build time — it costs no extra request.
+
+   Every colour, size and space comes from tokens.css. The literals that appear
+   here — 1px and 2px borders, the 3:4 product ratio, 100% — are the values
+   CLAUDE.md names in prose. Nothing else is a raw value. */
+
+@import "./tokens.css";
+
+/* ========================================================================
+   1 — FONTS
+   Two families, two files, both self-hosted. See FONT-SETUP.md.
+   ======================================================================== */
+
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo.woff2") format("woff2-variations");
+  font-weight: 400 600;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2-variations");
+  font-weight: 400 500;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* Metric-matched fallback. Downloads nothing — local() only.
+
+   font-display: swap renders text immediately in a system font and swaps when
+   Archivo lands. On a slow connection that is the right trade, but the swap
+   reflows the page unless the fallback occupies identical space. These four
+   overrides make it occupy identical space.
+
+   Derived from the actual binaries, not estimated: Archivo unitsPerEm 1000,
+   ascender 878, descender -210, lineGap 0, weighted average advance 0.45650em;
+   Arial unitsPerEm 2048, weighted average advance 0.44928em. Both measured over
+   English letter frequency. size-adjust is the ratio of those two averages; the
+   vertical overrides restate Archivo's own metrics against that scale.
+
+   size-adjust is tuned to Arial. Helvetica is near-identical. Android's Roboto
+   is not, but the three vertical overrides are absolute and correct the line box
+   whichever local face is picked, which is where most of the shift lives. */
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial"), local("Helvetica Neue"), local("Helvetica"), local("Roboto");
+  size-adjust: 101.61%;
+  ascent-override: 86.41%;
+  descent-override: 20.67%;
+  line-gap-override: 0%;
+}
+
+/* ========================================================================
+   2 — RESET
+   ======================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: dark;
+}
+
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd,
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+ul[role="list"],
+ol[role="list"] {
+  list-style: none;
+}
+
+img,
+picture,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  overflow-wrap: break-word;
+}
+
+/* Deliberately absent: scroll-behavior: smooth — motion the constraints do not
+   sanction. And no outline reset of any kind, at any point, ever. */
+
+/* ========================================================================
+   3 — BASE ELEMENTS
+   ======================================================================== */
+
+/* No background on html. With html unset the browser propagates body's
+   background to the canvas, so overscroll paints Packing Dark rather than
+   revealing the light :root fail-safe underneath. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--t-body-sm);
+  font-weight: var(--w-regular);
+  line-height: var(--lh-ui);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--w-medium);
+  line-height: var(--lh-display);
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--t-display);
+}
+
+h2 {
+  font-size: var(--t-heading);
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--t-body-sm);
+  line-height: var(--lh-ui);
+  letter-spacing: var(--tr-label);
+}
+
+/* The one conversational voice on the site. Mixed case, weight 400, 26px.
+   Not applied to every <p> — plain paragraphs are UI copy at body-sm. This is
+   the product description register and it is opt-in. */
+.prose {
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
+  font-weight: var(--w-regular);
+  text-wrap: pretty;
+  max-width: 34ch;
+}
+
+/* Uppercase structural label. Never mono — that register belongs to data. */
+.label {
+  font-size: var(--t-label);
+  font-weight: var(--w-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-label);
+  line-height: var(--lh-ui);
+}
+
+/* 11px, non-interactive only. Edge stamp and dispatch-rule label. */
+.micro {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-label);
+  line-height: var(--lh-ui);
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: opacity var(--dur) var(--ease);
+}
+
+a:hover {
+  opacity: 0.7;
+}
+
+/* Focus is Tissue Cream, not the accent. The accent means "you can check this"
+   and a focus ring is not a checkable fact. The single exception in the whole
+   system is the underline input's bottom border, built at step 6. */
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--surface);
+  color: var(--fg);
+}
+
+/* ========================================================================
+   4 — LAYOUT PRIMITIVES
+   Two. A .reveal primitive waits for step 4, when the product section that
+   consumes --reveal-height actually exists.
+   ======================================================================== */
+
+.wrap {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ========================================================================
+   5 — THE TWO NAMED CLASSES
+   ======================================================================== */
+
+/* Consignment docket. The signature element.
+
+   Built entirely on the scoped semantic tokens, so one class renders correctly
+   in both systems with no light-system variant. --accent appears exactly once
+   in this stylesheet, on the line below marked FACT. If it ever appears twice,
+   something has gone wrong. */
+.docket {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  padding: var(--s-16) var(--s-20);
+  font-family: var(--font-mono);
+  font-size: var(--t-docket);
+  line-height: var(--lh-docket);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-8) var(--s-20);
+}
+
+.docket__label {
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-docket);
+}
+
+.docket__value {
+  color: var(--fg);
+}
+
+/* FACT — the only --accent reference in this file. Lead time, dispatch point,
+   stock, capacity, run counts. Nothing else, ever. */
+.docket__value--fact {
+  color: var(--accent);
+}
+
+/* Honest placeholder for a product with no real photograph.
+
+   Reads as a blank dispatch label, not a broken image: kraft ground, the product
+   name set in mono at the bottom-left where a label would be written. No icon,
+   no "image coming soon", no skeleton shimmer.
+
+   --kraft is referenced directly rather than through --surface: the placeholder
+   is always kraft, and it only ever appears inside the light system. */
+.photo-pending {
+  aspect-ratio: 3 / 4;
+  background-color: var(--kraft);
+  border-radius: var(--radius-surface);
+  display: flex;
+  align-items: flex-end;
+  padding: var(--s-16);
+  font-family: var(--font-mono);
+  font-size: var(--t-docket);
+  line-height: var(--lh-docket);
+  letter-spacing: var(--tr-docket);
+  text-transform: uppercase;
+  color: var(--kraft-deep);
+}

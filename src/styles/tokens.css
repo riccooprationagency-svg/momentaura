@@ -19,14 +19,19 @@
   --ink: #17181a;
   --muted: #6b6e72;
   --kraft: #d9cfbc;
-  --kraft-deep: #b5a894;
+  --kraft-deep: #5d5245; /* corrected — original #b5a894 failed AA on kraft at 1.5:1.
+                            Label text on .photo-pending, its only sanctioned use. 4.9:1 */
   --dispatch: #0f7a5a;
   --rule: #e2ded5;
 
   /* ---------- TYPE ---------- */
-  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* "Archivo Fallback" is a metric-matched alias for the local system sans,
+     declared in global.css. It carries no download — it exists so the swap from
+     fallback to webfont does not reflow the page. */
+  --font-sans: "Archivo", "Archivo Fallback", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
+  --t-micro: 0.6875rem;   /* 11 — edge label, dispatch rule label. Non-interactive only */
   --t-docket: 0.75rem;    /* 12 — mono, dockets and data */
   --t-label: 0.75rem;     /* 12 — uppercase labels */
   --t-caption: 0.875rem;  /* 14 */
@@ -65,7 +70,11 @@
   --radius-surface: 2px;
   --radius-button: 999px;
   --radius-input: 0px;
-  --reveal-height: 100vh;
+
+  /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome
+     makes 100vh taller than the visible viewport and strands the buyer below
+     the fold with no visible affordance. */
+  --reveal-height: 100dvh;
 
   /* ---------- MOTION ---------- */
   --dur: 240ms;
@@ -87,7 +96,22 @@
 }
 
 /* Section scopes. Apply to a <section>, not to :root — both systems coexist
-   on the same page, chosen per product. */
+   on the same page, chosen per product.
+
+   The light values are also the bare :root default, so an element that loses or
+   never receives a data-system attribute fails toward light — the honest state.
+   Dark is an explicit override, never an inherited accident. A product rendered
+   dark over a kraft placeholder is the one combination CLAUDE.md forbids
+   outright, and it must not be reachable by omission. */
+
+:root {
+  --bg: var(--paper);
+  --fg: var(--ink);
+  --surface: var(--kraft);
+  --border: var(--rule);
+  --fg-muted: var(--muted);
+  --accent: var(--dispatch);
+}
 
 [data-system="dark"] {
   --bg: var(--packing-dark);

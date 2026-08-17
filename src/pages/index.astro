@@ -1,0 +1,48 @@
+---
+// Temporary. Step 1 proof only — replaced wholesale by the real homepage at
+// step 5, and the <head> moves into Base.astro at step 2.
+//
+// A genuinely blank page would prove Archivo loaded and nothing else. These
+// few lines also prove the mono register resolves, that [data-system] scoping
+// works, and that the accent reaches exactly one element.
+import "../styles/global.css";
+import devGuards from "../styles/dev-guards.css?raw";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MomentAura — foundation</title>
+    <link
+      rel="preload"
+      href="/fonts/archivo.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    {import.meta.env.DEV && <style is:global set:html={devGuards} />}
+  </head>
+
+  <body data-system="dark">
+    <main class="wrap">
+      <h1>Foundation</h1>
+
+      <p class="prose">
+        Text renders before any image completes. This paragraph is the only
+        conversational voice on the site, and it is the one place the type goes
+        mixed case.
+      </p>
+
+      <dl class="docket">
+        <dt class="docket__label">Contents</dt>
+        <dd class="docket__value">One page, no components yet</dd>
+        <dt class="docket__label">Dispatch</dt>
+        <dd class="docket__value docket__value--fact">Nairobi</dd>
+        <dt class="docket__label">Status</dt>
+        <dd class="docket__value">Step 1 of 11</dd>
+      </dl>
+    </main>
+  </body>
+</html>

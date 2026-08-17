@@ -1,0 +1,29 @@
+/* Development only. Never reaches production — inlined behind import.meta.env.DEV,
+   which Vite folds to false at build time, so the markup that carries this is
+   never emitted into dist/.
+
+   These make constraint violations visible while building rather than
+   discoverable after deploying. Add to this file; do not add to global.css. */
+
+/* THE forbidden combination. CLAUDE.md: "Never render a product dark with a
+   placeholder inside it." tokens.css now fails toward light so this should be
+   unreachable, but the rule matters enough to be belt and braces. */
+[data-system="dark"] .photo-pending {
+  outline: 3px solid var(--seal);
+  outline-offset: 3px;
+  position: relative;
+}
+
+[data-system="dark"] .photo-pending::after {
+  content: "DARK SYSTEM + PLACEHOLDER — FORBIDDEN. SET data-system=\"light\" OR ADD A PHOTOGRAPH";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  background-color: var(--seal);
+  color: var(--tissue-cream);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: var(--tr-docket);
+  line-height: var(--lh-ui);
+  padding: var(--s-8) var(--s-12);
+}

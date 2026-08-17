@@ -39,7 +39,11 @@ Category: straight grid, no 100vh rhythm. Product: two columns, docket, size sel
 quantity, one filled button.
 
 ## 7 — Cart
-localStorage only. `client:idle`. At 10+ units, route to the quote path.
+localStorage only. `client:idle`.
+
+No quote path in v1. This is an apparel store with a cart. The 10-unit quote route
+and the Order Bar's "Request a quote" behaviour in `docs/STYLE-dark-editorial.md`
+are both gifting-era and do not apply.
 
 ## 8 — Checkout
 Cloudflare Function. Re-price server-side. Redirect to the hosted gateway page.
