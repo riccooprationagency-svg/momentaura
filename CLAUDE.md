@@ -1,0 +1,258 @@
+# Build constraints — MomentAura
+
+Read this file fully before writing any code. Every session.
+
+**This file supersedes everything in `docs/`.** Those documents carry reasoning and
+history; this one carries the rules. Where they conflict, this file wins. If a prompt
+conflicts with this file, say so rather than silently following it.
+
+---
+
+## Stack
+
+Astro (static output) · Cloudflare Pages · Cloudflare KV for order state · Cloudflare
+Functions for anything touching money. No React, no Tailwind, no UI library. Plain CSS
+with custom properties. Ask before adding any dependency; the answer is almost always no.
+
+## What this sells
+
+Apparel and accessories — t-shirts, hoodies, sweatshirts, bags, watches, necklaces.
+Nairobi, Kenya. Prices in KSh. Payment by M-Pesa.
+
+## The buyer
+
+Arrives **suspicious**, not curious. They have been burned by a vendor who took the
+money and went quiet, or know someone who has.
+
+Every decision gets one test: **does this reduce suspicion or add to it?** Vagueness
+adds. Specificity reduces. "Fast delivery" adds. "Nairobi, 5 working days" reduces.
+Anything that cannot be checked is a liability however good it looks.
+
+---
+
+## The two systems
+
+The site runs **two visual systems simultaneously**, chosen per product.
+
+```js
+product.photo === null  →  light system    (honest placeholder)
+product.photo !== null  →  dark editorial  (the real thing)
+```
+
+The dark system does not degrade without photography — strip the product out and what
+remains is an empty rectangle. So a product without a real photograph renders light,
+with a kraft placeholder block, until it has one.
+
+Never render a product dark with a placeholder inside it.
+
+---
+
+## Tokens
+
+All live in `src/styles/tokens.css`. A raw hex or magic pixel value anywhere else is a bug.
+
+### Dark editorial — default
+
+```
+--packing-dark   #0e0b07   canvas, every section ground
+--tissue-cream   #f6efe2   all text, borders on interactive elements
+--kraft-board    #3a2e1e   docket, capacity notice, filled button — only elevated solid
+--twine          #4a4034   hairlines, dashed dividers, docket borders
+--sisal          #8f8371   docket field labels, muted text
+--foil-green     #2fbf8b   VERIFIABLE FACTS ONLY
+--seal           #8c3a24   sold out, run closed. At most once per page
+```
+
+### Light — products without photography
+
+```
+--paper          #f7f5f0   page ground
+--ink            #17181a   headings, body, prices
+--muted          #6b6e72   secondary text
+--kraft          #d9cfbc   placeholder blocks, docket ground
+--dispatch       #0f7a5a   accent, same rule as foil-green
+--rule           #e2ded5   hairlines
+```
+
+### The accent rule — both systems
+
+`--foil-green` and `--dispatch` mean exactly one thing: **you can check this.**
+
+Permitted: lead time, dispatch point, stock status, capacity remaining, run counts.
+Forbidden: headlines, decoration, button fills, hover states, the logo, anything else.
+
+One misuse destroys its meaning across the whole site. This is the single most important
+constraint in this file.
+
+### Contrast — verified, do not revert
+
+`--sisal` and `--foil-green` were corrected after failing WCAG AA against Kraft Board.
+Any new token gets computed against every surface it will sit on, not eyeballed.
+
+---
+
+## Fonts
+
+Two families. Both free, both variable, both self-hosted. Never load from a CDN.
+
+| Family | Use | Weights |
+|---|---|---|
+| **Archivo** | Everything readable — headings, body, nav, buttons | 400, 500, 600 |
+| **JetBrains Mono** | Data only — dockets, prices, quantities, lead times, order codes | 400, 500 |
+
+The typeface switch is the signal. When type goes mono, the reader is looking at a fact.
+Never set prose in mono. Never set docket data in Archivo.
+
+```
+--t-docket   12px / 1.7  / +0.06em   mono
+--t-label    12px / 1.4  / +0.08em   uppercase
+--t-caption  14px / 1.4
+--t-body-sm  17px / 1.5
+--t-body     26px / 1.3              mixed case, weight 400 — the only prose voice
+--t-heading  clamp(28px, 6vw, 38px) / 0.9   uppercase, weight 500
+--t-display  clamp(30px, 8vw, 48px) / 0.9   uppercase, weight 500
+```
+
+Line-height 0.9 at display is the signature: uppercase letterforms overlap their line
+bounds and stack as solid form rather than sitting in lines. Do not loosen it.
+
+Weight ceiling 600, and 600 only in the logo. Nothing else above 500.
+
+---
+
+## Layout
+
+- Max content width **1240px**, gutter 32px desktop / 20px mobile
+- Radius: **2px** every surface. **999px** buttons. **0px** inputs. Nothing else
+- Borders 1px solid or dashed. **Never a shadow, anywhere, for anything**
+- Depth is the single luminance step from canvas to Kraft Board
+- Product reveals 100vh desktop, `min-height: 620px` mobile. **One product per section**
+- Category and listing pages drop the 100vh rhythm — browsing and choosing are different jobs
+- Left-aligned. Headings may centre; body copy never does
+
+## Components
+
+**Consignment docket** — the signature element. Kraft ground, 1px Twine border, 2px
+radius, mono. Two-column grid: field labels uppercase Sisal, values Tissue Cream,
+checkable facts in Foil Green. Fields: contents, lead time, dispatch, min order, status.
+Never decorated, animated, or shadowed. On every product.
+
+**Capacity notice** — replaces every countdown and urgency badge. Real production figure,
+real cut-off date, mono, figure in Foil Green. When the date passes it turns Seal and
+reads closed. **Every number must be true. If it cannot be verified, the component does
+not render.**
+
+**Dispatch rule** — dashed Twine hairline interrupted mid-span by a mono uppercase fact.
+A divider with nothing to say is vertical space instead.
+
+**Buttons** — filled pill (Kraft Board fill, cream text) or ghost pill (transparent, 1px
+cream border). One filled button per section maximum.
+
+**Inputs** — underline only. 1px bottom border, no box, no fill. Focus adds a 2px Foil
+Green bottom border. The one place the accent touches an interactive element, and it is
+a state, not a fill.
+
+---
+
+## Banned — no exceptions
+
+Gradients of any kind · gradient text · glassmorphism or `backdrop-blur` · pill badges
+above headlines · three-column icon grids · centred body copy · font weights above 600 ·
+dark heroes with radial glows · scroll-triggered animation · fade-up-on-scroll · parallax ·
+bento grids · drop shadows · emoji anywhere including code comments · 3D blobs · mesh
+gradients · stock illustration · decorative icons · skeleton loaders · countdown timers ·
+"only N left" · fake stock counts · testimonials or star ratings before real reviews
+exist · exit-intent popups · "someone just bought this" notifications
+
+## Banned words
+
+*elevate · unlock · seamless · supercharge · effortless · transform · curated · timeless ·
+luxury · premium · bespoke · signature · aura · moments · journey · experience · discover ·
+founded on a passion for · born from a love of*
+
+No exclamation marks. No "simply", "just", or "please". No "we" if it is one person.
+
+## Copy rules
+
+- **Sentence case for products and prose. Uppercase for nav, labels, headings, buttons**
+- Product names say what the thing is
+- Concrete nouns and numbers instead of adjectives
+- Prices always visible. Never "contact for price" under KSh 10,000
+- Delivery as a **date**, not a duration. "Thursday 14 August", not "5–7 days"
+- Buttons keep their verb through the flow: "Add to order" → "Added to order"
+- Errors say what happened, how to fix it, and carry a phone number. Never "something
+  went wrong"
+
+---
+
+## Motion
+
+Transitions 200–300ms on `cubic-bezier(0.625, 0.05, 0, 1)`. Opacity, transform and
+border-colour only. Never spring, bounce, animated hue, scroll-jacking, or parallax.
+
+One elaborate moment permitted site-wide: the box-opening or fold sequence on a product
+page. Image sequence, under 400KB, lazy-loaded, tap-triggered, below the fold. It answers
+"what is actually in it" — it is not atmosphere.
+
+Everything respects `prefers-reduced-motion`.
+
+## Imagery
+
+Real photographs only. **No AI-generated product imagery. No AI-generated people. No
+supplier photos in production. No stock lifestyle. No blank mockups presented as products.**
+
+One surface, one light, one angle, one 3:4 crop, across every product. WebP, lazy-loaded
+below the fold, explicit width and height on every image.
+
+Where no real photograph exists: light system, kraft placeholder block, product name in
+mono. An honest placeholder beats a dishonest photograph.
+
+## Performance — pass/fail, not aspirational
+
+Kenyan mobile traffic on metered bundles.
+
+- Homepage transfer **under 500KB**. Any page under 1MB
+- LCP **under 2.5s on throttled 3G**
+- Text renders before any image completes. Zero render-blocking JS
+- No hero video below 480px — a still renders instead
+- Cart is the only client-side JS. `client:idle`, never `client:load`
+- Touch targets 44px minimum
+
+Test on a real phone on mobile data before every deploy. Not on wifi.
+
+## Security
+
+- **Never build a card form.** Payment always redirects to the gateway's hosted page
+- **Never commit secrets.** Gateway and Daraja credentials live in Cloudflare environment
+  variables, read only inside `functions/`
+- Re-price server-side from our own catalogue. Never trust a client price
+- The M-Pesa callback is unauthenticated — Safaricom does not sign it. Unguessable path,
+  IP allowlist, idempotent by `CheckoutRequestID`, never trust the amount in the body
+- **An STK prompt is not a payment.** Only a callback or a successful status query marks
+  an order paid
+- Payment code is the highest-risk in the repo. Every change read line by line
+
+## Legal
+
+- No licensed characters, no third-party trademarks, in imagery or copy. Ever
+- Privacy policy and a working marketing opt-out ship with the first deploy
+- Never state a stock figure, capacity, date or lead time that is not true
+
+---
+
+## How to work in this repo
+
+- Build components, not pages. Pages compose components
+- Product data lives in `src/data/products.json`. Never hardcode a product into a template
+- Prefer deleting to adding. If a section can be cut without losing information, cut it
+- Every colour, size and space comes from a token
+
+## Prompting note
+
+Ask for **structure**, never mood.
+
+Good: "A product reveal section, 100vh, heading left at display size uppercase, product
+image centred at 40% width, description and docket right."
+
+Bad: "Make it look premium." Premium has no visual definition, so the model falls back to
+its average — which is the generic result this file exists to prevent.

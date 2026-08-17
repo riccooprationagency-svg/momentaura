@@ -1,0 +1,46 @@
+<svg viewBox="0 0 900 620" width="900" height="620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A logo system showing a primary wordmark, a docket lockup with a hairline rule and dispatch line, a compact square stamp mark containing the letters M A, and the same marks reversed on a dark ground.">
+  <title>MomentAura logo system</title>
+  <rect width="900" height="620" fill="#f7f5f0"/>
+
+  <!-- 01 PRIMARY WORDMARK -->
+  <text x="50" y="52" font-family="monospace" font-size="10" letter-spacing="1.6" fill="#8f8371">01 — PRIMARY WORDMARK</text>
+  <text x="50" y="112" font-family="Archivo, Inter, Helvetica, sans-serif" font-size="46" font-weight="600"
+        letter-spacing="1.5" fill="#17181a">MOMENTAURA</text>
+
+  <line x1="50" y1="160" x2="850" y2="160" stroke="#e2ded5" stroke-width="1"/>
+
+  <!-- 02 DOCKET LOCKUP -->
+  <text x="50" y="196" font-family="monospace" font-size="10" letter-spacing="1.6" fill="#8f8371">02 — DOCKET LOCKUP</text>
+  <text x="50" y="252" font-family="Archivo, Inter, Helvetica, sans-serif" font-size="38" font-weight="600"
+        letter-spacing="1.2" fill="#17181a">MOMENTAURA</text>
+  <line x1="50" y1="270" x2="308" y2="270" stroke="#17181a" stroke-width="1.5"/>
+  <text x="50" y="290" font-family="monospace" font-size="11" letter-spacing="2.4" fill="#6b6e72">NAIROBI · EST 2026</text>
+
+  <line x1="50" y1="330" x2="850" y2="330" stroke="#e2ded5" stroke-width="1"/>
+
+  <!-- 03 COMPACT STAMP -->
+  <text x="50" y="366" font-family="monospace" font-size="10" letter-spacing="1.6" fill="#8f8371">03 — COMPACT STAMP</text>
+  <rect x="50" y="386" width="76" height="76" rx="2" fill="none" stroke="#17181a" stroke-width="2.5"/>
+  <text x="88" y="428" font-family="Archivo, Inter, Helvetica, sans-serif" font-size="30" font-weight="600"
+        letter-spacing="1" fill="#17181a" text-anchor="middle">MA</text>
+  <line x1="64" y1="440" x2="112" y2="440" stroke="#17181a" stroke-width="1.5"/>
+  <text x="88" y="453" font-family="monospace" font-size="7" letter-spacing="1.2" fill="#17181a" text-anchor="middle">NBO</text>
+
+  <text x="150" y="404" font-family="monospace" font-size="10" letter-spacing="1" fill="#6b6e72">Neck label · hang tag · favicon</text>
+  <text x="150" y="422" font-family="monospace" font-size="10" letter-spacing="1" fill="#6b6e72">Embroidered chest mark · dispatch sticker</text>
+  <text x="150" y="440" font-family="monospace" font-size="10" letter-spacing="1" fill="#6b6e72">Minimum 15mm · one colour only</text>
+
+  <!-- 04 REVERSED -->
+  <rect x="0" y="490" width="900" height="130" fill="#0e0b07"/>
+  <text x="50" y="524" font-family="monospace" font-size="10" letter-spacing="1.6" fill="#8f8371">04 — REVERSED</text>
+  <text x="50" y="572" font-family="Archivo, Inter, Helvetica, sans-serif" font-size="34" font-weight="600"
+        letter-spacing="1.2" fill="#f6efe2">MOMENTAURA</text>
+  <line x1="50" y1="588" x2="280" y2="588" stroke="#f6efe2" stroke-width="1.2"/>
+  <text x="50" y="606" font-family="monospace" font-size="10" letter-spacing="2.4" fill="#8f8371">NAIROBI · EST 2026</text>
+
+  <rect x="740" y="516" width="66" height="66" rx="2" fill="none" stroke="#f6efe2" stroke-width="2.5"/>
+  <text x="773" y="552" font-family="Archivo, Inter, Helvetica, sans-serif" font-size="26" font-weight="600"
+        letter-spacing="1" fill="#f6efe2" text-anchor="middle">MA</text>
+  <line x1="752" y1="562" x2="794" y2="562" stroke="#f6efe2" stroke-width="1.2"/>
+  <text x="773" y="574" font-family="monospace" font-size="6.5" letter-spacing="1.2" fill="#f6efe2" text-anchor="middle">NBO</text>
+</svg>

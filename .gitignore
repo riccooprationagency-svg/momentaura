@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.astro/
+
+# Secrets — never commit these. Daraja and gateway credentials live only in
+# Cloudflare environment variables.
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# Raw photography and reference images. Unprocessed, unlicensed, and not
+# version-control material. Production imagery is WebP at a 3:4 crop and
+# enters the repo through public/ only once it is ours to ship.
+#
+# Several of these are suppliers' and other companies' product photography.
+# They are not ours to ship: CLAUDE.md bans supplier photos and third-party
+# trademarks in imagery. The extension rules are a second line of defence so a
+# stray JPEG cannot enter from any directory.
+assets-source/images/
+*.jpg
+*.jpeg
+
+# Cloudflare / Wrangler
+.wrangler/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
