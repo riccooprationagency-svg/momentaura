@@ -1,0 +1,297 @@
+---
+// The shell every page composes. Head, skip link, nav, footer, edge label.
+//
+// The nav is Packing Dark from the first pixel rather than transparent-then-dark
+// on scroll. Knowing when to switch needs a scroll listener, and CLAUDE.md says
+// the cart is the only client-side JS. This shell ships zero.
+//
+// It is sticky rather than fixed: sticky occupies flow space, so no page needs
+// to know the nav's height or compensate for it, and there is no layout shift.
+
+import "../styles/global.css";
+import devGuards from "../styles/dev-guards.css?raw";
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Page chrome. Individual sections override per product. */
+  system?: "dark" | "light";
+}
+
+const { title, description, system = "dark" } = Astro.props;
+
+const path = Astro.url.pathname;
+const isCurrent = (href: string) =>
+  href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
+
+const NAV = [
+  { href: "/shop", label: "Shop" },
+  { href: "/delivery", label: "Delivery" },
+  { href: "/contact", label: "Contact" },
+];
+
+const FOOTER = [
+  { href: "/delivery", label: "Delivery and returns" },
+  { href: "/track", label: "Track an order" },
+  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
+  { href: "/privacy", label: "Privacy" },
+];
+
+const year = new Date().getFullYear();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+
+    <!-- Archivo only. JetBrains Mono sits lower on the page; preloading both
+         competes for bandwidth and delays first paint. -->
+    <link
+      rel="preload"
+      href="/fonts/archivo.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    {import.meta.env.DEV && <style is:global set:html={devGuards} />}
+  </head>
+
+  <body data-system={system}>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="nav__inner wrap">
+        <a class="nav__wordmark" href="/">MomentAura</a>
+
+        <nav class="nav__links" aria-label="Primary">
+          {
+            NAV.map((item) => (
+              <a
+                href={item.href}
+                class="nav__link"
+                aria-current={isCurrent(item.href) ? "page" : undefined}
+              >
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+
+        <!-- Static until step 7 wires the cart. Zero is true. -->
+        <a class="nav__order" href="/cart">
+          <span class="sr-only">Items in order:</span>
+          <span aria-hidden="true">(</span>0<span aria-hidden="true">)</span>
+        </a>
+      </div>
+    </header>
+
+    <span class="edge" aria-hidden="true">MomentAura — Nairobi</span>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot__inner">
+        <div class="foot__mark">
+          <span class="foot__wordmark">MomentAura</span>
+          <span class="foot__place">Nairobi, Kenya</span>
+        </div>
+
+        <nav class="foot__links" aria-label="Footer">
+          {FOOTER.map((item) => <a href={item.href}>{item.label}</a>)}
+        </nav>
+
+        <p class="foot__legal">&copy; {year} MomentAura</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  /* ---------- skip link ---------- */
+
+  .skip-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 20;
+    transform: translateY(-120%);
+    background-color: var(--surface);
+    color: var(--fg);
+    padding: var(--s-12) var(--s-20);
+    border-radius: var(--radius-surface);
+    text-decoration: none;
+    font-size: var(--t-label);
+    font-weight: var(--w-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    transition: transform var(--dur) var(--ease);
+  }
+
+  .skip-link:focus-visible {
+    transform: translateY(0);
+  }
+
+  /* ---------- nav ---------- */
+
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--s-40);
+    min-height: var(--s-56);
+  }
+
+  .nav__wordmark {
+    /* The one place weight 600 appears in the whole system. */
+    font-size: var(--t-body-sm);
+    font-weight: var(--w-semi);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-docket);
+    text-decoration: none;
+    margin-inline-end: auto;
+  }
+
+  .nav__links {
+    display: flex;
+    gap: var(--s-28);
+  }
+
+  .nav__link {
+    font-size: var(--t-label);
+    font-weight: var(--w-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    text-decoration: none;
+    /* 44px touch target without changing the visual height of the bar. */
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .nav__link[aria-current="page"] {
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .nav__order {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: flex-end;
+  }
+
+  /* Categories live in the six tiles, so there is no hamburger and nothing to
+     put behind one. The bar collapses to wordmark and order count. */
+  @media (max-width: 640px) {
+    .nav__links {
+      display: none;
+    }
+
+    .nav__inner {
+      gap: var(--s-16);
+    }
+  }
+
+  /* ---------- vertical edge label ---------- */
+
+  .edge {
+    position: fixed;
+    top: 50%;
+    right: var(--s-12);
+    translate: 0 -50%;
+    z-index: 5;
+    writing-mode: vertical-rl;
+    font-family: var(--font-mono);
+    font-size: var(--t-micro);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    pointer-events: none;
+    display: none;
+  }
+
+  @media (min-width: 1100px) {
+    .edge {
+      display: block;
+    }
+  }
+
+  /* ---------- footer ---------- */
+
+  .foot {
+    border-top: 1px solid var(--border);
+    margin-block-start: var(--s-120);
+    padding-block: var(--s-56);
+  }
+
+  .foot__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-40);
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .foot__mark {
+    display: grid;
+    gap: var(--s-8);
+  }
+
+  .foot__wordmark {
+    font-size: var(--t-body-sm);
+    font-weight: var(--w-semi);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-docket);
+  }
+
+  .foot__place,
+  .foot__legal {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+  }
+
+  .foot__links {
+    display: grid;
+    gap: var(--s-12);
+  }
+
+  .foot__links a {
+    font-size: var(--t-caption);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .foot__links a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (max-width: 640px) {
+    .foot__inner {
+      gap: var(--s-28);
+    }
+  }
+</style>
