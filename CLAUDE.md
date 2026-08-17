@@ -260,6 +260,15 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   a component — one import path only, so the custom properties can never be undefined.
   A page that imports only `global.css` gets both; a page that imports only `tokens.css`
   gets a stylesheet that builds clean and renders unstyled
+- **Any new or changed colour token requires `node scripts/contrast.mjs` to pass before
+  commit.** It reads `tokens.css` directly and asserts every specified pairing. Add a
+  row to its `PAIRINGS` table when a component puts a token on a surface it has not sat
+  on before. This rule failed twice on eyeballing — `--sisal` shipped at 3.56:1 on Kraft
+  Board behind a comment claiming it had been corrected, and `--kraft-deep` would have
+  shipped at 1.5:1. Do not eyeball it
+- `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
+  accent reference in the whole source tree, the banned-construct list, and page weight
+  against budget. Both scripts run on every commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 

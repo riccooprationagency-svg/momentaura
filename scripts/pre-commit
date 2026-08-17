@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# MomentAura pre-commit gate.
+#
+# Canonical copy. .git/hooks is not version controlled, so this lives in the
+# repo and is installed by copying:
+#
+#   cp scripts/pre-commit .git/hooks/pre-commit
+#
+# A fresh clone has no hooks until someone runs that. See README.md.
+#
+# Runs the two constraint gates. V2 and V3 inside verify.mjs guard the accent
+# rule — the constraint CLAUDE.md calls the single most important in the file,
+# and the one that erodes without anything failing. It has to run without
+# anyone remembering to run it.
+#
+#   SKIP_BUILD=1 git commit ...   commit without rebuilding (V4 uses stale dist/)
+#   git commit --no-verify ...    skip this hook entirely
+#
+set -e
+
+echo ""
+echo "  pre-commit — MomentAura constraint gates"
+
+if [ -z "$SKIP_BUILD" ]; then
+  echo "  building so the output checks measure current code..."
+  if ! npm run build >/dev/null 2>&1; then
+    echo ""
+    echo "  BUILD FAILED. Commit refused."
+    echo "  Run npm run build to see why, or SKIP_BUILD=1 to commit anyway."
+    echo ""
+    exit 1
+  fi
+fi
+
+node scripts/contrast.mjs
+node scripts/verify.mjs
+
+echo "  gates passed."
+echo ""

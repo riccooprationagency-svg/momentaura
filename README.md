@@ -18,6 +18,29 @@ fresh machine and every CI runner needs `npx astro telemetry disable` again. Sen
 anonymous build data to a third party is not something this project should do silently
 given the Data Protection Act reasoning in `FONT-SETUP.md`.
 
+## Gates
+
+```bash
+cp scripts/pre-commit .git/hooks/pre-commit   # once per clone — see below
+node scripts/contrast.mjs                     # WCAG, reads tokens.css directly
+node scripts/verify.mjs                        # hex, accent, banned list, budget
+```
+
+Both run on every commit. Zero dependencies, plain Node.
+
+`scripts/contrast.mjs` asserts every specified colour pairing against the real token
+values. `scripts/verify.mjs` asserts no raw hex outside `tokens.css`, exactly one
+accent reference in the whole source tree, no banned constructs, and page weight
+against the 500KB homepage budget. Either failing refuses the commit.
+
+**`.git/hooks/` is not version controlled, so a fresh clone has no gates until you run
+that copy.** Do it first, before writing anything. The accent rule is the constraint
+CLAUDE.md ranks as most important and it erodes silently — nothing fails, the build
+passes, the page looks right, and the signal quietly stops meaning anything.
+
+`SKIP_BUILD=1 git commit` skips the rebuild; `git commit --no-verify` skips the gates
+entirely. Reach for the second one roughly never.
+
 ## Reading order
 
 `CLAUDE.md` is authoritative and supersedes everything in `docs/`. Read it in full
