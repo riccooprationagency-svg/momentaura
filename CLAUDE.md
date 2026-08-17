@@ -113,6 +113,10 @@ Never set prose in mono. Never set docket data in Archivo.
 --t-display  clamp(30px, 8vw, 48px) / 0.9   uppercase, weight 500
 ```
 
+`--t-body` is the product-description register, not a document default. It is opt-in
+via `.prose` — the one paragraph per product section. UI copy, dense copy and plain
+paragraphs are `--t-body-sm`. Setting every `<p>` to 26px makes the interface shout.
+
 Line-height 0.9 at display is the signature: uppercase letterforms overlap their line
 bounds and stack as solid form rather than sitting in lines. Do not loosen it.
 
@@ -144,6 +148,12 @@ not render.**
 
 **Dispatch rule** — dashed Twine hairline interrupted mid-span by a mono uppercase fact.
 A divider with nothing to say is vertical space instead.
+
+**Closed stamp** — sold out, run closed, cut-off passed. `--seal` **fill** with Tissue
+Cream on top, 2px radius, mono at `--t-docket`, uppercase. Seal is never a text colour:
+it fails contrast on both grounds, and a closed run should read as stamped, not tinted.
+The product stays visible — visible sold-out history is evidence that other people
+bought. At most once per page.
 
 **Buttons** — filled pill (Kraft Board fill, cream text) or ghost pill (transparent, 1px
 cream border). One filled button per section maximum.
@@ -246,6 +256,10 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
 - Product data lives in `src/data/products.json`. Never hardcode a product into a template
 - Prefer deleting to adding. If a section can be cut without losing information, cut it
 - Every colour, size and space comes from a token
+- `global.css` imports `tokens.css`. Never import `tokens.css` separately in a page or
+  a component — one import path only, so the custom properties can never be undefined.
+  A page that imports only `global.css` gets both; a page that imports only `tokens.css`
+  gets a stylesheet that builds clean and renders unstyled
 
 ## Prompting note
 

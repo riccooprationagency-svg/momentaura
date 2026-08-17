@@ -10,8 +10,18 @@
   --tissue-cream: #f6efe2;
   --kraft-board: #3a2e1e;
   --twine: #4a4034;
-  --sisal: #8f8371;      /* corrected — original #7a6e5c failed AA at 3.9:1 */
-  --foil-green: #2fbf8b; /* corrected — original #23a377 failed AA on kraft at 4.1:1 */
+  /* The three corrections below are measured against Kraft Board, the surface
+     each one actually sits on. Ratios are AA for normal text — these are 12px
+     labels, where the margin matters more, not less. Recompute before changing
+     any of them. */
+  --sisal: #a89c88;      /* corrected twice. #7a6e5c -> #8f8371 -> #a89c88.
+                            #8f8371 was still only 3.56:1 on kraft-board. Now 4.89:1 */
+  --foil-green: #2fbf8b; /* corrected — #23a377 was 4.1:1 on kraft-board. Now 5.63:1 */
+
+  /* FILL ONLY, never text. Sold out, run closed, cut-off passed. As a text
+     colour it is 2.57:1 on canvas and 1.73:1 on kraft-board — both fail. As a
+     fill with Tissue Cream on top it is comfortable, and a closed run should
+     read as a stamp rather than as tinted text. At most once per page. */
   --seal: #8c3a24;
 
   /* ---------- LIGHT — products awaiting photography ---------- */

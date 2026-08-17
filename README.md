@@ -7,9 +7,16 @@ library. Plain CSS with custom properties.
 
 ```bash
 npm install
-npm run dev      # localhost:4321
-npm run build    # -> dist/
+npx astro telemetry disable    # see below — once per machine
+npm run dev                    # localhost:4321
+npm run build                  # -> dist/
 ```
+
+**Telemetry is off, but that setting is global, not repo-scoped.** Astro stores it in
+a per-user config outside this directory, so it does not travel with a clone. Every
+fresh machine and every CI runner needs `npx astro telemetry disable` again. Sending
+anonymous build data to a third party is not something this project should do silently
+given the Data Protection Act reasoning in `FONT-SETUP.md`.
 
 ## Reading order
 
