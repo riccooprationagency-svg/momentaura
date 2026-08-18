@@ -197,14 +197,21 @@ controls gives "Add to order, unavailable" and no cause. `aria-describedby` poin
 with no hit area and is now 44px, matching the nav links, the order count and the footer
 links. Measuring every standalone link on the site found exactly two others under 44px:
 
-| Link | Height | Standing |
+| Link | Was | Now |
 |---|---|---|
-| `.nav__wordmark` | **26px** | A real gap. The home link, standalone, in a 56px bar with room for it. One line, same fix. Not applied — reported, as instructed |
-| `.skip-link` | 42px | Keyboard-only. It is reachable by focus and never by a thumb, so 44px buys nothing |
+| `.nav__wordmark` | 26px | **44px.** The home link, standalone, and there was room in a 56px bar. Same treatment as the nav links beside it, and the bar's height is unchanged |
+| `.skip-link` | 42px | **42px, deliberately. Do not "fix" this.** See below |
 
 Everything else clears it: nav 44, order count 44×44, footer links 44 each, buttons 44,
 category tiles 529, product cards 592. The one link inside prose — *delivery terms* at 18px
 — is correctly excluded; a link in running text is not a tap target.
+
+**The skip link is a deliberate exemption at 42px.** It is reachable by focus and by
+nothing else: it sits translated off the top of the page until `:focus-visible` brings it
+down, so no thumb ever lands on it and no pointer ever finds it. The 44px minimum exists
+for touch, and this control cannot be touched. Padding it to 44 would move a keyboard-only
+affordance to satisfy a rule about fingers. It is listed here because it will keep showing
+up in any audit that measures heights without asking how the control is reached.
 
 **No gate for this, deliberately.** Separating a standalone link from a prose link needs
 judgement, not a selector: `.detail__category a` and the *delivery terms* link are both an
