@@ -147,7 +147,9 @@ body {
   font-weight: var(--w-regular);
   line-height: var(--lh-ui);
   -webkit-font-smoothing: antialiased;
-  min-height: 100dvh;
+  /* --reveal-height, so the footer is pushed down on a short page. Below 640px
+     that token is 620px rather than a viewport unit, which is fine here. */
+  min-height: var(--reveal-height);
 }
 
 h1,
@@ -187,7 +189,7 @@ h6 {
   line-height: var(--lh-body);
   font-weight: var(--w-regular);
   text-wrap: pretty;
-  max-width: 34ch;
+  max-width: var(--measure);
 }
 
 /* Uppercase structural label. Never mono — that register belongs to data. */
@@ -212,7 +214,7 @@ a {
   color: inherit;
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+  text-underline-offset: var(--underline-offset);
   transition: opacity var(--dur) var(--ease);
 }
 

@@ -266,6 +266,11 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   on before. This rule failed twice on eyeballing — `--sisal` shipped at 3.56:1 on Kraft
   Board behind a comment claiming it had been corrected, and `--kraft-deep` would have
   shipped at 1.5:1. Do not eyeball it
+- **Breakpoints are declared in the comment at the top of `tokens.css` and written
+  literally in every `@media` query.** `var()` does not work in a media prelude, so a
+  breakpoint cannot be a token. There are two — 640px and 1100px. Read them there,
+  change them there and in the queries together. Media preludes are the one place a
+  raw pixel value is expected
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
   accent reference in the whole source tree, the banned-construct list, and page weight
   against budget. Both scripts run on every commit via `.git/hooks/pre-commit`

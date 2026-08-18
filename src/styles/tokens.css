@@ -2,7 +2,16 @@
    A raw hex or magic pixel value anywhere else in the codebase is a bug.
 
    Two systems run simultaneously. Product with a real photograph → dark editorial.
-   Product without → light, with an honest kraft placeholder. */
+   Product without → light, with an honest kraft placeholder.
+
+   BREAKPOINTS — declared here, used literally in @media queries.
+
+     640px    mobile. Gutter, body size and reveal height all change below it
+     1100px   wide desktop. The vertical edge label appears above it
+
+   var() does not work in a media prelude, so these two cannot be tokens. This
+   comment is the single place to read them; the numbers themselves are repeated
+   in every query that needs one. Change them here and in the queries together. */
 
 :root {
   /* ---------- DARK EDITORIAL — default ---------- */
@@ -80,6 +89,15 @@
   --radius-surface: 2px;
   --radius-button: 999px;
   --radius-input: 0px;
+
+  /* Minimum hit area on anything interactive. Size selectors are the most-missed
+     target on apparel sites. */
+  --tap-target: 44px;
+
+  /* Measure for the 26px prose voice. Longer lines lose the reader on a phone. */
+  --measure: 34ch;
+
+  --underline-offset: 0.2em;
 
   /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome
      makes 100vh taller than the visible viewport and strands the buyer below

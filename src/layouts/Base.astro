@@ -180,7 +180,7 @@ const year = new Date().getFullYear();
     /* 44px touch target without changing the visual height of the bar. */
     display: flex;
     align-items: center;
-    min-height: 44px;
+    min-height: var(--tap-target);
   }
 
   .nav__link[aria-current="page"] {
@@ -194,8 +194,8 @@ const year = new Date().getFullYear();
     text-decoration: none;
     display: flex;
     align-items: center;
-    min-height: 44px;
-    min-width: 44px;
+    min-height: var(--tap-target);
+    min-width: var(--tap-target);
     justify-content: flex-end;
   }
 
@@ -281,12 +281,12 @@ const year = new Date().getFullYear();
     text-decoration: none;
     display: flex;
     align-items: center;
-    min-height: 44px;
+    min-height: var(--tap-target);
   }
 
   .foot__links a:hover {
     text-decoration: underline;
-    text-underline-offset: 0.2em;
+    text-underline-offset: var(--underline-offset);
   }
 
   @media (max-width: 640px) {

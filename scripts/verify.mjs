@@ -49,7 +49,11 @@ function walkAll(dir, out = []) {
 // Text files worth reading. Everything else — fonts, images — is weighed, not read.
 const walk = (dir) => walkAll(dir).filter((f) => SCANNED.has(extname(f)));
 
-const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "");
+// Blanks comments out in place rather than deleting them, so every reported
+// line number still matches the real file. Collapsing a multi-line comment
+// shifts every line after it and points you at the wrong place.
+const stripComments = (s) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
 
 const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
 
@@ -83,6 +87,60 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     });
   }
   console.log(`  V2  raw hex           ${hits === 0 ? "none outside tokens.css" : `${hits} found`}`);
+}
+
+/* ---------- V2b — no raw dimension outside tokens.css ----------
+ *
+ * CLAUDE.md: "A raw hex or magic pixel value anywhere else is a bug." The check
+ * above enforced the hex half. This is the pixel half, and it is the one that
+ * multiplies once components start landing.
+ *
+ * Allowed literals and nothing else: the identity values 0 and 0px, the border
+ * widths 1px and 2px that CLAUDE.md names in prose, 100%, -1px because it is the
+ * visually-hidden idiom and changing it breaks the pattern, and 1fr because a
+ * grid track is structurally closer to auto than to a measurement. The 3/4
+ * product ratio is unitless so it never matches.
+ *
+ * Media preludes are exempt. var() does not work in a media query, so a
+ * breakpoint cannot be a token — that is a language limit, not a discipline
+ * failure. The two breakpoints are declared in a comment at the top of
+ * tokens.css so there is one place to read them.
+ *
+ * dev-guards.css is excluded entirely. It is inlined behind import.meta.env.DEV
+ * and never reaches production, so holding it to production discipline is cost
+ * with no return. This is deliberate, not an oversight — do not re-add it.
+ *
+ * Comments are stripped first, including // line comments — a comment recording
+ * that --s-56 is 56px is not a magic value.
+ */
+
+{
+  const ALLOWED = new Set(["0", "0px", "1px", "2px", "-1px", "100%", "1fr"]);
+  const UNIT =
+    /-?\d*\.?\d+(px|rem|em|ex|ch|%|vw|vh|dvh|svh|lvh|vmin|vmax|pt|pc|cm|mm|in|deg|rad|turn|ms|s|fr)\b/gi;
+
+  const strip = (s) =>
+    stripComments(s)
+      .split(/\r?\n/)
+      .map((l) => (l.includes("://") ? l : l.replace(/\/\/.*$/, "")))
+      .join("\n");
+
+  let hits = 0;
+  for (const file of sourceFiles.filter((f) => !f.endsWith("dev-guards.css"))) {
+    strip(readFileSync(file, "utf8"))
+      .split(/\r?\n/)
+      .forEach((rawLine, i) => {
+        // Drop the media prelude before matching, keeping anything after the
+        // opening brace so a declaration on the same line is still checked.
+        const line = rawLine.replace(/@media[^{]*\{?/g, "");
+        for (const m of line.matchAll(UNIT)) {
+          if (ALLOWED.has(m[0].toLowerCase())) continue;
+          hits++;
+          fail("V2", `${rel(file)}:${i + 1}  raw dimension ${m[0]} — every size and space comes from a token`);
+        }
+      });
+  }
+  console.log(`  V2  raw dimensions    ${hits === 0 ? "none outside tokens.css" : `${hits} found`}`);
 }
 
 /* ---------- V3 — accent containment ---------- */

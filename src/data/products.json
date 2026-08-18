@@ -1,0 +1,72 @@
+[
+  {
+    "slug": "faith-hoodie",
+    "name": "Faith hoodie",
+    "category": "apparel",
+    "price": 3500,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 0,
+    "photo": null,
+    "sizes": []
+  },
+  {
+    "slug": "crush-bucket-hat",
+    "name": "Crush bucket hat",
+    "category": "apparel",
+    "price": 800,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 0,
+    "photo": null,
+    "sizes": []
+  },
+  {
+    "slug": "bullet-pendant",
+    "name": "Bullet pendant",
+    "category": "accessories",
+    "price": 1400,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 0,
+    "photo": null,
+    "sizes": []
+  },
+  {
+    "slug": "personalised-hoodie",
+    "name": "Personalised hoodie",
+    "category": "personalised",
+    "price": 2800,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 0,
+    "photo": null,
+    "sizes": []
+  },
+  {
+    "slug": "crew-tee",
+    "name": "Crew tee",
+    "category": "apparel",
+    "price": 650,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 0,
+    "photo": null,
+    "sizes": []
+  }
+]
