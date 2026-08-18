@@ -31,7 +31,13 @@
   /* FILL ONLY, never text. Sold out, run closed, cut-off passed. As a text
      colour it is 2.57:1 on canvas and 1.73:1 on kraft-board — both fail. As a
      fill with Tissue Cream on top it is comfortable, and a closed run should
-     read as a stamp rather than as tinted text. At most once per page. */
+     read as a stamp rather than as tinted text.
+
+     Spent in one place: the docket's Stock row, and only when that docket is
+     rendering a detail view — Docket takes detail, defaulting off, and the
+     product page is its only caller. At most once per rendered page, which
+     verify.mjs V8b counts from dist/. Everywhere else closed status is
+     --fg-muted mono with no fill. */
   --seal: #8c3a24;
 
   /* ---------- LIGHT — products awaiting photography ---------- */
@@ -102,7 +108,16 @@
      target on apparel sites. */
   --tap-target: 44px;
 
-  /* Measure for the 26px prose voice. Longer lines lose the reader on a phone. */
+  /* Line length for any block of running text — the 26px prose voice and the
+     17px UI copy alike. Longer lines lose the reader on a phone.
+
+     Written for prose and now used at both sizes, which is honest rather than
+     sloppy: the value is in ch, so it caps characters per line and not pixels,
+     and characters per line is what readability actually turns on. It scales
+     with the type it constrains — 34ch is roughly 442px at --t-body and 289px at
+     --t-body-sm — so one token expresses the same rule at both. A second token
+     for UI copy would need a different ch count, and there is no evidence for
+     one; add it when a measured line proves it, not before. */
   --measure: 34ch;
 
   /* Narrowest a product card may get before the grid drops a column. Three

@@ -193,6 +193,36 @@ it cannot be ordered is a sibling `<p>` with no association to the control. Tabb
 controls gives "Add to order, unavailable" and no cause. `aria-describedby` pointing at
 `.detail__closed` would carry the reason with the control.
 
+**Tap targets, measured across every page.** `.detail__category a` was a 12px mono link
+with no hit area and is now 44px, matching the nav links, the order count and the footer
+links. Measuring every standalone link on the site found exactly two others under 44px:
+
+| Link | Height | Standing |
+|---|---|---|
+| `.nav__wordmark` | **26px** | A real gap. The home link, standalone, in a 56px bar with room for it. One line, same fix. Not applied — reported, as instructed |
+| `.skip-link` | 42px | Keyboard-only. It is reachable by focus and never by a thumb, so 44px buys nothing |
+
+Everything else clears it: nav 44, order count 44×44, footer links 44 each, buttons 44,
+category tiles 529, product cards 592. The one link inside prose — *delivery terms* at 18px
+— is correctly excluded; a link in running text is not a tap target.
+
+**No gate for this, deliberately.** Separating a standalone link from a prose link needs
+judgement, not a selector: `.detail__category a` and the *delivery terms* link are both an
+`<a>` inside a `<p>`, and only intent distinguishes them. A static check would have to
+guess, and a gate that guesses gets muted. The browser measurement above is repeatable by
+hand and that is the right tool for it.
+
+**Known, none of them live. Recorded so they are not rediscovered as surprises:**
+
+| Item | Why it is not live, and what would make it live |
+|---|---|
+| Root catch-all shadowing | `[category].astro` sits at the root but static output emits only the three declared paths, so nothing is shadowed. A future category slug colliding with a real page — `delivery`, `about`, `cart` — would collide for real |
+| Implicit system on category pages | The page sets no `data-system`; its heading and line inherit `Base`'s default. The cards set their own, so a change to that default would move the page furniture and not the cards |
+| V8 word-match holes | V8 matches `\bstamp\b` in stripped source. A component applying the class through a variable or a `class:list` array evades it. V8b still catches the render, which is why the pair exists |
+| V9 scope coverage | Now asserts every declared scope yields at least one pairing. It still only looks for three known selectors, so a fourth scope added to `tokens.css` would not be seen at all |
+| Button border dependency | The disabled outline is `--border`, which on paper is `--rule` at 1.23:1 — nearly invisible. WCAG exempts disabled controls from non-text contrast and the label carries the meaning, so this is a note, not a defect |
+| `aria-disabled` at step 7 | `aria-disabled` does not prevent activation. The cart's click handler must check it before acting, or a disabled Add to order will add to the order |
+
 **UNVERIFIED — narrow widths.** The two-column product page and both grids have never been
 seen below 1242px. The rules were read out of built CSS, which has twice proved a weaker
 signal than looking, and the browser extension cannot resize this window. This needs the

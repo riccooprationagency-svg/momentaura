@@ -60,7 +60,7 @@ All live in `src/styles/tokens.css`. A raw hex or magic pixel value anywhere els
 --twine          #4a4034   hairlines, dashed dividers, docket borders
 --sisal          #a89c88   docket field labels, muted text
 --foil-green     #2fbf8b   VERIFIABLE FACTS ONLY
---seal           #8c3a24   sold out, run closed. At most once per page
+--seal           #8c3a24   sold out, run closed. Docket Stock row, detail view only
 ```
 
 ### Light — products without photography
@@ -68,9 +68,9 @@ All live in `src/styles/tokens.css`. A raw hex or magic pixel value anywhere els
 ```
 --paper          #f7f5f0   page ground
 --ink            #17181a   headings, body, prices
---muted          #6b6e72   secondary text
+--muted          #535659   secondary text
 --kraft          #d9cfbc   placeholder blocks, docket ground
---dispatch       #0f7a5a   accent, same rule as foil-green
+--dispatch       #0c6248   accent, same rule as foil-green
 --rule           #e2ded5   hairlines
 ```
 
@@ -174,6 +174,13 @@ only home: that is where a buyer looks for facts, and stating checkable status i
 component's whole job. Everywhere else — cards, product page actions, listings — sold-out
 status is stated in **`--fg-muted` mono, uppercase, no fill**. Mono keeps it in the data
 register without spending the colour.
+
+**That wording covers short status labels, not sentences.** "Sold out" on a card, in a
+docket row, beside an action — those are data, and mono is the register for data. The line
+on a product page explaining that a product cannot be ordered is **prose, and prose is
+never set in mono**: it is Archivo at `--t-body-sm` in `--fg-muted`, which is what the
+typography rules above already require. A rule about labels must not be read as licence to
+mono-case a paragraph. No gate can tell these apart, so the distinction lives here.
 
 **And the docket only spends it in a detail view.** `Docket` takes `detail`, which defaults
 to **off**; the product page passes it and nothing else does. A homepage reveal is not a

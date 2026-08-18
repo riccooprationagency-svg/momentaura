@@ -30,7 +30,6 @@ import ProductCard from "../../components/ProductCard.astro";
 import {
   categories,
   products,
-  productsIn,
   relatedTo,
   systemFor,
   price,
@@ -203,8 +202,15 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     color: var(--fg-muted);
   }
 
+  /* A standalone link, not a link inside prose, so it carries the same 44px hit
+     area as the nav links, the order count and the footer links. Twelve-point
+     mono is a small target to hit with a thumb, and this is the only route back
+     to the category from a product. */
   .detail__category a {
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
   }
 
   .detail__category a:hover {

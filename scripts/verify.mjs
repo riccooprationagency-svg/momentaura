@@ -436,12 +436,13 @@ if (existsSync(DIST)) {
   // is a definition rather than a mapping, and must not be read as one.
   const mapping = (label, pattern) => {
     const roles = {};
-    for (const block of blocksFor(pattern)) {
+    const blocks = blocksFor(pattern);
+    for (const block of blocks) {
       for (const [, role, token] of block.matchAll(/--([a-z-]+)\s*:\s*var\(\s*--([a-z0-9-]+)\s*\)/g)) {
         roles[role] = token;
       }
     }
-    return { label, roles };
+    return { label, roles, present: blocks.length > 0 };
   };
 
   const scopes = [
@@ -477,9 +478,21 @@ if (existsSync(DIST)) {
   const required = new Set();
   const missing = new Map();
 
-  for (const { label, roles } of scopes) {
+  for (const { label, roles, present } of scopes) {
     const texts = TEXT_ROLES.filter((r) => roles[r]);
     const surfaces = SURFACE_ROLES.filter((r) => roles[r]);
+
+    // A scope that exists but yields nothing is this check going quietly blind
+    // on that scope — the selector was renamed, or the roles were, and the
+    // derivation silently narrowed instead of failing. Cheap to assert, and the
+    // failure it prevents is the whole point of deriving rather than listing.
+    if (present && (!texts.length || !surfaces.length)) {
+      fail("V9", `${label} is declared in tokens.css but yields no pairing`);
+      fail("V9", `  text roles found: ${texts.join(", ") || "none"} — ground roles: ${surfaces.join(", ") || "none"}`);
+      fail("V9", `  A scope this check cannot read is a scope it is not checking.`);
+      continue;
+    }
+    if (!present) continue;
 
     if (texts.length && !surfaces.length) {
       fail("V9", `${label} remaps ${texts.join(", ")} but no ground — the pairing it creates cannot be checked`);
@@ -668,6 +681,67 @@ if (existsSync(DIST)) {
   );
 } else {
   notes.push("dist/ absent — V10b not counted. Run npm run build.");
+}
+
+/* ---------- V11 — CLAUDE.md's palette matches tokens.css ----------
+ *
+ * CLAUDE.md prints the palette as a table of token names and hex values, and it
+ * is the file every session is told to read first. When a token is corrected in
+ * tokens.css and the table is not, the authoritative document states a colour
+ * the source contradicts — and it stated two: --muted and --dispatch sat at
+ * their pre-correction values while the real ones had already shipped.
+ *
+ * That is the exact failure CLAUDE.md documents twice in its own contrast
+ * section, reproduced in the document doing the documenting. The only reason it
+ * survived is that every gate here reads code and none read markdown.
+ *
+ * One direction only. Everything the table claims must be true; tokens.css is
+ * free to hold tokens the table does not print, because it holds type, space and
+ * structure tokens that are not palette entries.
+ */
+
+{
+  const paletteOf = (source) => {
+    const out = {};
+    for (const [, name, hex] of stripComments(source).matchAll(
+      /--([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g
+    )) {
+      out[name] = hex.toLowerCase();
+    }
+    return out;
+  };
+
+  const tokens = paletteOf(readFileSync(TOKENS, "utf8"));
+  const doc = readFileSync(join(ROOT, "CLAUDE.md"), "utf8");
+
+  // Table rows read `--token-name   #hex   description`, one per line.
+  const claims = [...doc.matchAll(/^--([a-z0-9-]+)\s+(#[0-9a-fA-F]{3,8})\b/gm)];
+
+  if (claims.length === 0) {
+    fail("V11", "no palette rows found in CLAUDE.md — the table moved and this check is blind");
+  }
+
+  let mismatched = 0;
+  for (const [, name, claimed] of claims) {
+    const actual = tokens[name];
+    if (!actual) {
+      mismatched++;
+      fail("V11", `CLAUDE.md documents --${name}, which tokens.css does not define`);
+      continue;
+    }
+    if (actual !== claimed.toLowerCase()) {
+      mismatched++;
+      fail("V11", `CLAUDE.md says --${name} is ${claimed}, tokens.css says ${actual}`);
+    }
+  }
+  if (mismatched) {
+    fail("V11", "  Correct the table. It is the file every session reads first, and a");
+    fail("V11", "  palette it prints wrongly is worse than one it does not print at all.");
+  }
+
+  console.log(
+    `  V11 documented hexes  ${claims.length} row(s) in CLAUDE.md, ${mismatched === 0 ? "all match tokens.css" : `${mismatched} wrong`}`
+  );
 }
 
 /* ---------- V4 — build output shape and weight ---------- */

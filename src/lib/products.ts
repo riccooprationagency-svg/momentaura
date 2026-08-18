@@ -47,8 +47,14 @@ export const price = (value: number): string => `KSh ${value.toLocaleString("en-
  * The lines name what a category actually holds and nothing else. No process
  * claim, no material claim, no adjective: "printed in Nairobi" and "cut from
  * heavyweight cotton" are unverifiable from here, and an unverifiable line under
- * a heading is the vagueness the whole system exists to remove. They are checkable
- * against the grid immediately below them, which is the point.
+ * a heading is the vagueness the whole system exists to remove.
+ *
+ * They are not claims a reader can tick off against the grid, and the earlier
+ * version of this comment said they were. "Pendants." sits above one pendant.
+ * That is ordinary English — a category names a kind of thing, not a count, and
+ * renaming it per item would be worse — but it is a category label, not a
+ * checkable fact, and calling it checkable is the kind of overstatement the
+ * accent rule exists to prevent elsewhere.
  *
  * Declared order, derived membership. The order is the order of the keys below —
  * apparel first because it is the fullest category, which alphabetising would
