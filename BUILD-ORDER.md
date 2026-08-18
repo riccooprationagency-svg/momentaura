@@ -92,8 +92,9 @@ filter over a nine-item grid is furniture.
 | Box-opening sequence | No frames. It is the one elaborate moment permitted site-wide and it arrives with real photography or not at all |
 
 **The out-of-stock ruling, as built.** Every product is `stock: 0`, so every product page
-renders it: the button present and disabled — `--fg-muted` text, `--border` outline, no
-fill, `cursor: not-allowed`, `aria-disabled` — under a docket that stamps its Stock row,
+renders it: the button present and disabled — `--fg-muted` text, `--fg-muted` outline set
+as the full `border` shorthand, no fill, `cursor: not-allowed`, `aria-disabled` — under a
+docket that stamps its Stock row,
 above one line naming the product and saying it cannot be ordered. Never absent. A missing
 button leaves the buyer unsure whether the page is broken or the product unbuyable, and
 that ambiguity is the suspicion the whole system exists to reduce.
@@ -227,7 +228,6 @@ hand and that is the right tool for it.
 | Implicit system on category pages | The page sets no `data-system`; its heading and line inherit `Base`'s default. The cards set their own, so a change to that default would move the page furniture and not the cards |
 | V8 word-match holes | V8 matches `\bstamp\b` in stripped source. A component applying the class through a variable or a `class:list` array evades it. V8b still catches the render, which is why the pair exists |
 | V9 scope coverage | Now asserts every declared scope yields at least one pairing. It still only looks for three known selectors, so a fourth scope added to `tokens.css` would not be seen at all |
-| Button border dependency | The disabled outline is `--border`, which on paper is `--rule` at 1.23:1 — nearly invisible. WCAG exempts disabled controls from non-text contrast and the label carries the meaning, so this is a note, not a defect |
 | `aria-disabled` at step 7 | `aria-disabled` does not prevent activation. The cart's click handler must check it before acting, or a disabled Add to order will add to the order |
 | `//` blanking in `stripAllComments` | It strips `//` to end of line, guarded only by a `://` test. A source line carrying `//` inside a string that is not a URL would be blanked, and every check downstream would read a line that is not there. No such line exists in `src/` today |
 

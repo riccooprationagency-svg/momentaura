@@ -199,8 +199,11 @@ examination. Never hide the product to avoid the problem — say it in muted mon
 **Buttons** — filled pill (Kraft Board fill, cream text) or ghost pill (transparent, 1px
 cream border). One filled button per section maximum.
 
-**Disabled** is `--fg-muted` text, `--border` outline, no fill, `cursor: not-allowed`,
-`aria-disabled`. Never the accent. Two rules, both learned the hard way:
+**Disabled** is `--fg-muted` text, **`--fg-muted` outline**, no fill, `cursor: not-allowed`,
+`aria-disabled`. Never the accent. Not `--border`: on paper that resolves to `--rule` at
+1.23:1, which leaves the control with no visible edge — and a disabled control that stops
+looking like a control defeats the whole reason for rendering it instead of hiding it.
+Three rules, all learned the hard way:
 
 - **Opacity is never how a disabled state is expressed.** Fading a filled pill halves the
   contrast of its label against the ground, so the one state that most needs to be read
@@ -210,6 +213,9 @@ cream border). One filled button per section maximum.
   navigates on click and on Enter. `pointer-events: none` hides that rather than fixing
   it, and it suppresses the not-allowed cursor while leaving the keyboard path open. Drop
   the href instead
+- **Set the full `border` shorthand, never `border-color` alone.** A variant that supplies
+  no border of its own would otherwise render the disabled state with no outline at all.
+  The state must not depend on another rule having got there first
 
 A disabled action is never removed from the page. A missing button leaves the buyer unsure
 whether the page is broken or the product unbuyable, and that ambiguity is the suspicion

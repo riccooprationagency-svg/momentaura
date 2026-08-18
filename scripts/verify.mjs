@@ -701,6 +701,23 @@ if (existsSync(DIST)) {
  * One direction only. Everything the table claims must be true; tokens.css is
  * free to hold tokens the table does not print, because it holds type, space and
  * structure tokens that are not palette entries.
+ *
+ * WHERE THIS COVERAGE ENDS, and it ends early.
+ *
+ * This reads hex values in the palette tables. Nothing else. Every prose claim
+ * CLAUDE.md makes about a token is unchecked: which token a component uses, what
+ * a rule is for, which surface something sits on, what the disabled state is
+ * outlined in. Those are the sentences that go stale, and both drifts found so
+ * far were found by review rather than by a gate — the palette hexes, and then
+ * the Buttons spec still saying the disabled outline was --border after the code
+ * had moved to --fg-muted.
+ *
+ * Do not extend this into a prose checker. Deciding whether a sentence about a
+ * token still describes the code needs judgement about what the sentence means,
+ * and a gate that guesses at meaning produces confident wrong answers and then
+ * gets muted — which costs more than the checking is worth. The hex table is
+ * mechanical and therefore checkable; the prose around it is not, and stays a
+ * job for whoever reads the diff.
  */
 
 {
