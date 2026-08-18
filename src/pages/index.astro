@@ -33,6 +33,23 @@ const revealed = products.slice(0, 2);
   title="MomentAura — apparel and accessories, Nairobi"
   description="Apparel and accessories made and dispatched from Nairobi. Prices in KSh, payment by M-Pesa."
 >
+  <!--
+    The hero image slot is empty, and that is a decision rather than an
+    oversight.
+
+    No real photograph of stock we hold exists yet. The three alternatives are
+    each banned by name in CLAUDE.md — supplier photographs, stock lifestyle,
+    and AI-generated product imagery — so there is nothing legitimate to put
+    here. It is not a placeholder either: a kraft block would make the hero
+    announce an absence, and the dark system does not take a placeholder.
+
+    So the hero is typography on Packing Dark, held to 70dvh so the dispatch
+    rule and the first tiles sit above the fold. A full empty viewport reads as
+    broken; a short one reads as composed.
+
+    It fills when the shoot happens. Nothing else here needs to change: add the
+    image and lift the height back to a full viewport.
+  -->
   <section class="hero">
     <div class="wrap hero__inner">
       <p class="hero__line">Nairobi — apparel and accessories</p>
@@ -79,7 +96,7 @@ const revealed = products.slice(0, 2);
 
 <style>
   .hero {
-    min-height: calc(var(--reveal-height) - var(--s-56));
+    min-height: max(var(--hero-min), var(--hero-height));
     display: flex;
     align-items: flex-end;
     padding-block: var(--s-80);

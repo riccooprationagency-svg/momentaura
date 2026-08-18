@@ -52,8 +52,9 @@ const walk = (dir) => walkAll(dir).filter((f) => SCANNED.has(extname(f)));
 // Blanks comments out in place rather than deleting them, so every reported
 // line number still matches the real file. Collapsing a multi-line comment
 // shifts every line after it and points you at the wrong place.
+const blank = (m) => m.replace(/[^\n]/g, " ");
 const stripComments = (s) =>
-  s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+  s.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/<!--[\s\S]*?-->/g, blank);
 
 const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
 
