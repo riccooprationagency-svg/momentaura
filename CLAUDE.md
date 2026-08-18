@@ -189,6 +189,11 @@ No exclamation marks. No "simply", "just", or "please". No "we" if it is one per
 - Concrete nouns and numbers instead of adjectives
 - Prices always visible. Never "contact for price" under KSh 10,000
 - Delivery as a **date**, not a duration. "Thursday 14 August", not "5–7 days"
+- **Lead time is both, by context, and the distinction is not decoration.** On a card
+  or in a docket it is a property of the product and reads as a duration — "5 working
+  days". On a product page, at checkout and on the confirmation it is a **date**,
+  because that is where the buyer is acting on a commitment, and a duration there asks
+  them to do arithmetic before they can trust you. Do not flatten these into one
 - Buttons keep their verb through the flow: "Add to order" → "Added to order"
 - Errors say what happened, how to fix it, and carry a phone number. Never "something
   went wrong"

@@ -218,7 +218,11 @@ a {
   transition: opacity var(--dur) var(--ease);
 }
 
-a:hover {
+/* Inline text links only. A fade on a whole card link dims the placeholder,
+   name, price and stamp together — decorative motion on the main browsing
+   surface, and closer to a hover overlay than the rules allow. Cards signal
+   hover with a border colour instead. */
+:is(p, li, dd, figcaption) a:hover {
   opacity: 0.7;
 }
 

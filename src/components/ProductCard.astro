@@ -48,6 +48,13 @@ const soldOut = product.stock === 0;
     background-color: var(--bg);
     color: var(--fg);
     border-radius: var(--radius-surface);
+    /* Border colour is the only hover signal. No fade, no zoom, no overlay. */
+    border: 1px solid transparent;
+    transition: border-color var(--dur) var(--ease);
+  }
+
+  .card:hover {
+    border-color: var(--border);
   }
 
   .card__link {
