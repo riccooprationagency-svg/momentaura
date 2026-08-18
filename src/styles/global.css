@@ -321,3 +321,23 @@ a:hover {
   text-transform: uppercase;
   color: var(--kraft-deep);
 }
+
+/* Closed stamp. Sold out, run closed, cut-off passed.
+
+   Seal is a fill and never a text colour: as text it is 2.57:1 on canvas and
+   1.73:1 on kraft board, both failing. Cream on a Seal fill is 6.69:1, and a
+   closed run should read as stamped rather than tinted. The product stays
+   visible — visible sold-out history is evidence that other people bought.
+   At most once per page. */
+.stamp {
+  display: inline-block;
+  background-color: var(--seal);
+  color: var(--tissue-cream);
+  border-radius: var(--radius-surface);
+  padding: var(--s-8) var(--s-12);
+  font-family: var(--font-mono);
+  font-size: var(--t-docket);
+  line-height: var(--lh-ui);
+  letter-spacing: var(--tr-docket);
+  text-transform: uppercase;
+}

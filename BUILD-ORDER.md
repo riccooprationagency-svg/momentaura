@@ -22,8 +22,13 @@ exists), `system` derived from it, contents, price, leadTimeDays, stock, and run
 for limited items.
 
 ## 4 — Components, in this order
-`Docket.astro` → `ProductCard.astro` → `DispatchRule.astro` → `CapacityNotice.astro` →
-`Button.astro`
+`Docket.astro` → `ProductCard.astro` → `DispatchRule.astro` → `Button.astro`
+
+**`CapacityNotice.astro` is deliberately not built.** Every number it would
+render — production capacity, cut-off date, run size, remaining — is currently
+unknown, and CLAUDE.md is explicit that a component whose numbers cannot be
+verified does not render. Build it when there is a real run with a real count.
+This is a decision, not a gap.
 
 Build and verify each in isolation before composing. The docket is the signature
 element — get it right before anything depends on it.

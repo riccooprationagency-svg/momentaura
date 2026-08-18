@@ -76,6 +76,8 @@ const PAIRINGS = [
   ["ink", "paper", "body and headings, light system"],
   ["muted", "paper", "secondary text, light system"],
   ["dispatch", "paper", "checkable facts, light system"],
+  ["tissue-cream", "kraft-board", "filled button label, dark system"],
+  ["ink", "kraft", "filled button label, light system"],
 ];
 
 const AA_NORMAL = 4.5;

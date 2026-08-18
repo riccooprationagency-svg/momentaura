@@ -1,0 +1,44 @@
+---
+// A divider that carries a fact rather than filling a gap.
+//
+// A dashed hairline interrupted at its midpoint by one mono uppercase fact. If
+// there is nothing true to put in it, it renders nothing and the caller gets
+// vertical space instead — which is the honest version of a divider.
+interface Props {
+  label?: string;
+}
+
+const { label } = Astro.props;
+---
+
+{
+  label && (
+    <div class="rule" role="separator" aria-label={label}>
+      <span class="rule__line" />
+      <span class="rule__label">{label}</span>
+      <span class="rule__line" />
+    </div>
+  )
+}
+
+<style>
+  .rule {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--s-20);
+  }
+
+  .rule__line {
+    border-block-start: 1px dashed var(--border);
+  }
+
+  .rule__label {
+    font-family: var(--font-mono);
+    font-size: var(--t-micro);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    white-space: nowrap;
+  }
+</style>

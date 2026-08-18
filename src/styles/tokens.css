@@ -97,6 +97,10 @@
   /* Measure for the 26px prose voice. Longer lines lose the reader on a phone. */
   --measure: 34ch;
 
+  /* Narrowest a product card may get before the grid drops a column. Three
+     across desktop, two tablet, one mobile falls out of this. */
+  --card-min: 220px;
+
   --underline-offset: 0.2em;
 
   /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome

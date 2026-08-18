@@ -1,0 +1,91 @@
+---
+// A product in a grid. Category pages and the homepage tiles compose it.
+//
+// The system is derived from the photograph every time it renders. There is no
+// stored flag to fall out of step with what is actually on disk.
+import { systemFor, price, type Product } from "../lib/products";
+
+interface Props {
+  product: Product;
+}
+
+const { product } = Astro.props;
+const system = systemFor(product);
+const soldOut = product.stock === 0;
+---
+
+<article class="card" data-system={system}>
+  <a class="card__link" href={`/products/${product.slug}`}>
+    {
+      system === "light" ? (
+        <div class="photo-pending">{product.name}</div>
+      ) : (
+        <img
+          class="card__photo"
+          src={product.photo}
+          alt={product.name}
+          width="600"
+          height="800"
+          loading="lazy"
+          decoding="async"
+        />
+      )
+    }
+
+    <div class="card__meta">
+      <h3 class="card__name">{product.name}</h3>
+      <p class="card__price">{price(product.price)}</p>
+      {soldOut && <p class="card__status"><span class="stamp">Sold out</span></p>}
+    </div>
+  </a>
+</article>
+
+<style>
+  /* No hover zoom, no overlay, no "shop now". The photograph and the name are
+     sufficient. Every card identical in treatment — variation between cards
+     reads as instability, which is what a suspicious buyer is scanning for. */
+  .card {
+    background-color: var(--bg);
+    color: var(--fg);
+    border-radius: var(--radius-surface);
+  }
+
+  .card__link {
+    display: grid;
+    gap: var(--s-12);
+    text-decoration: none;
+    color: inherit;
+    padding: var(--s-12);
+  }
+
+  .card__photo {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: var(--radius-surface);
+    width: 100%;
+    height: auto;
+  }
+
+  .card__meta {
+    display: grid;
+    gap: var(--s-8);
+  }
+
+  .card__name {
+    font-size: var(--t-body-sm);
+    font-weight: var(--w-medium);
+    text-transform: none;
+    line-height: var(--lh-ui);
+    letter-spacing: normal;
+  }
+
+  .card__price {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .card__status {
+    margin-block-start: var(--s-8);
+  }
+</style>

@@ -5,16 +5,22 @@
    These make constraint violations visible while building rather than
    discoverable after deploying. Add to this file; do not add to global.css. */
 
-/* THE forbidden combination. CLAUDE.md: "Never render a product dark with a
+/* The :not() is load-bearing. A bare descendant selector matches any
+   .photo-pending under <body data-system="dark">, including one inside a card
+   that correctly sets light closer in. That fired on every honest placeholder
+   on the page — a false positive, which is worse than no guard, because it
+   trains people to ignore the thing.
+
+   THE forbidden combination. CLAUDE.md: "Never render a product dark with a
    placeholder inside it." tokens.css now fails toward light so this should be
    unreachable, but the rule matters enough to be belt and braces. */
-[data-system="dark"] .photo-pending {
+[data-system="dark"] .photo-pending:not([data-system="light"] .photo-pending) {
   outline: 3px solid var(--seal);
   outline-offset: 3px;
   position: relative;
 }
 
-[data-system="dark"] .photo-pending::after {
+[data-system="dark"] .photo-pending:not([data-system="light"] .photo-pending)::after {
   content: "DARK SYSTEM + PLACEHOLDER — FORBIDDEN. SET data-system=\"light\" OR ADD A PHOTOGRAPH";
   position: absolute;
   inset-inline: 0;

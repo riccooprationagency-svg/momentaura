@@ -1,0 +1,68 @@
+---
+// Filled pill or ghost pill. One filled button per section, maximum — its
+// rarity is the signal.
+//
+// Both variants resolve through the scoped semantic tokens, so one component
+// renders correctly in either system. Neither variant ever takes the accent:
+// the accent means "you can check this" and a button is an instruction.
+interface Props {
+  variant?: "filled" | "ghost";
+  href?: string;
+  type?: "button" | "submit";
+  disabled?: boolean;
+}
+
+const { variant = "filled", href, type = "button", disabled = false } = Astro.props;
+const Tag = href ? "a" : "button";
+---
+
+<Tag
+  class:list={["btn", `btn--${variant}`]}
+  href={href}
+  type={href ? undefined : type}
+  aria-disabled={disabled ? "true" : undefined}
+>
+  <slot />
+</Tag>
+
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--tap-target);
+    padding-inline: var(--s-28);
+    border-radius: var(--radius-button);
+    font-size: var(--t-label);
+    font-weight: var(--w-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity var(--dur) var(--ease);
+  }
+
+  .btn:hover {
+    opacity: 0.8;
+  }
+
+  .btn[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Kraft Board fill, cream text in the dark system. In the light system the
+     same two tokens resolve to kraft and ink. The one elevated solid. */
+  .btn--filled {
+    background-color: var(--surface);
+    color: var(--fg);
+    border: 1px solid var(--surface);
+  }
+
+  /* The border does the work. */
+  .btn--ghost {
+    background-color: transparent;
+    color: var(--fg);
+    border: 1px solid var(--fg);
+  }
+</style>

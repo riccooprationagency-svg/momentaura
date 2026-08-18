@@ -1,0 +1,125 @@
+---
+// Temporary. Step 4 check page — every component in isolation, then composed
+// into the grid the category page will use. Deleted once step 6 builds the real
+// category page.
+import Base from "../layouts/Base.astro";
+import Docket from "../components/Docket.astro";
+import ProductCard from "../components/ProductCard.astro";
+import DispatchRule from "../components/DispatchRule.astro";
+import Button from "../components/Button.astro";
+import { products } from "../lib/products";
+
+const first = products[0];
+
+// Not real data. A local illustration of what a docket looks like once the
+// supplier is chosen and the facts are known, shown beside the honest one so
+// the difference is visible. Never rendered outside this page.
+const illustrative = {
+  ...first,
+  fabricWeight: "320 gsm",
+  fit: "Regular",
+  printMethod: "Screen print",
+  leadTimeDays: 5,
+  stock: 12,
+};
+
+const empty = {
+  ...first,
+  dispatch: null,
+  stock: null as unknown as number,
+};
+---
+
+<Base title="Components — MomentAura">
+  <div class="wrap page">
+    <h1>Components</h1>
+
+    <section class="block">
+      <h2>Docket</h2>
+      <p class="prose">
+        Left is the real product data. Every unknown field is omitted rather than
+        filled with a placeholder, so it renders two rows. Right is what the same
+        component produces once the facts exist.
+      </p>
+      <div class="pair">
+        <Docket product={first} />
+        <Docket product={illustrative} />
+      </div>
+      <p class="note">
+        With every field null the component returns nothing at all. The gap below
+        this line is that third docket.
+      </p>
+      <Docket product={empty} />
+    </section>
+
+    <section class="block">
+      <h2>Dispatch rule</h2>
+      <DispatchRule label="Nairobi · M-Pesa" />
+      <p class="note">
+        With no label it renders nothing. The gap below is that second rule.
+      </p>
+      <DispatchRule />
+    </section>
+
+    <section class="block">
+      <h2>Buttons</h2>
+      <div class="row">
+        <Button variant="filled">Add to order</Button>
+        <Button variant="ghost" href="/delivery">Delivery terms</Button>
+        <Button variant="filled" disabled>Sold out</Button>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Product cards</h2>
+      <p class="prose">
+        All five products, as they actually are. No photograph exists, so every
+        card renders light with an honest placeholder, and every one is out of
+        stock.
+      </p>
+      <div class="grid">
+        {products.map((product) => <ProductCard product={product} />)}
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-block: var(--s-56);
+    display: grid;
+    gap: var(--s-80);
+  }
+
+  .block {
+    display: grid;
+    gap: var(--s-20);
+  }
+
+  .pair {
+    display: grid;
+    gap: var(--s-20);
+    grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
+    align-items: start;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-16);
+    align-items: center;
+  }
+
+  .grid {
+    display: grid;
+    gap: var(--s-20);
+    grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
+  }
+
+  .note {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+  }
+</style>

@@ -1,0 +1,61 @@
+---
+// The consignment docket. The signature element.
+//
+// It renders what is true and nothing else. A null field is omitted entirely —
+// no "TBC", no em dash, no empty row. A docket showing a blank where a fabric
+// weight belongs is worse than a docket with one less row, because the blank is
+// a visible absence and the missing row is simply not a claim.
+//
+// If every field is null the component returns nothing at all, rather than an
+// empty kraft box announcing that we know nothing about the product.
+import type { Product } from "../lib/products";
+
+interface Props {
+  product: Product;
+}
+
+const { product } = Astro.props;
+
+// Fixed order regardless of which fields survive. The reader learns the shape.
+const FIELDS = [
+  { label: "Fabric weight", value: product.fabricWeight },
+  { label: "Fit", value: product.fit },
+  { label: "Print method", value: product.printMethod },
+  {
+    label: "Lead time",
+    value: product.leadTimeDays === null ? null : `${product.leadTimeDays} working days`,
+    fact: true,
+  },
+  { label: "Dispatch", value: product.dispatch, fact: true },
+  {
+    label: "Stock",
+    value: product.stock,
+    fact: true,
+    // Zero is not missing. It is a fact, and it renders as a stamp.
+    closed: product.stock === 0,
+  },
+];
+
+const rows = FIELDS.filter((f) => f.value !== null && f.value !== undefined);
+---
+
+{
+  rows.length > 0 && (
+    <dl class="docket">
+      {rows.map((row) => (
+        <>
+          <dt class="docket__label">{row.label}</dt>
+          <dd class="docket__value">
+            {row.closed ? (
+              <span class="stamp">Sold out</span>
+            ) : (
+              <span class={row.fact ? "docket__value--fact" : undefined}>
+                {row.label === "Stock" ? `${row.value} in stock` : row.value}
+              </span>
+            )}
+          </dd>
+        </>
+      ))}
+    </dl>
+  )
+}
