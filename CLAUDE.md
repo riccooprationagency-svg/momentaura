@@ -257,6 +257,11 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
 
 ## How to work in this repo
 
+- **One branch per build step, branched from current `main`, then PR, merge, delete.**
+  Never commit a step directly to `main`. The gates catch constraint violations, not
+  design mistakes — nothing in `contrast.mjs` or `verify.mjs` can tell you a hero is
+  empty, a rhythm is wrong, or a docket reads badly. A pull request is the only place
+  those surface before they ship
 - Build components, not pages. Pages compose components
 - Product data lives in `src/data/products.json`. Never hardcode a product into a template
 - Prefer deleting to adding. If a section can be cut without losing information, cut it
