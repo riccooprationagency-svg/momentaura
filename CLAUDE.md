@@ -92,8 +92,16 @@ the surface they actually sit on. `--sisal` took two passes: #7a6e5c to #8f8371 
 Kraft Board behind a comment claiming both were done. `--seal` is fill-only for the same
 reason — as text it fails on both grounds.
 
+`--muted` and `--dispatch` were corrected the same way, at 3.32:1 and 3.44:1 on `--kraft`.
+That is the light system's docket ground, so those two set every field label and every
+checkable fact on a site where every product still renders light. Neither pairing was in
+the table, which is why the miss reached four tokens rather than one.
+
 Any new token gets computed against every surface it will sit on, not eyeballed, and
 `node scripts/contrast.mjs` reads the real values out of `tokens.css` to prove it.
+Which surfaces those are is derived, not recalled: `verify.mjs` V9 computes the reachable
+set from the scope blocks at the foot of this file's token list and fails on any pairing
+missing a row. **Never add a token to a scope block without running both scripts.**
 
 ---
 
@@ -305,11 +313,19 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   A page that imports only `global.css` gets both; a page that imports only `tokens.css`
   gets a stylesheet that builds clean and renders unstyled
 - **Any new or changed colour token requires `node scripts/contrast.mjs` to pass before
-  commit.** It reads `tokens.css` directly and asserts every specified pairing. Add a
-  row to its `PAIRINGS` table when a component puts a token on a surface it has not sat
-  on before. This rule failed twice on eyeballing — `--sisal` shipped at 3.56:1 on Kraft
-  Board behind a comment claiming it had been corrected, and `--kraft-deep` would have
-  shipped at 1.5:1. Do not eyeball it
+  commit.** It reads `tokens.css` directly and asserts every pairing in its `PAIRINGS`
+  table. Do not eyeball it. This rule failed four times on eyeballing — `--sisal` shipped
+  at 3.56:1 on Kraft Board behind a comment claiming it had been corrected, `--kraft-deep`
+  would have shipped at 1.5:1, and `--muted` and `--dispatch` sat at 3.32:1 and 3.44:1 on
+  kraft, which is where every docket on the site puts them
+- **You do not maintain the `PAIRINGS` table by remembering.** `verify.mjs` V9 derives the
+  reachable set from the scope blocks in `tokens.css` — every token resolving as `--fg`,
+  `--fg-muted` or `--accent` against every token resolving as `--bg` or `--surface` in the
+  same scope — and fails if any of them has no row. All four misses above were the same
+  miss: `--fg-muted` and `--accent` are scoped aliases, so one class puts them on two
+  grounds per system without either being named anywhere. Nothing in the docket says
+  "sisal on Kraft Board". Remap a semantic role, or add a system, and V9 tells you which
+  pairings you have just created
 - **Breakpoints are declared in the comment at the top of `tokens.css` and written
   literally in every `@media` query.** `var()` does not work in a media prelude, so a
   breakpoint cannot be a token. There are three — 640px, 900px and 1100px. Read them there,
@@ -317,8 +333,8 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   raw pixel value is expected
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
   accent reference in the whole source tree, the closed stamp contained to `Docket.astro`,
-  the banned-construct list, and page weight against budget. Both scripts run on every
-  commit via `.git/hooks/pre-commit`
+  the `PAIRINGS` table complete against the reachable set, the banned-construct list, and
+  page weight against budget. Both scripts run on every commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 

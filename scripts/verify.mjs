@@ -8,6 +8,7 @@
  *   V4  build output shape and page weight
  *   V6  banned constructs
  *   V8  the closed stamp is contained to the docket
+ *   V9  every reachable text-on-surface pairing has a contrast.mjs row
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -323,6 +324,143 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
 
   console.log(
     `  V8  closed stamp      ${uses.length} use(s)${strays.length === 0 ? `, ${HOME} only` : `, ${strays.length} outside ${HOME}`}`
+  );
+}
+
+/* ---------- V9 — the pairings table is complete ----------
+ *
+ * Numbered V9 because V8 is the closed-stamp check above.
+ *
+ * Every token that resolves as --fg, --fg-muted or --accent must have a row in
+ * contrast.mjs against every token that can resolve as --bg or --surface in the
+ * same scope. Not the pairings someone remembered to add — the pairings the
+ * scoping in tokens.css makes reachable.
+ *
+ * Four tokens have now failed on a surface nobody thought to check: --sisal on
+ * Kraft Board, --kraft-deep on kraft, and --muted and --dispatch on kraft. That
+ * is not four oversights, it is one gap in the table, and it is the wrong shape
+ * of thing to fix four times. contrast.mjs proves the listed pairings pass; this
+ * proves the list is the right list.
+ *
+ * The mechanism the misses share: --fg-muted and --accent are scoped aliases, so
+ * one class puts them on two grounds per system without naming either. Nothing
+ * in the component says "sisal on kraft board" — the docket says --fg-muted on
+ * --surface, and which surface that is depends on where it renders. So the
+ * reachable set has to be derived from the scope blocks, never enumerated by
+ * hand, because enumerating by hand is the failure.
+ *
+ * Borders are excluded on purpose. --border is not text, and WCAG's non-text
+ * 3:1 does not apply to the hairlines here — a docket edge is not a control
+ * boundary, and a disabled control is explicitly exempt.
+ */
+
+{
+  const TEXT_ROLES = ["fg", "fg-muted", "accent"];
+  const SURFACE_ROLES = ["bg", "surface"];
+
+  const tokensSrc = stripComments(readFileSync(TOKENS, "utf8"));
+  const contrastPath = join(ROOT, "scripts", "contrast.mjs");
+  const contrastSrc = stripComments(readFileSync(contrastPath, "utf8"));
+
+  // Every block opened by `selector {`, sliced to its matching close brace so a
+  // :root nested inside an @media is read as the :root scope it is.
+  const blocksFor = (pattern) => {
+    const out = [];
+    const re = new RegExp(`${pattern}\\s*\\{`, "g");
+    let m;
+    while ((m = re.exec(tokensSrc))) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      const start = i;
+      while (i < tokensSrc.length && depth > 0) {
+        if (tokensSrc[i] === "{") depth++;
+        else if (tokensSrc[i] === "}") depth--;
+        i++;
+      }
+      out.push(tokensSrc.slice(start, i - 1));
+    }
+    return out;
+  };
+
+  // Only `--role: var(--token)` counts. The palette block assigns raw hex, which
+  // is a definition rather than a mapping, and must not be read as one.
+  const mapping = (label, pattern) => {
+    const roles = {};
+    for (const block of blocksFor(pattern)) {
+      for (const [, role, token] of block.matchAll(/--([a-z-]+)\s*:\s*var\(\s*--([a-z0-9-]+)\s*\)/g)) {
+        roles[role] = token;
+      }
+    }
+    return { label, roles };
+  };
+
+  const scopes = [
+    // Bare :root is the fail-safe light system, not a theoretical scope. An
+    // element that never receives data-system renders from it, so its pairings
+    // are as reachable as either explicit system's.
+    mapping(":root", ":root"),
+    mapping('[data-system="dark"]', '\\[data-system="dark"\\]'),
+    mapping('[data-system="light"]', '\\[data-system="light"\\]'),
+  ];
+
+  // The table, read out of contrast.mjs rather than restated here. Only the two
+  // token names of each row matter; the ratio is contrast.mjs's job.
+  const pairingsBlock = contrastSrc.match(/const PAIRINGS\s*=\s*\[([\s\S]*?)\n\];/);
+  const have = new Set();
+  let rowsSeen = 0;
+
+  if (!pairingsBlock) {
+    fail("V9", `could not find the PAIRINGS table in ${rel(contrastPath)} — this check is blind`);
+  } else {
+    rowsSeen = [...pairingsBlock[1].matchAll(/\[\s*"/g)].length;
+    const parsed = [...pairingsBlock[1].matchAll(/\[\s*"([a-z0-9-]+)"\s*,\s*"([a-z0-9-]+)"/g)];
+    for (const [, fg, bg] of parsed) have.add(`${fg} on ${bg}`);
+    // A regex that silently stops matching turns this into a check that passes
+    // because it found nothing. Count the rows two ways and compare.
+    if (parsed.length !== rowsSeen) {
+      fail("V9", `parsed ${parsed.length} of ${rowsSeen} PAIRINGS rows — the parser lost rows, fix it before trusting this`);
+    }
+  }
+
+  // Distinct pairings. :root and [data-system="light"] map the same six tokens,
+  // deliberately — light is the fail-safe — so counting both would overstate.
+  const required = new Set();
+  const missing = new Map();
+
+  for (const { label, roles } of scopes) {
+    const texts = TEXT_ROLES.filter((r) => roles[r]);
+    const surfaces = SURFACE_ROLES.filter((r) => roles[r]);
+
+    if (texts.length && !surfaces.length) {
+      fail("V9", `${label} remaps ${texts.join(", ")} but no ground — the pairing it creates cannot be checked`);
+      continue;
+    }
+
+    for (const textRole of texts) {
+      for (const surfaceRole of surfaces) {
+        const key = `${roles[textRole]} on ${roles[surfaceRole]}`;
+        required.add(key);
+        if (!have.has(key) && !missing.has(key)) {
+          missing.set(key, `--${textRole} on --${surfaceRole} in ${label}`);
+        }
+      }
+    }
+  }
+
+  if (!required.size) {
+    fail("V9", "derived no pairings from tokens.css — the scope blocks moved and this check is blind");
+  }
+
+  for (const [key, where] of missing) {
+    fail("V9", `${key} is reachable and has no PAIRINGS row — ${where}`);
+  }
+  if (missing.size) {
+    fail("V9", "  Add the row to scripts/contrast.mjs and let it compute the ratio.");
+    fail("V9", "  If it fails, correct the token against every surface it sits on.");
+  }
+
+  console.log(
+    `  V9  pairings table    ${required.size} reachable, ${rowsSeen} listed, ${missing.size} unchecked`
   );
 }
 

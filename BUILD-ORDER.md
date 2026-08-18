@@ -137,6 +137,19 @@ checkable fact. Neither pairing was in the `contrast.mjs` table, so nothing caug
 the same shape of miss as `--sisal` on Kraft Board. Now `#535659` at 4.78:1 and `#0c6248`
 at 4.76:1, with both pairings asserted.
 
+Four tokens have now failed on a surface nobody thought to check, which is one gap in the
+table rather than four oversights. `verify.mjs` **V9** closes it: it derives the reachable
+set from the scope blocks in `tokens.css` — every token resolving as `--fg`, `--fg-muted`
+or `--accent` against every token resolving as `--bg` or `--surface` in the same scope —
+and fails on any pairing with no row. 12 reachable, 14 listed, 0 unchecked. The two extra
+rows are direct token uses rather than scoped roles: Cream on a Seal fill, and the
+`.photo-pending` label on kraft.
+
+Negative-tested three ways: deleting the two rows above reproduces the exact failure this
+branch shipped with; remapping the dark system's `--fg-muted` to `--twine` reports both
+grounds it becomes reachable against; and breaking the table parser fails loudly rather
+than passing with nothing found.
+
 **Known, blocked on data.** The docket renders lead time as a duration and CLAUDE.md
 requires a date on a product page. `leadTimeDays` is null on every product, so nothing
 renders and there is nothing to convert. A date cannot be computed from a null; it lands
