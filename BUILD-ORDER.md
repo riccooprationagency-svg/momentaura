@@ -61,8 +61,84 @@ Each arrives when its data does.
 **Check:** transfer under 500KB. Measure, do not estimate.
 
 ## 6 — Category and product pages
-Category: straight grid, no 100vh rhythm. Product: two columns, docket, size selector,
-quantity, one filled button.
+Category: straight grid, no 100dvh rhythm. Product: two columns, image left at 3:4,
+details right, aligned top.
+
+**Routes.** `/apparel`, `/personalised`, `/accessories` from `src/pages/[category].astro`;
+`/products/[slug]` for the five products. Which categories exist is derived from
+`products.json`; their display names and the one line under each heading are declared once
+in `src/lib/products.ts`. A category in the data with no entry there fails the build rather
+than shipping a page headed by its own slug. `CategoryTile` pointed at `/shop/:slug`, a
+path nothing builds — corrected to `/:slug`, and the homepage now maps the same derived
+list instead of its own hardcoded copy.
+
+**Three category pages, not six.** Same reason as the three tiles in section 5.
+
+**No filter bar.** Five products across three categories cannot be filtered into a set that
+reads more easily than the grid already does. The largest category holds three items. A
+filter over a nine-item grid is furniture.
+
+**Not built, each because its data or its photography does not exist. Decisions, not gaps:**
+
+| Omitted | Why |
+|---|---|
+| Filters | Above. Revisit at roughly thirty products, not before |
+| Product description | No copy. Optional on `Product`, absent from the data, omitted while null — the same rule the docket applies to its null fields |
+| Size selector | `sizes[]` is empty on every product. A control that cannot be operated, on the page where the buyer is deciding whether this shop works, is worse than no control |
+| Quantity | Named here originally, not in the step 6 ruling. It belongs with the cart in step 7, where a quantity has somewhere to go |
+| Thumbnails | One crop per product at most, and no product has one |
+| Spec table | `fabricWeight`, `fit` and `printMethod` are null on every product |
+| Size chart | No measurements |
+| Box-opening sequence | No frames. It is the one elaborate moment permitted site-wide and it arrives with real photography or not at all |
+
+**The out-of-stock ruling, as built.** Every product is `stock: 0`, so every product page
+renders it: the button present and disabled — `--fg-muted` text, `--border` outline, no
+fill, `cursor: not-allowed`, `aria-disabled` — the closed stamp beside it, and one line
+naming the product and saying it cannot be ordered. Never absent. A missing button leaves
+the buyer unsure whether the page is broken or the product unbuyable, and that ambiguity is
+the suspicion the whole system exists to reduce.
+
+`Button.astro` needed fixing to render that state. Its `disabled` prop had produced a
+half-transparent filled pill: `opacity: 0.5` halved the label's contrast against the
+ground, so the one state that most needs to be legible was the least legible on the page.
+`pointer-events: none` also suppressed the not-allowed cursor while leaving the keyboard
+path to a disabled `<a href>` open. A disabled control is now never an anchor.
+
+**OPEN — the stamp cap needs a ruling.** CLAUDE.md: the closed stamp appears "at most once
+per page". Three instructions in this step each require one, and together they break that
+cap while every product is sold out:
+
+- `Docket` unchanged stamps its `Stock` row when stock is zero
+- the ruling above puts a second stamp beside the button
+- `ProductCard` unchanged stamps every sold-out card
+
+So `/apparel` renders three stamps and `/products/crew-tee` renders four. Built as
+instructed and flagged rather than quietly resolved, because the fix is a design decision:
+either the docket row or the action carries the stamp and the other reads as plain text, or
+`ProductCard` states sold out in `--fg-muted` mono and reserves the Seal fill for the
+product page. Seal loses its force at four to a page, which is the failure the cap exists
+to prevent.
+
+**Two contrast failures found and corrected.** `--muted` was 3.32:1 and `--dispatch`
+3.44:1 on `--kraft`. Both are live on every docket on the site: in the light system
+`--surface` resolves to kraft, `--fg-muted` sets every field label and `--accent` every
+checkable fact. Neither pairing was in the `contrast.mjs` table, so nothing caught it —
+the same shape of miss as `--sisal` on Kraft Board. Now `#535659` at 4.78:1 and `#0c6248`
+at 4.76:1, with both pairings asserted.
+
+**Known, blocked on data.** The docket renders lead time as a duration and CLAUDE.md
+requires a date on a product page. `leadTimeDays` is null on every product, so nothing
+renders and there is nothing to convert. A date cannot be computed from a null; it lands
+with the first true lead time.
+
+`/delivery` does not exist until step 10, so the product page's terms link is dead for now
+— the same as the nav and footer links that have pointed at it since step 2.
+
+`src/pages/components.astro` deleted. Its own header said step 6 replaced it.
+
+**Check:** measured, not estimated. Category page 3,662 bytes gzipped, product page 4,514,
+plus 75,332 bytes of fonts shared across the site. Zero JS, zero images. Both page types
+land near 80KB on a cold first view against a 1MB budget.
 
 ## 7 — Cart
 localStorage only. `client:idle`.

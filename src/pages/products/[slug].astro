@@ -1,0 +1,295 @@
+---
+// One product. Two columns, the object left at 3:4, everything a buyer needs to
+// decide on the right, both aligned top.
+//
+// Not built, each because the data or the photography does not exist. Decisions,
+// not gaps — see BUILD-ORDER section 6:
+//
+//   Thumbnails       one crop exists per product at most, and none exist yet
+//   Spec table       fabric weight, fit and print method are all null
+//   Size chart       no measurements, and sizes[] is empty on every product
+//   Box-opening      no image sequence, and it is the one elaborate moment on
+//                    the site — it arrives with real frames or not at all
+//   Size selector    sizes[] is empty on every product. An inert selector over
+//                    no options is worse than no selector: it is a control that
+//                    cannot be operated, on the page where the buyer is deciding
+//                    whether this shop works
+//   Quantity         BUILD-ORDER named it, the step 6 ruling does not, and it
+//                    belongs with the cart in step 7 where a quantity has
+//                    somewhere to go
+//
+// KNOWN, and blocked on data: the docket renders lead time as a duration, and
+// CLAUDE.md requires a date on a product page. leadTimeDays is null on every
+// product, so no lead time renders at all and there is nothing to convert yet.
+// The date has to be computed from a real lead time against real working days;
+// it cannot be derived from a null. It lands with the first true lead time.
+import Base from "../../layouts/Base.astro";
+import Docket from "../../components/Docket.astro";
+import Button from "../../components/Button.astro";
+import ProductCard from "../../components/ProductCard.astro";
+import {
+  categories,
+  products,
+  productsIn,
+  relatedTo,
+  systemFor,
+  price,
+  type Category,
+  type Product,
+} from "../../lib/products";
+
+export function getStaticPaths() {
+  const named = new Map(categories.map((c) => [c.slug, c]));
+
+  return products.map((product) => ({
+    params: { slug: product.slug },
+    props: {
+      product,
+      category: named.get(product.category)!,
+      related: relatedTo(product),
+    },
+  }));
+}
+
+interface Props {
+  product: Product;
+  category: Category;
+  related: Product[];
+}
+
+const { product, category, related } = Astro.props as Props;
+
+const system = systemFor(product);
+
+// Zero is a fact, not a missing value. Every product is stock 0 today, so this
+// page renders the closed state in practice; the open branch is the same
+// condition read the other way, not a second design.
+const soldOut = product.stock === 0;
+
+const meta = [product.name, price(product.price)].join(", ");
+const description = product.dispatch ? `${meta}. Dispatched from ${product.dispatch}.` : `${meta}.`;
+---
+
+<Base title={`${product.name} — MomentAura`} description={description}>
+  <section class="detail" data-system={system}>
+    <div class="wrap detail__inner">
+      <div class="detail__object">
+        {
+          system === "light" ? (
+            <span class="photo-pending" aria-hidden="true">{product.name}</span>
+          ) : (
+            /* Above the fold and the largest element on the page, so it is the
+               LCP candidate and it loads eagerly. The lazy rule in CLAUDE.md is
+               for images below the fold. */
+            <img
+              src={product.photo}
+              alt={product.name}
+              width="600"
+              height="800"
+              loading="eager"
+              decoding="async"
+            />
+          )
+        }
+      </div>
+
+      <div class="detail__body">
+        <p class="detail__category">
+          <a href={`/${category.slug}`}>{category.name}</a>
+        </p>
+
+        <h1 class="detail__name">{product.name}</h1>
+
+        <p class="detail__price">{price(product.price)}</p>
+
+        <!-- Description omitted while null, the same rule the docket applies to
+             its null fields. A bracketed stub is a visible absence; an omission
+             is simply not a claim. Describing how a garment feels before anyone
+             has handled one would be inventing facts. -->
+        {product.description && <p class="prose detail__prose">{product.description}</p>}
+
+        <Docket product={product} />
+
+        <!--
+          The out-of-stock ruling. The button renders disabled with the closed
+          stamp beside it, never absent.
+
+          A missing button leaves the buyer wondering whether the page is broken
+          or the product unbuyable, and that ambiguity is the suspicion this
+          whole system exists to reduce. Disabled plus stamped is unambiguous:
+          this exists, it was made, it cannot be had right now.
+        -->
+        <div class="detail__action">
+          <Button variant="filled" disabled={soldOut}>Add to order</Button>
+          {soldOut && <span class="stamp">Sold out</span>}
+        </div>
+
+        {
+          soldOut && (
+            <p class="detail__closed">
+              {product.name} is in the catalogue. It cannot be ordered until there is stock
+              to send.
+            </p>
+          )
+        }
+
+        <hr class="detail__hair" />
+
+        <p class="detail__terms">
+          Delivery dates and returns are on the <a href="/delivery">delivery terms</a> page.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {
+    /* Same category only, never padded from another. Two products sit alone in
+       their category, so this section does not render on their pages at all —
+       an empty heading over an empty grid is a worse answer than no heading. */
+    related.length > 0 && (
+      <section class="related">
+        <div class="wrap">
+          <h2 class="related__heading">More in {category.name}</h2>
+          <div class="related__grid">
+            {related.map((item) => (
+              <ProductCard product={item} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<style>
+  /* Paints --bg because it sets data-system. Without it the subtree's text and
+     borders switch systems while the ground stays behind, which reads as broken
+     and involves no illegitimate token. verify.mjs V7 asserts this. */
+  .detail {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .detail__inner {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-40);
+    align-items: start;
+  }
+
+  .detail__object img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: var(--radius-surface);
+    width: 100%;
+    height: auto;
+  }
+
+  .detail__body {
+    display: grid;
+    gap: var(--s-20);
+    justify-items: start;
+  }
+
+  .detail__category {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .detail__category a {
+    text-decoration: none;
+  }
+
+  .detail__category a:hover {
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+  }
+
+  /* Sentence case, --t-heading. Product names say what the thing is, and an
+     uppercased product name stops being a name and becomes a banner. */
+  .detail__name {
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    text-transform: none;
+    font-weight: var(--w-medium);
+  }
+
+  .detail__price {
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    /* Prices align digit for digit against the docket's figures below. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  .detail__prose {
+    margin-block: var(--s-8);
+  }
+
+  /* The docket is full width of the column; everything else sits at its start. */
+  .detail__body :global(.docket) {
+    justify-self: stretch;
+  }
+
+  .detail__action {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-16);
+  }
+
+  .detail__closed,
+  .detail__terms {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  .detail__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin: 0;
+  }
+
+  /* ---------- related ---------- */
+
+  .related {
+    padding-block-end: var(--s-80);
+  }
+
+  .related__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  /* Up to three, so the grid is the same three-column grid as the category page
+     and collapses at the same two breakpoints. */
+  .related__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-40) var(--s-20);
+  }
+
+  @media (min-width: 640px) {
+    .related__grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    /* The object column takes the same 40% share as a homepage reveal, so the
+       two pages read as one system rather than two layouts. */
+    .detail__inner {
+      grid-template-columns: var(--reveal-object) 1fr;
+      gap: var(--s-56);
+    }
+
+    .related__grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

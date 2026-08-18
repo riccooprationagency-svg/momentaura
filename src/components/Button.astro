@@ -13,7 +13,12 @@ interface Props {
 }
 
 const { variant = "filled", href, type = "button", disabled = false } = Astro.props;
-const Tag = href ? "a" : "button";
+
+// A disabled control is never an anchor. An <a href> with aria-disabled still
+// navigates on click and on Enter, and the only thing that stopped it here was
+// pointer-events: none, which also suppressed the not-allowed cursor and left
+// the keyboard path open. Dropping the href is the fix that holds both ways.
+const Tag = href && !disabled ? "a" : "button";
 ---
 
 <Tag
@@ -46,9 +51,25 @@ const Tag = href ? "a" : "button";
     opacity: 0.8;
   }
 
+  /* Sold out, run closed, cut-off passed. Muted text, border outline, no fill —
+     it reads as a control that exists and cannot be operated, which is exactly
+     what it is. Higher specificity than either variant, so it overrides both.
+     Never the accent: the accent means "you can check this".
+
+     Not opacity: 0.5. Fading the filled pill halved the contrast of its label
+     against the ground, so the one state that most needs to be legible was the
+     least legible on the page. --fg-muted is a token measured against every
+     surface it sits on. aria-disabled rather than the disabled attribute, so it
+     stays in the tab order and a screen reader can still find it and hear why. */
   .btn[aria-disabled="true"] {
-    opacity: 0.5;
-    pointer-events: none;
+    background-color: transparent;
+    color: var(--fg-muted);
+    border-color: var(--border);
+    cursor: not-allowed;
+  }
+
+  .btn[aria-disabled="true"]:hover {
+    opacity: 1;
   }
 
   /* Kraft Board fill, cream text in the dark system. In the light system the

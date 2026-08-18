@@ -37,11 +37,18 @@
   /* ---------- LIGHT — products awaiting photography ---------- */
   --paper: #f7f5f0;
   --ink: #17181a;
-  --muted: #6b6e72;
+  /* Corrected — #6b6e72 was 3.32:1 on kraft. It passed on paper and was only
+     ever checked there, but the light-system docket puts it on kraft: --surface
+     resolves to kraft, and every docket label on the site is --fg-muted on it.
+     Now 4.78:1 on kraft, 6.78:1 on paper. Both asserted in contrast.mjs. */
+  --muted: #535659;
   --kraft: #d9cfbc;
   --kraft-deep: #5d5245; /* corrected — original #b5a894 failed AA on kraft at 1.5:1.
                             Label text on .photo-pending, its only sanctioned use. 4.9:1 */
-  --dispatch: #0f7a5a;
+  /* Corrected — #0f7a5a was 3.44:1 on kraft, the same missed surface as --muted
+     above. This is the light-system accent, so it sits on kraft on every docket
+     fact a buyer is meant to check. Now 4.76:1 on kraft, 6.75:1 on paper. */
+  --dispatch: #0c6248;
   --rule: #e2ded5;
 
   /* ---------- TYPE ---------- */

@@ -76,6 +76,13 @@ const PAIRINGS = [
   ["ink", "paper", "body and headings, light system"],
   ["muted", "paper", "secondary text, light system"],
   ["dispatch", "paper", "checkable facts, light system"],
+  /* The light-system docket, which is every docket on the site while every
+     product is photo: null. --surface resolves to kraft there, so these two are
+     the light mirrors of the sisal and foil-green rows above. They were missing
+     from this table, both tokens failed on the surface they actually sat on, and
+     nothing caught it — the same shape of miss the header comment describes. */
+  ["muted", "kraft", "docket field labels on docket ground, light system"],
+  ["dispatch", "kraft", "checkable facts on docket ground, light system"],
   ["tissue-cream", "kraft-board", "filled button label, dark system"],
   ["ink", "kraft", "filled button label, light system"],
 ];
