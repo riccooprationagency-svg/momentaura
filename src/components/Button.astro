@@ -69,10 +69,25 @@ const Tag = isAnchor ? "a" : "button";
      least legible on the page. --fg-muted is a token measured against every
      surface it sits on. aria-disabled rather than the disabled attribute, so it
      stays in the tab order and a screen reader can still find it and hear why. */
+  /* The outline is --fg-muted, not --border. --border on paper is --rule at
+     1.23:1, so the pill had no visible edge and the control stopped looking like
+     a control — on the one page where the disabled state exists to say "this is
+     a real thing you cannot have right now". A disabled control still has to
+     read as a control.
+
+     Same token as the label, so it is already measured against every ground it
+     sits on: --fg-muted on --bg is muted on paper at 6.78:1 and sisal on
+     packing-dark at 7.27:1, both asserted in contrast.mjs and both required by
+     V9. Nothing added to the palette.
+
+     The full border shorthand, not border-color. A future variant that sets no
+     border would otherwise inherit none, and the disabled state would render
+     with no outline again — this state must not depend on another rule having
+     supplied a border first. */
   .btn[aria-disabled="true"] {
     background-color: transparent;
     color: var(--fg-muted);
-    border-color: var(--border);
+    border: 1px solid var(--fg-muted);
     cursor: not-allowed;
   }
 

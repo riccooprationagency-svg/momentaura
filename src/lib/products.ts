@@ -82,8 +82,14 @@ const present = new Set(products.map((p) => p.category));
 /* A category in the data with no entry above fails the build rather than
  * rendering a page headed by its own slug with nothing under it. That page would
  * ship — no gate reads copy — and it would be the worst page on the site. */
+/* Object.hasOwn, not `in`. `in` walks the prototype chain, so a category named
+ * "toString" or "constructor" would satisfy the guard, reach the lookup below,
+ * and hand a function to a page expecting a name — a confusing crash somewhere
+ * downstream instead of the deliberate error this loop exists to raise. It also
+ * matches Object.entries in the filter underneath, which enumerates own keys
+ * only, so the guard and the thing it guards now agree about what a key is. */
 for (const slug of present) {
-  if (!(slug in CATEGORY_COPY)) {
+  if (!Object.hasOwn(CATEGORY_COPY, slug)) {
     throw new Error(
       `products.json carries category "${slug}" with no entry in CATEGORY_COPY ` +
         `in src/lib/products.ts. Add a display name and a one-line description.`

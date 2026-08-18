@@ -229,11 +229,29 @@ hand and that is the right tool for it.
 | V9 scope coverage | Now asserts every declared scope yields at least one pairing. It still only looks for three known selectors, so a fourth scope added to `tokens.css` would not be seen at all |
 | Button border dependency | The disabled outline is `--border`, which on paper is `--rule` at 1.23:1 — nearly invisible. WCAG exempts disabled controls from non-text contrast and the label carries the meaning, so this is a note, not a defect |
 | `aria-disabled` at step 7 | `aria-disabled` does not prevent activation. The cart's click handler must check it before acting, or a disabled Add to order will add to the order |
+| `//` blanking in `stripAllComments` | It strips `//` to end of line, guarded only by a `://` test. A source line carrying `//` inside a string that is not a URL would be blanked, and every check downstream would read a line that is not there. No such line exists in `src/` today |
 
-**UNVERIFIED — narrow widths.** The two-column product page and both grids have never been
-seen below 1242px. The rules were read out of built CSS, which has twice proved a weaker
-signal than looking, and the browser extension cannot resize this window. This needs the
-real phone on Safaricom data that this file already requires before deploy.
+**Product page banding — reproduce it deliberately.** The page runs paper detail section,
+then a dark band for the related grid, then light cards sitting on that dark. It is not a
+violation: the detail section is light because the product has no photograph, `.related`
+carries no `data-system` so it inherits the dark chrome, and each card sets light for
+itself. It reads as intended and it is the same rhythm as the homepage. But the effect
+comes from three separate decisions rather than one, and the next grid added to a light
+page will only look right if whoever adds it reproduces that stack on purpose. It is worth
+knowing before it is copied.
+
+**UNVERIFIED — for the real device, not for more reasoning.** Two things go on the phone
+together, and neither is settled by reading anything:
+
+- **Narrow widths.** The two-column product page and both grids have never been seen below
+  1242px. The rules were read out of built CSS, which has twice proved a weaker signal than
+  looking, and the browser extension cannot resize this window
+- **`--measure` at `--t-body-sm`.** 34ch caps the 17px copy at roughly 289px. That is the
+  right character count and possibly the wrong column on a phone, where the gutter is
+  already 20px. Look at the closed-stock line and the category description on a real screen
+  before deciding whether UI copy needs its own measure
+
+Both need the real phone on Safaricom data that this file already requires before deploy.
 
 **Check:** measured, not estimated. Category page 3,662 bytes gzipped, product page 4,514,
 plus 75,332 bytes of fonts shared across the site. Zero JS, zero images. Both page types

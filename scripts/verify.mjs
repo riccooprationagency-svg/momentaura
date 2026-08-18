@@ -300,10 +300,14 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
  */
 
 {
+  // Docket.astro is the only component that may apply the class. global.css is
+  // the stylesheet that defines it. Everything else in src/ is a stray —
+  // including .css and .ts, which an .astro-only scan walked straight past.
   const HOME = "Docket.astro";
+  const DEFINES = "global.css";
   const uses = [];
 
-  for (const file of sourceFiles.filter((f) => f.endsWith(".astro"))) {
+  for (const file of sourceFiles) {
     stripAllComments(readFileSync(file, "utf8"))
       .split(/\r?\n/)
       .forEach((line, i) => {
@@ -311,10 +315,13 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
       });
   }
 
-  const strays = uses.filter((u) => basename(u.file) !== HOME);
+  const strays = uses.filter((u) => ![HOME, DEFINES].includes(basename(u.file)));
 
   if (!uses.some((u) => basename(u.file) === HOME)) {
     fail("V8", `${HOME} no longer stamps its Stock row — the closed stamp has no home`);
+  }
+  if (!uses.some((u) => basename(u.file) === DEFINES)) {
+    fail("V8", `${DEFINES} no longer defines .stamp — the class the docket applies does not exist`);
   }
   for (const s of strays) {
     fail("V8", `${rel(s.file)}:${s.line}  .stamp outside ${HOME}`);
@@ -326,7 +333,8 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
   }
 
   console.log(
-    `  V8  closed stamp      ${uses.length} use(s)${strays.length === 0 ? `, ${HOME} only` : `, ${strays.length} outside ${HOME}`}`
+    `  V8  closed stamp      ${uses.length} reference(s) across ${sourceFiles.length} source files` +
+      `${strays.length === 0 ? `, ${HOME} and ${DEFINES} only` : `, ${strays.length} stray`}`
   );
 }
 
@@ -493,11 +501,6 @@ if (existsSync(DIST)) {
       continue;
     }
     if (!present) continue;
-
-    if (texts.length && !surfaces.length) {
-      fail("V9", `${label} remaps ${texts.join(", ")} but no ground — the pairing it creates cannot be checked`);
-      continue;
-    }
 
     for (const textRole of texts) {
       for (const surfaceRole of surfaces) {
