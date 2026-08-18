@@ -93,10 +93,10 @@ filter over a nine-item grid is furniture.
 
 **The out-of-stock ruling, as built.** Every product is `stock: 0`, so every product page
 renders it: the button present and disabled — `--fg-muted` text, `--border` outline, no
-fill, `cursor: not-allowed`, `aria-disabled` — the closed stamp beside it, and one line
-naming the product and saying it cannot be ordered. Never absent. A missing button leaves
-the buyer unsure whether the page is broken or the product unbuyable, and that ambiguity is
-the suspicion the whole system exists to reduce.
+fill, `cursor: not-allowed`, `aria-disabled` — under a docket that stamps its Stock row,
+above one line naming the product and saying it cannot be ordered. Never absent. A missing
+button leaves the buyer unsure whether the page is broken or the product unbuyable, and
+that ambiguity is the suspicion the whole system exists to reduce.
 
 `Button.astro` needed fixing to render that state. Its `disabled` prop had produced a
 half-transparent filled pill: `opacity: 0.5` halved the label's contrast against the
@@ -104,20 +104,31 @@ ground, so the one state that most needs to be legible was the least legible on 
 `pointer-events: none` also suppressed the not-allowed cursor while leaving the keyboard
 path to a disabled `<a href>` open. A disabled control is now never an anchor.
 
-**OPEN — the stamp cap needs a ruling.** CLAUDE.md: the closed stamp appears "at most once
-per page". Three instructions in this step each require one, and together they break that
-cap while every product is sold out:
+**The stamp cap — RESOLVED. The stamp belongs to the docket, one per page, always.**
+As first built, three instructions each required a stamp and `/apparel` rendered three
+while `/products/crew-tee` rendered four, two of them 80px apart. The ruling:
 
-- `Docket` unchanged stamps its `Stock` row when stock is zero
-- the ruling above puts a second stamp beside the button
-- `ProductCard` unchanged stamps every sold-out card
+| Surface | Sold-out status |
+|---|---|
+| `Docket` Stock row | Keeps the Seal fill. Where a buyer looks for facts, and stating checkable status is the component's whole job |
+| Product page action | No stamp. The disabled button under a stamped docket already says it twice; a third instance is the redundancy that drains the colour. The one line naming the product stays, as plain `--fg-muted` text |
+| `ProductCard` | "Sold out" in `--fg-muted` mono, no fill. On a grid of three or nine, Seal fills stop reading as exceptional and start reading as the page's colour scheme |
 
-So `/apparel` renders three stamps and `/products/crew-tee` renders four. Built as
-instructed and flagged rather than quietly resolved, because the fix is a design decision:
-either the docket row or the action carries the stamp and the other reads as plain text, or
-`ProductCard` states sold out in `--fg-muted` mono and reserves the Seal fill for the
-product page. Seal loses its force at four to a page, which is the failure the cap exists
-to prevent.
+Counted after the change: category pages 0, product pages 1, homepage 2. CLAUDE.md's
+Closed stamp spec now states this, and `verify.mjs` V8 contains the class to
+`Docket.astro` — the rule erodes exactly the way the accent rule does, silently and with
+every gate still green.
+
+**STILL OPEN — the homepage renders two.** `index.astro` composes two `ProductReveal`
+sections, each with its own docket, each product `stock: 0`. That is two Seal fills on one
+page, so "one per page, always" does not yet hold there. It is a step 5 surface and the fix
+is a design decision, so it is flagged rather than taken:
+
+- the ruling reserves the fill for "the detail view, where a single product is under examination", and a homepage reveal is not that — it carries a *See the details* button pointing at the page that is. By that reasoning the reveal's docket should read muted mono, which means `Docket` gains a `detail` prop defaulting to **off**, so it fails toward the muted state the way `tokens.css` fails toward light
+- or the homepage drops to one reveal, which changes the rhythm section 5 chose deliberately
+
+The stronger gate — one stamp per *rendered* page, not just one component using the class —
+goes in once this is settled. Shipping it now would ship a failing gate.
 
 **Two contrast failures found and corrected.** `--muted` was 3.32:1 and `--dispatch`
 3.44:1 on `--kraft`. Both are live on every docket on the site: in the light system

@@ -35,7 +35,7 @@ const soldOut = product.stock === 0;
     <div class="card__meta">
       <h3 class="card__name">{product.name}</h3>
       <p class="card__price">{price(product.price)}</p>
-      {soldOut && <p class="card__status"><span class="stamp">Sold out</span></p>}
+      {soldOut && <p class="card__status">Sold out</p>}
     </div>
   </a>
 </article>
@@ -92,7 +92,17 @@ const soldOut = product.stock === 0;
     letter-spacing: var(--tr-docket);
   }
 
+  /* Muted mono, no fill. The Seal stamp belongs to the docket and nowhere else.
+     On a grid of three or nine sold-out cards the fills stop reading as
+     exceptional and start reading as the page's colour scheme, which is the
+     whole failure the once-per-page cap exists to prevent. Mono still marks it
+     as status rather than prose, so the register is intact without the fill. */
   .card__status {
     margin-block-start: var(--s-8);
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-transform: uppercase;
+    color: var(--fg-muted);
   }
 </style>

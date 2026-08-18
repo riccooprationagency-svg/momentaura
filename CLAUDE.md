@@ -159,10 +159,38 @@ A divider with nothing to say is vertical space instead.
 Cream on top, 2px radius, mono at `--t-docket`, uppercase. Seal is never a text colour:
 it fails contrast on both grounds, and a closed run should read as stamped, not tinted.
 The product stays visible — visible sold-out history is evidence that other people
-bought. At most once per page.
+bought.
+
+**The stamp belongs to the docket. One per page, always.** The docket's Stock row is its
+only home: that is where a buyer looks for facts, and stating checkable status is the
+component's whole job. Everywhere else — cards, product page actions, listings — sold-out
+status is stated in **`--fg-muted` mono, uppercase, no fill**. Mono keeps it in the data
+register without spending the colour.
+
+This is not a style preference. On a grid of three or nine sold-out cards the fills stop
+reading as exceptional and start reading as the page's colour scheme, and a second stamp
+80px below the first says the same thing twice. Both drain the one colour that means
+*closed*. Reserve the fill for the detail view, where a single product is under
+examination. Never hide the product to avoid the problem — say it in muted mono.
 
 **Buttons** — filled pill (Kraft Board fill, cream text) or ghost pill (transparent, 1px
 cream border). One filled button per section maximum.
+
+**Disabled** is `--fg-muted` text, `--border` outline, no fill, `cursor: not-allowed`,
+`aria-disabled`. Never the accent. Two rules, both learned the hard way:
+
+- **Opacity is never how a disabled state is expressed.** Fading a filled pill halves the
+  contrast of its label against the ground, so the one state that most needs to be read
+  becomes the least readable on the page. Use a token measured against the surface it
+  sits on
+- **A disabled control is never an anchor.** An `<a href>` with `aria-disabled` still
+  navigates on click and on Enter. `pointer-events: none` hides that rather than fixing
+  it, and it suppresses the not-allowed cursor while leaving the keyboard path open. Drop
+  the href instead
+
+A disabled action is never removed from the page. A missing button leaves the buyer unsure
+whether the page is broken or the product unbuyable, and that ambiguity is the suspicion
+this whole system exists to reduce. Render it disabled and say why in one line.
 
 **Inputs** — underline only. 1px bottom border, no box, no fill. Focus adds a 2px Foil
 Green bottom border. The one place the accent touches an interactive element, and it is
@@ -288,8 +316,9 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   change them there and in the queries together. Media preludes are the one place a
   raw pixel value is expected
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
-  accent reference in the whole source tree, the banned-construct list, and page weight
-  against budget. Both scripts run on every commit via `.git/hooks/pre-commit`
+  accent reference in the whole source tree, the closed stamp contained to `Docket.astro`,
+  the banned-construct list, and page weight against budget. Both scripts run on every
+  commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 

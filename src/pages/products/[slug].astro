@@ -111,18 +111,19 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
         <Docket product={product} />
 
         <!--
-          The out-of-stock ruling. The button renders disabled with the closed
-          stamp beside it, never absent.
+          The out-of-stock ruling. The button renders disabled, never absent.
 
           A missing button leaves the buyer wondering whether the page is broken
           or the product unbuyable, and that ambiguity is the suspicion this
-          whole system exists to reduce. Disabled plus stamped is unambiguous:
-          this exists, it was made, it cannot be had right now.
+          whole system exists to reduce. Disabled, under a docket that stamps its
+          Stock row, above a line naming the product, is unambiguous: this
+          exists, it was made, it cannot be had right now.
+
+          No stamp beside the button. The docket above already carries the one
+          Seal fill this page gets, and a second instance 80px below it is the
+          redundancy that drains the colour.
         -->
-        <div class="detail__action">
-          <Button variant="filled" disabled={soldOut}>Add to order</Button>
-          {soldOut && <span class="stamp">Sold out</span>}
-        </div>
+        <Button variant="filled" disabled={soldOut}>Add to order</Button>
 
         {
           soldOut && (
@@ -233,13 +234,6 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
   /* The docket is full width of the column; everything else sits at its start. */
   .detail__body :global(.docket) {
     justify-self: stretch;
-  }
-
-  .detail__action {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-16);
   }
 
   .detail__closed,

@@ -332,7 +332,14 @@ a {
    1.73:1 on kraft board, both failing. Cream on a Seal fill is 6.69:1, and a
    closed run should read as stamped rather than tinted. The product stays
    visible — visible sold-out history is evidence that other people bought.
-   At most once per page. */
+
+   THIS CLASS BELONGS TO THE DOCKET'S STOCK ROW AND NOWHERE ELSE. One per page,
+   always. Everywhere else — cards, product page actions, listings — sold-out
+   status is --fg-muted mono, uppercase, no fill. Nine fills on a grid read as
+   the page's colour scheme rather than as an exception, and a second fill 80px
+   below the first says the same thing twice. Either one drains the only colour
+   that means closed. If you are reaching for this class outside Docket.astro,
+   the answer is muted mono. */
 .stamp {
   display: inline-block;
   background-color: var(--seal);

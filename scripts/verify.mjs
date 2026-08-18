@@ -7,6 +7,7 @@
  *   V3  --accent referenced exactly once in the whole source tree
  *   V4  build output shape and page weight
  *   V6  banned constructs
+ *   V8  the closed stamp is contained to the docket
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -55,6 +56,18 @@ const walk = (dir) => walkAll(dir).filter((f) => SCANNED.has(extname(f)));
 const blank = (m) => m.replace(/[^\n]/g, " ");
 const stripComments = (s) =>
   s.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/<!--[\s\S]*?-->/g, blank);
+
+// Block comments plus // line comments. Any check that looks for a word rather
+// than a CSS property needs this: a frontmatter comment explaining that zero
+// stock renders as a stamp contains the word "stamp", and a gate that counts it
+// is a gate reporting a violation that is not there. A false positive is worse
+// than no check, because it trains people to ignore the thing.
+// The :// guard leaves URLs alone.
+const stripAllComments = (s) =>
+  stripComments(s)
+    .split(/\r?\n/)
+    .map((l) => (l.includes("://") ? l : l.replace(/\/\/.*$/, "")))
+    .join("\n");
 
 const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
 
@@ -136,15 +149,9 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
   const UNIT =
     /-?\d*\.?\d+(px|rem|em|ex|ch|%|vw|vh|dvh|svh|lvh|vmin|vmax|pt|pc|cm|mm|in|deg|rad|turn|ms|s|fr)(?![\w%])/gi;
 
-  const strip = (s) =>
-    stripComments(s)
-      .split(/\r?\n/)
-      .map((l) => (l.includes("://") ? l : l.replace(/\/\/.*$/, "")))
-      .join("\n");
-
   let hits = 0;
   for (const file of sourceFiles.filter((f) => !f.endsWith("dev-guards.css"))) {
-    strip(readFileSync(file, "utf8"))
+    stripAllComments(readFileSync(file, "utf8"))
       .split(/\r?\n/)
       .forEach((rawLine, i) => {
         if (FONT_METRIC.test(rawLine)) return;
@@ -268,6 +275,55 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     }
   }
   console.log(`  V7  system carriers   ${carriers} checked, all paint --bg`);
+}
+
+/* ---------- V8 — the closed stamp belongs to the docket ----------
+ *
+ * CLAUDE.md: the Seal fill renders in the docket's Stock row and nowhere else.
+ * Everywhere else — cards, product page actions, listings — sold-out status is
+ * --fg-muted mono with no fill.
+ *
+ * This is the same class of rule as V3 and it erodes the same way. Nothing fails
+ * when a second component reaches for .stamp: the build passes, the colour is a
+ * legitimate token, the page looks deliberate, and the only casualty is that
+ * Seal stops meaning closed. It cost a category page three fills and a product
+ * page four before anyone counted them.
+ *
+ * Containment in source, not a count per built page. The stronger check is one
+ * stamp per rendered page, and it is not here yet because the homepage renders
+ * two product reveals and therefore two dockets — see BUILD-ORDER section 6. Add
+ * it once that is ruled on rather than shipping a gate that is already failing.
+ */
+
+{
+  const HOME = "Docket.astro";
+  const uses = [];
+
+  for (const file of sourceFiles.filter((f) => f.endsWith(".astro"))) {
+    stripAllComments(readFileSync(file, "utf8"))
+      .split(/\r?\n/)
+      .forEach((line, i) => {
+        if (/\bstamp\b/.test(line)) uses.push({ file, line: i + 1 });
+      });
+  }
+
+  const strays = uses.filter((u) => basename(u.file) !== HOME);
+
+  if (!uses.some((u) => basename(u.file) === HOME)) {
+    fail("V8", `${HOME} no longer stamps its Stock row — the closed stamp has no home`);
+  }
+  for (const s of strays) {
+    fail("V8", `${rel(s.file)}:${s.line}  .stamp outside ${HOME}`);
+  }
+  if (strays.length) {
+    fail("V8", "  Sold-out status outside the docket is --fg-muted mono, uppercase, no");
+    fail("V8", "  fill. Nine fills on a grid read as the page's colour scheme rather");
+    fail("V8", "  than as an exception, which costs Seal the one thing it means.");
+  }
+
+  console.log(
+    `  V8  closed stamp      ${uses.length} use(s)${strays.length === 0 ? `, ${HOME} only` : `, ${strays.length} outside ${HOME}`}`
+  );
 }
 
 /* ---------- V4 — build output shape and weight ---------- */
