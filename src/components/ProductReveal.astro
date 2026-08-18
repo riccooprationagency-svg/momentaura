@@ -1,0 +1,108 @@
+---
+// One product, one viewport. The pace change is the message.
+//
+// Three columns on desktop: heading, the object, then description and docket.
+// The system is derived from the photograph, so a product without one renders
+// light with an honest placeholder rather than as an empty dark rectangle.
+import Docket from "./Docket.astro";
+import Button from "./Button.astro";
+import { systemFor, price, type Product } from "../lib/products";
+
+interface Props {
+  product: Product;
+}
+
+const { product } = Astro.props;
+const system = systemFor(product);
+---
+
+<section class="reveal" data-system={system}>
+  <div class="wrap reveal__inner">
+    <h2 class="reveal__heading">{product.name}</h2>
+
+    <div class="reveal__object">
+      {
+        system === "light" ? (
+          <span class="photo-pending">{product.name}</span>
+        ) : (
+          <img
+            src={product.photo}
+            alt={product.name}
+            width="600"
+            height="800"
+            loading="lazy"
+            decoding="async"
+          />
+        )
+      }
+    </div>
+
+    <div class="reveal__detail">
+      <p class="prose">
+        [One paragraph on the {product.name.toLowerCase()}. What it is, what it is
+        made of, what it is for. Written once the garment is in hand.]
+      </p>
+      <p class="reveal__price">{price(product.price)}</p>
+      <Docket product={product} />
+      <Button variant="filled" href={`/products/${product.slug}`}>See the details</Button>
+    </div>
+  </div>
+</section>
+
+<style>
+  .reveal {
+    background-color: var(--bg);
+    color: var(--fg);
+    min-height: var(--reveal-height);
+    display: flex;
+    align-items: center;
+    padding-block: var(--s-80);
+  }
+
+  .reveal__inner {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-40);
+    align-items: center;
+  }
+
+  .reveal__heading {
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+  }
+
+  .reveal__object img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: var(--radius-surface);
+    width: 100%;
+    height: auto;
+  }
+
+  .reveal__detail {
+    display: grid;
+    gap: var(--s-20);
+    justify-items: start;
+  }
+
+  .reveal__price {
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+  }
+
+  /* Three columns above the mobile breakpoint: heading, object, detail. The
+     object takes the middle 40%. Below it, they stack in the same order. */
+  @media (min-width: 900px) {
+    .reveal__inner {
+      grid-template-columns: 1fr 40% 1fr;
+      gap: var(--s-56);
+    }
+
+    .reveal__heading {
+      font-size: var(--t-display);
+    }
+  }
+</style>

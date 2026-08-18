@@ -1,0 +1,58 @@
+---
+// One category. Identical treatment across all of them — variation between
+// tiles reads as instability, which is what a suspicious buyer is scanning for.
+//
+// No category has a photograph yet, so every tile carries the same honest
+// placeholder and renders light.
+interface Props {
+  slug: string;
+  name: string;
+  photo?: string | null;
+}
+
+const { slug, name, photo = null } = Astro.props;
+const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "light";
+---
+
+<a class="tile" href={`/shop/${slug}`} data-system={system}>
+  {
+    system === "light" ? (
+      <span class="photo-pending">{name}</span>
+    ) : (
+      <img src={photo} alt={name} width="600" height="800" loading="lazy" decoding="async" />
+    )
+  }
+  <span class="tile__name">{name}</span>
+</a>
+
+<style>
+  .tile {
+    display: grid;
+    gap: var(--s-12);
+    text-decoration: none;
+    color: var(--fg);
+    border: 1px solid transparent;
+    border-radius: var(--radius-surface);
+    padding: var(--s-8);
+    transition: border-color var(--dur) var(--ease);
+  }
+
+  .tile:hover {
+    border-color: var(--border);
+  }
+
+  .tile img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: var(--radius-surface);
+    width: 100%;
+    height: auto;
+  }
+
+  .tile__name {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-transform: uppercase;
+  }
+</style>

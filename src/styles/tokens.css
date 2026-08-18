@@ -7,9 +7,10 @@
    BREAKPOINTS — declared here, used literally in @media queries.
 
      640px    mobile. Gutter, body size and reveal height all change below it
+     900px    product reveals go three columns: heading, object, detail
      1100px   wide desktop. The vertical edge label appears above it
 
-   var() does not work in a media prelude, so these two cannot be tokens. This
+   var() does not work in a media prelude, so these cannot be tokens. This
    comment is the single place to read them; the numbers themselves are repeated
    in every query that needs one. Change them here and in the queries together. */
 

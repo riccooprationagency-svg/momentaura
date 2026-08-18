@@ -1,29 +1,155 @@
 ---
-// Temporary. Step 2 check page — nav and footer on an otherwise empty page,
-// both viewports. Replaced wholesale by the real homepage at step 5.
+// Homepage.
 //
-// The heading, paragraph and docket stay because they prove the three type
-// registers and the accent path still resolve through the shell.
+// Not present, each because the data behind it does not exist yet:
+//   hero video       no footage
+//   hero photograph  no real photography of stock we hold
+//   capacity notice  no production figure, no cut-off date
+//   dispatch ledger  zero orders dispatched
+//   testimonials     no reviews, and none until roughly twenty orders
+//
+// None of these is a slot, a comment or an empty element. Each arrives when its
+// data does. See BUILD-ORDER section 5.
 import Base from "../layouts/Base.astro";
+import DispatchRule from "../components/DispatchRule.astro";
+import CategoryTile from "../components/CategoryTile.astro";
+import ProductReveal from "../components/ProductReveal.astro";
+import { products } from "../lib/products";
+
+// The three categories that exist. Six was written for a catalogue that still
+// included watches and licensed panels, which the legal deletion removed.
+const CATEGORIES = [
+  { slug: "apparel", name: "Apparel" },
+  { slug: "personalised", name: "Personalised" },
+  { slug: "accessories", name: "Accessories" },
+];
+
+// Two reveals, not five. Enough to establish the rhythm; five identical
+// placeholder screens would be five identical placeholder screens.
+const revealed = products.slice(0, 2);
 ---
 
-<Base title="MomentAura — foundation">
-  <div class="wrap">
-    <h1>Foundation</h1>
+<Base
+  title="MomentAura — apparel and accessories, Nairobi"
+  description="Apparel and accessories made and dispatched from Nairobi. Prices in KSh, payment by M-Pesa."
+>
+  <section class="hero">
+    <div class="wrap hero__inner">
+      <p class="hero__line">Nairobi — apparel and accessories</p>
+      <h1 class="hero__mark">MomentAura</h1>
+    </div>
+  </section>
 
-    <p class="prose">
-      Text renders before any image completes. This paragraph is the only
-      conversational voice on the site, and it is the one place the type goes
-      mixed case.
-    </p>
-
-    <dl class="docket">
-      <dt class="docket__label">Contents</dt>
-      <dd class="docket__value">Layout shell, no components yet</dd>
-      <dt class="docket__label">Dispatch</dt>
-      <dd class="docket__value docket__value--fact">Nairobi</dd>
-      <dt class="docket__label">Status</dt>
-      <dd class="docket__value">Step 2 of 11</dd>
-    </dl>
+  <div class="wrap band">
+    <DispatchRule label="Nairobi" />
   </div>
+
+  <section class="wrap band">
+    <h2 class="section-heading">What we make</h2>
+    <div class="tiles">
+      {CATEGORIES.map((c) => <CategoryTile slug={c.slug} name={c.name} />)}
+    </div>
+  </section>
+
+  {revealed.map((product) => <ProductReveal product={product} />)}
+
+  <section class="wrap band story">
+    <h2 class="section-heading">Who makes it</h2>
+    <div class="story__inner">
+      <div class="story__portrait">
+        <span class="photo-pending">[Portrait]</span>
+      </div>
+      <div class="story__copy">
+        <p class="prose">
+          [Name] runs MomentAura from [area], Nairobi. [One or two sentences on
+          why they started and what they do themselves.]
+        </p>
+        <p class="prose">
+          Garments come from [supplier]. Printing is done by [printer]. Every
+          order is packed by hand and dispatched from Nairobi.
+        </p>
+        <p class="story__note">
+          Bracketed text is a slot, not copy. It is filled in when the answer is
+          known and checkable, and the section does not ship with it visible.
+        </p>
+      </div>
+    </div>
+  </section>
 </Base>
+
+<style>
+  .hero {
+    min-height: calc(var(--reveal-height) - var(--s-56));
+    display: flex;
+    align-items: flex-end;
+    padding-block: var(--s-80);
+  }
+
+  .hero__inner {
+    display: grid;
+    gap: var(--s-16);
+  }
+
+  .hero__line {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .hero__mark {
+    font-size: var(--t-display);
+    line-height: var(--lh-display);
+    text-transform: uppercase;
+    font-weight: var(--w-semi);
+  }
+
+  .band {
+    padding-block: var(--s-80);
+  }
+
+  .section-heading {
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+    margin-block-end: var(--s-40);
+  }
+
+  .tiles {
+    display: grid;
+    gap: var(--s-20);
+    grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
+  }
+
+  .story__inner {
+    display: grid;
+    gap: var(--s-40);
+  }
+
+  .story__portrait {
+    max-width: var(--card-min);
+  }
+
+  .story__copy {
+    display: grid;
+    gap: var(--s-20);
+  }
+
+  .story__note {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    line-height: var(--lh-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+  }
+
+  @media (min-width: 900px) {
+    .story__inner {
+      grid-template-columns: auto 1fr;
+      align-items: start;
+      gap: var(--s-56);
+    }
+  }
+</style>

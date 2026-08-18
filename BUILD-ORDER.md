@@ -34,8 +34,27 @@ Build and verify each in isolation before composing. The docket is the signature
 element — get it right before anything depends on it.
 
 ## 5 — Homepage
-Hero (static image, video slot empty) → dispatch rule → six category tiles → product
-reveals, one per section.
+Hero → dispatch rule → three category tiles → two product reveals → story block.
+
+**Three tiles, not six.** Six was written for a catalogue that still included
+watches and licensed panels. The legal deletion removed them. Three categories
+exist: apparel, personalised, accessories.
+
+**Two reveals, not one per product.** Every product is `photo: null`, so each
+reveal is a light section with a kraft placeholder. Two establish the rhythm;
+five identical placeholder screens establish nothing further.
+
+**Not built, each because its data does not exist. Decisions, not gaps:**
+
+| Omitted | Why |
+|---|---|
+| Hero video | No footage. Not a slot, not an empty element |
+| Hero photograph | No real photography of stock we hold |
+| Capacity notice | No production figure and no cut-off date. Every number it would carry is unknown |
+| Dispatch ledger | Zero orders dispatched |
+| Testimonials | No reviews, and none until roughly twenty orders are complete |
+
+Each arrives when its data does.
 
 **Check:** transfer under 500KB. Measure, do not estimate.
 
