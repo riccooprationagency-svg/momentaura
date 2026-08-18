@@ -23,7 +23,7 @@ const system = systemFor(product);
     <div class="reveal__object">
       {
         system === "light" ? (
-          <span class="photo-pending">{product.name}</span>
+          <span class="photo-pending" aria-hidden="true">{product.name}</span>
         ) : (
           <img
             src={product.photo}
@@ -37,11 +37,11 @@ const system = systemFor(product);
       }
     </div>
 
+    <!-- No description paragraph. There is no text yet, and a bracketed stub is
+         a visible absence where an omission is simply not a claim — the same
+         rule the docket applies to its null fields. It returns when the copy
+         exists. -->
     <div class="reveal__detail">
-      <p class="prose">
-        [One paragraph on the {product.name.toLowerCase()}. What it is, what it is
-        made of, what it is for. Written once the garment is in hand.]
-      </p>
       <p class="reveal__price">{price(product.price)}</p>
       <Docket product={product} />
       <Button variant="filled" href={`/products/${product.slug}`}>See the details</Button>
@@ -97,7 +97,7 @@ const system = systemFor(product);
      object takes the middle 40%. Below it, they stack in the same order. */
   @media (min-width: 900px) {
     .reveal__inner {
-      grid-template-columns: 1fr 40% 1fr;
+      grid-template-columns: 1fr var(--reveal-object) 1fr;
       gap: var(--s-56);
     }
 

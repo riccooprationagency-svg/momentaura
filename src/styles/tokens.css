@@ -102,6 +102,10 @@
      across desktop, two tablet, one mobile falls out of this. */
   --card-min: 220px;
 
+  /* The object in a product reveal takes the middle share of the width, with
+     heading and detail flanking it. */
+  --reveal-object: 40%;
+
   --underline-offset: 0.2em;
 
   /* Hero. Deliberately short of a full viewport: it carries no photograph, and

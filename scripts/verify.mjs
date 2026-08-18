@@ -22,7 +22,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join, relative, extname } from "node:path";
+import { dirname, join, relative, extname, basename } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
@@ -104,7 +104,7 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
  *
  * Media preludes are exempt. var() does not work in a media query, so a
  * breakpoint cannot be a token — that is a language limit, not a discipline
- * failure. The two breakpoints are declared in a comment at the top of
+ * failure. The three breakpoints are declared in a comment at the top of
  * tokens.css so there is one place to read them.
  *
  * dev-guards.css is excluded entirely. It is inlined behind import.meta.env.DEV
@@ -116,9 +116,25 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
  */
 
 {
-  const ALLOWED = new Set(["0", "0px", "1px", "2px", "-1px", "100%", "1fr"]);
+  const ALLOWED = new Set([
+    "0", "0px", "100%", "1fr",
+    // Border widths CLAUDE.md names in prose.
+    "1px", "2px",
+    // Positioning idioms, not design decisions. -1px and inset(50%) are the
+    // visually-hidden pattern; 50% with -50% is the centring pair; -100% is an
+    // element's own height, which is a definition rather than a magic number.
+    "-1px", "50%", "-50%", "-100%",
+  ]);
+
+  // Font metric overrides are measured from the font binaries, not chosen.
+  // Tokenising them would imply they are design values open to adjustment.
+  // Their derivation and provenance live in FONT-SETUP.md.
+  const FONT_METRIC = /^\s*(size-adjust|ascent-override|descent-override|line-gap-override)\s*:/;
+  // The trailing guard is a negative lookahead, not \b. \b after "%" requires a
+  // word character to follow, so "40%;" never matched and every raw percentage
+  // in the tree passed silently from the day this check was written.
   const UNIT =
-    /-?\d*\.?\d+(px|rem|em|ex|ch|%|vw|vh|dvh|svh|lvh|vmin|vmax|pt|pc|cm|mm|in|deg|rad|turn|ms|s|fr)\b/gi;
+    /-?\d*\.?\d+(px|rem|em|ex|ch|%|vw|vh|dvh|svh|lvh|vmin|vmax|pt|pc|cm|mm|in|deg|rad|turn|ms|s|fr)(?![\w%])/gi;
 
   const strip = (s) =>
     stripComments(s)
@@ -131,6 +147,7 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     strip(readFileSync(file, "utf8"))
       .split(/\r?\n/)
       .forEach((rawLine, i) => {
+        if (FONT_METRIC.test(rawLine)) return;
         // Drop the media prelude before matching, keeping anything after the
         // opening brace so a declaration on the same line is still checked.
         const line = rawLine.replace(/@media[^{]*\{?/g, "");
@@ -195,8 +212,15 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     const raw = readFileSync(file, "utf8");
     const stripped = stripComments(raw);
 
+    // dist/ is scanned raw, comments and all. In source, a comment recording
+    // why we do not use a shadow is not a shadow. In built output there is no
+    // such thing as an explanatory comment — a box-shadow that reaches the
+    // browser is a violation wherever in the file it sits, and blanking
+    // comments there hid exactly what this check exists to find.
+    const isBuilt = file.startsWith(DIST);
+
     for (const [re, label, scanComments] of BANNED) {
-      const lines = (scanComments ? raw : stripped).split(/\r?\n/);
+      const lines = (scanComments || isBuilt ? raw : stripped).split(/\r?\n/);
       lines.forEach((line, i) => {
         if (re.test(line)) {
           hits++;
@@ -206,6 +230,44 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     }
   }
   console.log(`  V6  banned            ${hits === 0 ? `none in ${targets.length} files` : `${hits} found`}`);
+}
+
+/* ---------- V7 — data-system implies a background ----------
+ *
+ * An element that sets data-system remaps --bg, --fg, --surface, --border and
+ * --accent for its whole subtree. If it then never paints --bg, it inherits the
+ * surrounding ground while its text and borders switch systems — light-system
+ * ink on the dark canvas, or the reverse. It reads as broken and every colour
+ * involved is a legitimate token, so nothing else catches it.
+ *
+ * contrast.mjs cannot: the failing pairing only exists at runtime, as a
+ * consequence of where the element sits. That is why this is a structural check
+ * and not another row in the pairings table — fixing the one component that had
+ * the bug would not have stopped the next one.
+ */
+
+{
+  // <body> is the one legitimate exception: its background is declared once in
+  // global.css rather than in the layout. The assertion below keeps that
+  // exemption honest instead of taking it on trust.
+  const EXEMPT = new Set(["Base.astro"]);
+  const PAINTS_BG = /background-color:\s*var\(--bg\)/;
+
+  if (!PAINTS_BG.test(readFileSync(join(SRC, "styles", "global.css"), "utf8"))) {
+    fail("V7", "global.css no longer paints background-color: var(--bg) — the Base.astro exemption is void");
+  }
+
+  let carriers = 0;
+  for (const file of sourceFiles.filter((f) => f.endsWith(".astro"))) {
+    const src = stripComments(readFileSync(file, "utf8"));
+    if (!/data-system\s*=/.test(src)) continue;
+    carriers++;
+    if (EXEMPT.has(basename(file))) continue;
+    if (!PAINTS_BG.test(src)) {
+      fail("V7", `${rel(file)}  sets data-system but never declares background-color: var(--bg)`);
+    }
+  }
+  console.log(`  V7  system carriers   ${carriers} checked, all paint --bg`);
 }
 
 /* ---------- V4 — build output shape and weight ---------- */

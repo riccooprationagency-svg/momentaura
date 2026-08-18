@@ -53,6 +53,8 @@ five identical placeholder screens establish nothing further.
 | Capacity notice | No production figure and no cut-off date. Every number it would carry is unknown |
 | Dispatch ledger | Zero orders dispatched |
 | Testimonials | No reviews, and none until roughly twenty orders are complete |
+| Story block | No portrait and no copy. A bracketed stub is a visible absence where an omission is simply not a claim — the same rule the docket applies to its null fields |
+| Reveal description | Same reason. Describing how a garment feels before anyone has handled one would be inventing facts |
 
 Each arrives when its data does.
 

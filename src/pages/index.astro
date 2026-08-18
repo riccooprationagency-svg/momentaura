@@ -7,6 +7,8 @@
 //   capacity notice  no production figure, no cut-off date
 //   dispatch ledger  zero orders dispatched
 //   testimonials     no reviews, and none until roughly twenty orders
+//   story block      no portrait and no copy. A bracketed stub is a visible
+//                    absence; an omission is not a claim
 //
 // None of these is a slot, a comment or an empty element. Each arrives when its
 // data does. See BUILD-ORDER section 5.
@@ -62,36 +64,13 @@ const revealed = products.slice(0, 2);
   </div>
 
   <section class="wrap band">
-    <h2 class="section-heading">What we make</h2>
+    <h2 class="section-heading">What is made here</h2>
     <div class="tiles">
       {CATEGORIES.map((c) => <CategoryTile slug={c.slug} name={c.name} />)}
     </div>
   </section>
 
   {revealed.map((product) => <ProductReveal product={product} />)}
-
-  <section class="wrap band story">
-    <h2 class="section-heading">Who makes it</h2>
-    <div class="story__inner">
-      <div class="story__portrait">
-        <span class="photo-pending">[Portrait]</span>
-      </div>
-      <div class="story__copy">
-        <p class="prose">
-          [Name] runs MomentAura from [area], Nairobi. [One or two sentences on
-          why they started and what they do themselves.]
-        </p>
-        <p class="prose">
-          Garments come from [supplier]. Printing is done by [printer]. Every
-          order is packed by hand and dispatched from Nairobi.
-        </p>
-        <p class="story__note">
-          Bracketed text is a slot, not copy. It is filled in when the answer is
-          known and checkable, and the section does not ship with it visible.
-        </p>
-      </div>
-    </div>
-  </section>
 </Base>
 
 <style>
@@ -140,33 +119,4 @@ const revealed = products.slice(0, 2);
     grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
   }
 
-  .story__inner {
-    display: grid;
-    gap: var(--s-40);
-  }
-
-  .story__portrait {
-    max-width: var(--card-min);
-  }
-
-  .story__copy {
-    display: grid;
-    gap: var(--s-20);
-  }
-
-  .story__note {
-    font-family: var(--font-mono);
-    font-size: var(--t-docket);
-    line-height: var(--lh-docket);
-    letter-spacing: var(--tr-docket);
-    color: var(--fg-muted);
-  }
-
-  @media (min-width: 900px) {
-    .story__inner {
-      grid-template-columns: auto 1fr;
-      align-items: start;
-      gap: var(--s-56);
-    }
-  }
 </style>

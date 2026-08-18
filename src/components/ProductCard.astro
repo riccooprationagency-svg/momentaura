@@ -18,7 +18,7 @@ const soldOut = product.stock === 0;
   <a class="card__link" href={`/products/${product.slug}`}>
     {
       system === "light" ? (
-        <div class="photo-pending">{product.name}</div>
+        <div class="photo-pending" aria-hidden="true">{product.name}</div>
       ) : (
         <img
           class="card__photo"

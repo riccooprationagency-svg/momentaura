@@ -58,7 +58,7 @@ All live in `src/styles/tokens.css`. A raw hex or magic pixel value anywhere els
 --tissue-cream   #f6efe2   all text, borders on interactive elements
 --kraft-board    #3a2e1e   docket, capacity notice, filled button — only elevated solid
 --twine          #4a4034   hairlines, dashed dividers, docket borders
---sisal          #8f8371   docket field labels, muted text
+--sisal          #a89c88   docket field labels, muted text
 --foil-green     #2fbf8b   VERIFIABLE FACTS ONLY
 --seal           #8c3a24   sold out, run closed. At most once per page
 ```
@@ -86,8 +86,14 @@ constraint in this file.
 
 ### Contrast — verified, do not revert
 
-`--sisal` and `--foil-green` were corrected after failing WCAG AA against Kraft Board.
-Any new token gets computed against every surface it will sit on, not eyeballed.
+`--sisal`, `--foil-green` and `--kraft-deep` were each corrected after failing WCAG AA on
+the surface they actually sit on. `--sisal` took two passes: #7a6e5c to #8f8371 to
+#a89c88, because the first correction fixed `--foil-green` and left sisal at 3.56:1 on
+Kraft Board behind a comment claiming both were done. `--seal` is fill-only for the same
+reason — as text it fails on both grounds.
+
+Any new token gets computed against every surface it will sit on, not eyeballed, and
+`node scripts/contrast.mjs` reads the real values out of `tokens.css` to prove it.
 
 ---
 
@@ -278,7 +284,7 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   shipped at 1.5:1. Do not eyeball it
 - **Breakpoints are declared in the comment at the top of `tokens.css` and written
   literally in every `@media` query.** `var()` does not work in a media prelude, so a
-  breakpoint cannot be a token. There are two — 640px and 1100px. Read them there,
+  breakpoint cannot be a token. There are three — 640px, 900px and 1100px. Read them there,
   change them there and in the queries together. Media preludes are the one place a
   raw pixel value is expected
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one

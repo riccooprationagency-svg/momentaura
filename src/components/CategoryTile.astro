@@ -17,7 +17,7 @@ const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "ligh
 <a class="tile" href={`/shop/${slug}`} data-system={system}>
   {
     system === "light" ? (
-      <span class="photo-pending">{name}</span>
+      <span class="photo-pending" aria-hidden="true">{name}</span>
     ) : (
       <img src={photo} alt={name} width="600" height="800" loading="lazy" decoding="async" />
     )
@@ -30,6 +30,10 @@ const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "ligh
     display: grid;
     gap: var(--s-12);
     text-decoration: none;
+    /* Both, always. An element that sets data-system remaps --fg for its whole
+       subtree, so painting the text without painting the ground leaves light
+       ink on the dark canvas. */
+    background-color: var(--bg);
     color: var(--fg);
     border: 1px solid transparent;
     border-radius: var(--radius-surface);
