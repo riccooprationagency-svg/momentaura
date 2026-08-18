@@ -8,13 +8,27 @@
 //
 // If every field is null the component returns nothing at all, rather than an
 // empty kraft box announcing that we know nothing about the product.
+// The Seal fill on the Stock row is opt-in, via detail, and it defaults to OFF.
+//
+// The fill is reserved for the detail view, where a single product is under
+// examination. A homepage reveal is not that — it carries a "See the details"
+// button pointing at the page that is. Everywhere but that page the Stock row
+// reads --fg-muted mono, uppercase, no fill, the same as a card.
+//
+// The default is the load-bearing part, not the prop. It fails toward the muted
+// state the way tokens.css fails toward light and V7 fails toward requiring a
+// background: a surface that forgets to opt in renders quietly, never loudly. A
+// new page composing this component cannot accidentally spend the colour, and
+// spending it is unrecoverable — Seal means closed exactly as long as it is rare.
 import type { Product } from "../lib/products";
 
 interface Props {
   product: Product;
+  /** Render the closed stamp as a Seal fill. The product page only. */
+  detail?: boolean;
 }
 
-const { product } = Astro.props;
+const { product, detail = false } = Astro.props;
 
 // Fixed order regardless of which fields survive. The reader learns the shape.
 const FIELDS = [
@@ -47,7 +61,11 @@ const rows = FIELDS.filter((f) => f.value !== null && f.value !== undefined);
           <dt class="docket__label">{row.label}</dt>
           <dd class="docket__value">
             {row.closed ? (
-              <span class="stamp">Sold out</span>
+              detail ? (
+                <span class="stamp">Sold out</span>
+              ) : (
+                <span class="docket__value--closed">Sold out</span>
+              )
             ) : (
               <span class={row.fact ? "docket__value--fact" : undefined}>
                 {row.label === "Stock" ? `${row.value} in stock` : row.value}

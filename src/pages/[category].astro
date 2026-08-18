@@ -1,0 +1,91 @@
+---
+// One category, one grid. Browsing and choosing are a different job from
+// arriving, so this page drops the 100dvh reveal rhythm entirely: heading, one
+// line, then a straight grid the eye can scan in a single movement.
+//
+// Three pages, generated from the categories present in products.json. Not
+// scaffolded for six — watches and licensed panels left with the legal deletion,
+// and a page for a category holding nothing is a dead end with a nav link.
+//
+// No filter bar. Five products across three categories cannot be filtered into a
+// smaller set that is any easier to read than the grid already is, and a filter
+// over a nine-item grid is furniture. See BUILD-ORDER section 6.
+import Base from "../layouts/Base.astro";
+import ProductCard from "../components/ProductCard.astro";
+import { categories, productsIn, type Category, type Product } from "../lib/products";
+
+export function getStaticPaths() {
+  return categories.map((category) => ({
+    params: { category: category.slug },
+    props: { category, items: productsIn(category.slug) },
+  }));
+}
+
+interface Props {
+  category: Category;
+  items: Product[];
+}
+
+const { category, items } = Astro.props as Props;
+---
+
+<Base title={`${category.name} — MomentAura`} description={category.line}>
+  <div class="wrap page">
+    <header class="page__head">
+      <h1 class="page__heading">{category.name}</h1>
+      <p class="page__line">{category.line}</p>
+    </header>
+
+    <div class="grid">
+      {items.map((product) => <ProductCard product={product} />)}
+    </div>
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__head {
+    display: grid;
+    gap: var(--s-12);
+    margin-block-end: var(--s-56);
+  }
+
+  /* --t-heading, not --t-display. The display size is the arrival voice; a
+     category page is already inside the shop. */
+  .page__heading {
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+  }
+
+  .page__line {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  /* One across, two, then three. Declared at the breakpoints in tokens.css
+     rather than left to auto-fit: auto-fit reflows on the card minimum and gives
+     a different column count per category, and cards changing shape between
+     pages reads as instability. */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-40) var(--s-20);
+  }
+
+  @media (min-width: 640px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

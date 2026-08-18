@@ -31,17 +31,30 @@
   /* FILL ONLY, never text. Sold out, run closed, cut-off passed. As a text
      colour it is 2.57:1 on canvas and 1.73:1 on kraft-board — both fail. As a
      fill with Tissue Cream on top it is comfortable, and a closed run should
-     read as a stamp rather than as tinted text. At most once per page. */
+     read as a stamp rather than as tinted text.
+
+     Spent in one place: the docket's Stock row, and only when that docket is
+     rendering a detail view — Docket takes detail, defaulting off, and the
+     product page is its only caller. At most once per rendered page, which
+     verify.mjs V8b counts from dist/. Everywhere else closed status is
+     --fg-muted mono with no fill. */
   --seal: #8c3a24;
 
   /* ---------- LIGHT — products awaiting photography ---------- */
   --paper: #f7f5f0;
   --ink: #17181a;
-  --muted: #6b6e72;
+  /* Corrected — #6b6e72 was 3.32:1 on kraft. It passed on paper and was only
+     ever checked there, but the light-system docket puts it on kraft: --surface
+     resolves to kraft, and every docket label on the site is --fg-muted on it.
+     Now 4.78:1 on kraft, 6.78:1 on paper. Both asserted in contrast.mjs. */
+  --muted: #535659;
   --kraft: #d9cfbc;
   --kraft-deep: #5d5245; /* corrected — original #b5a894 failed AA on kraft at 1.5:1.
                             Label text on .photo-pending, its only sanctioned use. 4.9:1 */
-  --dispatch: #0f7a5a;
+  /* Corrected — #0f7a5a was 3.44:1 on kraft, the same missed surface as --muted
+     above. This is the light-system accent, so it sits on kraft on every docket
+     fact a buyer is meant to check. Now 4.76:1 on kraft, 6.75:1 on paper. */
+  --dispatch: #0c6248;
   --rule: #e2ded5;
 
   /* ---------- TYPE ---------- */
@@ -95,7 +108,16 @@
      target on apparel sites. */
   --tap-target: 44px;
 
-  /* Measure for the 26px prose voice. Longer lines lose the reader on a phone. */
+  /* Line length for any block of running text — the 26px prose voice and the
+     17px UI copy alike. Longer lines lose the reader on a phone.
+
+     Written for prose and now used at both sizes, which is honest rather than
+     sloppy: the value is in ch, so it caps characters per line and not pixels,
+     and characters per line is what readability actually turns on. It scales
+     with the type it constrains — 34ch is roughly 442px at --t-body and 289px at
+     --t-body-sm — so one token expresses the same rule at both. A second token
+     for UI copy would need a different ch count, and there is no evidence for
+     one; add it when a measured line proves it, not before. */
   --measure: 34ch;
 
   /* Narrowest a product card may get before the grid drops a column. Three

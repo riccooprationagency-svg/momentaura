@@ -16,15 +16,12 @@ import Base from "../layouts/Base.astro";
 import DispatchRule from "../components/DispatchRule.astro";
 import CategoryTile from "../components/CategoryTile.astro";
 import ProductReveal from "../components/ProductReveal.astro";
-import { products } from "../lib/products";
+import { categories, products } from "../lib/products";
 
-// The three categories that exist. Six was written for a catalogue that still
-// included watches and licensed panels, which the legal deletion removed.
-const CATEGORIES = [
-  { slug: "apparel", name: "Apparel" },
-  { slug: "personalised", name: "Personalised" },
-  { slug: "accessories", name: "Accessories" },
-];
+// The categories are derived from products.json in one place now, so the tiles
+// here and the pages they link to cannot drift apart. Three exist. Six was
+// written for a catalogue that still included watches and licensed panels, which
+// the legal deletion removed.
 
 // Two reveals, not five. Enough to establish the rhythm; five identical
 // placeholder screens would be five identical placeholder screens.
@@ -66,7 +63,7 @@ const revealed = products.slice(0, 2);
   <section class="wrap band">
     <h2 class="section-heading">What is made here</h2>
     <div class="tiles">
-      {CATEGORIES.map((c) => <CategoryTile slug={c.slug} name={c.name} />)}
+      {categories.map((c) => <CategoryTile slug={c.slug} name={c.name} />)}
     </div>
   </section>
 

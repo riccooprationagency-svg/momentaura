@@ -60,7 +60,7 @@ All live in `src/styles/tokens.css`. A raw hex or magic pixel value anywhere els
 --twine          #4a4034   hairlines, dashed dividers, docket borders
 --sisal          #a89c88   docket field labels, muted text
 --foil-green     #2fbf8b   VERIFIABLE FACTS ONLY
---seal           #8c3a24   sold out, run closed. At most once per page
+--seal           #8c3a24   sold out, run closed. Docket Stock row, detail view only
 ```
 
 ### Light — products without photography
@@ -68,9 +68,9 @@ All live in `src/styles/tokens.css`. A raw hex or magic pixel value anywhere els
 ```
 --paper          #f7f5f0   page ground
 --ink            #17181a   headings, body, prices
---muted          #6b6e72   secondary text
+--muted          #535659   secondary text
 --kraft          #d9cfbc   placeholder blocks, docket ground
---dispatch       #0f7a5a   accent, same rule as foil-green
+--dispatch       #0c6248   accent, same rule as foil-green
 --rule           #e2ded5   hairlines
 ```
 
@@ -92,8 +92,16 @@ the surface they actually sit on. `--sisal` took two passes: #7a6e5c to #8f8371 
 Kraft Board behind a comment claiming both were done. `--seal` is fill-only for the same
 reason — as text it fails on both grounds.
 
+`--muted` and `--dispatch` were corrected the same way, at 3.32:1 and 3.44:1 on `--kraft`.
+That is the light system's docket ground, so those two set every field label and every
+checkable fact on a site where every product still renders light. Neither pairing was in
+the table, which is why the miss reached four tokens rather than one.
+
 Any new token gets computed against every surface it will sit on, not eyeballed, and
 `node scripts/contrast.mjs` reads the real values out of `tokens.css` to prove it.
+Which surfaces those are is derived, not recalled: `verify.mjs` V9 computes the reachable
+set from the scope blocks at the foot of this file's token list and fails on any pairing
+missing a row. **Never add a token to a scope block without running both scripts.**
 
 ---
 
@@ -159,10 +167,59 @@ A divider with nothing to say is vertical space instead.
 Cream on top, 2px radius, mono at `--t-docket`, uppercase. Seal is never a text colour:
 it fails contrast on both grounds, and a closed run should read as stamped, not tinted.
 The product stays visible — visible sold-out history is evidence that other people
-bought. At most once per page.
+bought.
+
+**The stamp belongs to the docket. One per page, always.** The docket's Stock row is its
+only home: that is where a buyer looks for facts, and stating checkable status is the
+component's whole job. Everywhere else — cards, product page actions, listings — sold-out
+status is stated in **`--fg-muted` mono, uppercase, no fill**. Mono keeps it in the data
+register without spending the colour.
+
+**That wording covers short status labels, not sentences.** "Sold out" on a card, in a
+docket row, beside an action — those are data, and mono is the register for data. The line
+on a product page explaining that a product cannot be ordered is **prose, and prose is
+never set in mono**: it is Archivo at `--t-body-sm` in `--fg-muted`, which is what the
+typography rules above already require. A rule about labels must not be read as licence to
+mono-case a paragraph. No gate can tell these apart, so the distinction lives here.
+
+**And the docket only spends it in a detail view.** `Docket` takes `detail`, which defaults
+to **off**; the product page passes it and nothing else does. A homepage reveal is not a
+detail view — it carries a *See the details* button pointing at the page that is. The
+default is the load-bearing part, not the prop: it fails toward the muted state the way
+tokens fail toward light and V7 fails toward requiring a background, so a new surface
+composing `Docket` renders quietly rather than loudly. A component that forgets to opt in
+costs nothing; one that spends the colour by accident costs it everywhere.
+
+This is not a style preference. On a grid of three or nine sold-out cards the fills stop
+reading as exceptional and start reading as the page's colour scheme, and a second stamp
+80px below the first says the same thing twice. Both drain the one colour that means
+*closed*. Reserve the fill for the detail view, where a single product is under
+examination. Never hide the product to avoid the problem — say it in muted mono.
 
 **Buttons** — filled pill (Kraft Board fill, cream text) or ghost pill (transparent, 1px
 cream border). One filled button per section maximum.
+
+**Disabled** is `--fg-muted` text, **`--fg-muted` outline**, no fill, `cursor: not-allowed`,
+`aria-disabled`. Never the accent. Not `--border`: on paper that resolves to `--rule` at
+1.23:1, which leaves the control with no visible edge — and a disabled control that stops
+looking like a control defeats the whole reason for rendering it instead of hiding it.
+Three rules, all learned the hard way:
+
+- **Opacity is never how a disabled state is expressed.** Fading a filled pill halves the
+  contrast of its label against the ground, so the one state that most needs to be read
+  becomes the least readable on the page. Use a token measured against the surface it
+  sits on
+- **A disabled control is never an anchor.** An `<a href>` with `aria-disabled` still
+  navigates on click and on Enter. `pointer-events: none` hides that rather than fixing
+  it, and it suppresses the not-allowed cursor while leaving the keyboard path open. Drop
+  the href instead
+- **Set the full `border` shorthand, never `border-color` alone.** A variant that supplies
+  no border of its own would otherwise render the disabled state with no outline at all.
+  The state must not depend on another rule having got there first
+
+A disabled action is never removed from the page. A missing button leaves the buyer unsure
+whether the page is broken or the product unbuyable, and that ambiguity is the suspicion
+this whole system exists to reduce. Render it disabled and say why in one line.
 
 **Inputs** — underline only. 1px bottom border, no box, no fill. Focus adds a 2px Foil
 Green bottom border. The one place the accent touches an interactive element, and it is
@@ -277,19 +334,29 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   A page that imports only `global.css` gets both; a page that imports only `tokens.css`
   gets a stylesheet that builds clean and renders unstyled
 - **Any new or changed colour token requires `node scripts/contrast.mjs` to pass before
-  commit.** It reads `tokens.css` directly and asserts every specified pairing. Add a
-  row to its `PAIRINGS` table when a component puts a token on a surface it has not sat
-  on before. This rule failed twice on eyeballing — `--sisal` shipped at 3.56:1 on Kraft
-  Board behind a comment claiming it had been corrected, and `--kraft-deep` would have
-  shipped at 1.5:1. Do not eyeball it
+  commit.** It reads `tokens.css` directly and asserts every pairing in its `PAIRINGS`
+  table. Do not eyeball it. This rule failed four times on eyeballing — `--sisal` shipped
+  at 3.56:1 on Kraft Board behind a comment claiming it had been corrected, `--kraft-deep`
+  would have shipped at 1.5:1, and `--muted` and `--dispatch` sat at 3.32:1 and 3.44:1 on
+  kraft, which is where every docket on the site puts them
+- **You do not maintain the `PAIRINGS` table by remembering.** `verify.mjs` V9 derives the
+  reachable set from the scope blocks in `tokens.css` — every token resolving as `--fg`,
+  `--fg-muted` or `--accent` against every token resolving as `--bg` or `--surface` in the
+  same scope — and fails if any of them has no row. All four misses above were the same
+  miss: `--fg-muted` and `--accent` are scoped aliases, so one class puts them on two
+  grounds per system without either being named anywhere. Nothing in the docket says
+  "sisal on Kraft Board". Remap a semantic role, or add a system, and V9 tells you which
+  pairings you have just created
 - **Breakpoints are declared in the comment at the top of `tokens.css` and written
   literally in every `@media` query.** `var()` does not work in a media prelude, so a
   breakpoint cannot be a token. There are three — 640px, 900px and 1100px. Read them there,
   change them there and in the queries together. Media preludes are the one place a
   raw pixel value is expected
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
-  accent reference in the whole source tree, the banned-construct list, and page weight
-  against budget. Both scripts run on every commit via `.git/hooks/pre-commit`
+  accent reference in the whole source tree, the closed stamp contained to `Docket.astro`
+  and counted at no more than one Seal fill per built page, the `PAIRINGS` table complete
+  against the reachable set, the banned-construct list, and page weight against budget.
+  Both scripts run on every commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 

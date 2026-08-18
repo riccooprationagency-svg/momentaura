@@ -7,6 +7,11 @@
  *   V3  --accent referenced exactly once in the whole source tree
  *   V4  build output shape and page weight
  *   V6  banned constructs
+ *   V8  the closed stamp is contained to the docket
+ *   V8b at most one Seal fill on any rendered page
+ *   V9  every reachable text-on-surface pairing has a contrast.mjs row
+ *   V10 tag-specific attributes derive from the condition that picks the tag
+ *   V10b the rendered elements in dist/ carry only their own attributes
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -55,6 +60,18 @@ const walk = (dir) => walkAll(dir).filter((f) => SCANNED.has(extname(f)));
 const blank = (m) => m.replace(/[^\n]/g, " ");
 const stripComments = (s) =>
   s.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/<!--[\s\S]*?-->/g, blank);
+
+// Block comments plus // line comments. Any check that looks for a word rather
+// than a CSS property needs this: a frontmatter comment explaining that zero
+// stock renders as a stamp contains the word "stamp", and a gate that counts it
+// is a gate reporting a violation that is not there. A false positive is worse
+// than no check, because it trains people to ignore the thing.
+// The :// guard leaves URLs alone.
+const stripAllComments = (s) =>
+  stripComments(s)
+    .split(/\r?\n/)
+    .map((l) => (l.includes("://") ? l : l.replace(/\/\/.*$/, "")))
+    .join("\n");
 
 const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
 
@@ -136,15 +153,9 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
   const UNIT =
     /-?\d*\.?\d+(px|rem|em|ex|ch|%|vw|vh|dvh|svh|lvh|vmin|vmax|pt|pc|cm|mm|in|deg|rad|turn|ms|s|fr)(?![\w%])/gi;
 
-  const strip = (s) =>
-    stripComments(s)
-      .split(/\r?\n/)
-      .map((l) => (l.includes("://") ? l : l.replace(/\/\/.*$/, "")))
-      .join("\n");
-
   let hits = 0;
   for (const file of sourceFiles.filter((f) => !f.endsWith("dev-guards.css"))) {
-    strip(readFileSync(file, "utf8"))
+    stripAllComments(readFileSync(file, "utf8"))
       .split(/\r?\n/)
       .forEach((rawLine, i) => {
         if (FONT_METRIC.test(rawLine)) return;
@@ -268,6 +279,489 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     }
   }
   console.log(`  V7  system carriers   ${carriers} checked, all paint --bg`);
+}
+
+/* ---------- V8 — the closed stamp belongs to the docket ----------
+ *
+ * CLAUDE.md: the Seal fill renders in the docket's Stock row and nowhere else.
+ * Everywhere else — cards, product page actions, listings — sold-out status is
+ * --fg-muted mono with no fill.
+ *
+ * This is the same class of rule as V3 and it erodes the same way. Nothing fails
+ * when a second component reaches for .stamp: the build passes, the colour is a
+ * legitimate token, the page looks deliberate, and the only casualty is that
+ * Seal stops meaning closed. It cost a category page three fills and a product
+ * page four before anyone counted them.
+ *
+ * Containment in source. V8b below counts the fills per built page, which is the
+ * rule itself; this one keeps the class from spreading to a second component in
+ * the first place, where the fix is cheap and obvious rather than a page count
+ * someone has to trace back to a component.
+ */
+
+{
+  // Docket.astro is the only component that may apply the class. global.css is
+  // the stylesheet that defines it. Everything else in src/ is a stray —
+  // including .css and .ts, which an .astro-only scan walked straight past.
+  const HOME = "Docket.astro";
+  const DEFINES = "global.css";
+  const uses = [];
+
+  for (const file of sourceFiles) {
+    stripAllComments(readFileSync(file, "utf8"))
+      .split(/\r?\n/)
+      .forEach((line, i) => {
+        if (/\bstamp\b/.test(line)) uses.push({ file, line: i + 1 });
+      });
+  }
+
+  const strays = uses.filter((u) => ![HOME, DEFINES].includes(basename(u.file)));
+
+  if (!uses.some((u) => basename(u.file) === HOME)) {
+    fail("V8", `${HOME} no longer stamps its Stock row — the closed stamp has no home`);
+  }
+  if (!uses.some((u) => basename(u.file) === DEFINES)) {
+    fail("V8", `${DEFINES} no longer defines .stamp — the class the docket applies does not exist`);
+  }
+  for (const s of strays) {
+    fail("V8", `${rel(s.file)}:${s.line}  .stamp outside ${HOME}`);
+  }
+  if (strays.length) {
+    fail("V8", "  Sold-out status outside the docket is --fg-muted mono, uppercase, no");
+    fail("V8", "  fill. Nine fills on a grid read as the page's colour scheme rather");
+    fail("V8", "  than as an exception, which costs Seal the one thing it means.");
+  }
+
+  console.log(
+    `  V8  closed stamp      ${uses.length} reference(s) across ${sourceFiles.length} source files` +
+      `${strays.length === 0 ? `, ${HOME} and ${DEFINES} only` : `, ${strays.length} stray`}`
+  );
+}
+
+/* ---------- V8b — one Seal fill per rendered page ----------
+ *
+ * The check V8 defers to, and the one that actually states the rule: at most one
+ * Seal fill on any page a buyer can load. V8 constrains which component may spend
+ * the colour; only this one constrains how often it gets spent, because one
+ * component rendered three times spends it three times and source containment
+ * cannot see that.
+ *
+ * It is countable from dist/ and nowhere else. /apparel renders one component
+ * nine times, a product page renders two dockets and a grid of cards, and no
+ * amount of reading src/ tells you the totals. That is why this is measured, not
+ * reasoned about — the same reason V4 weighs the built pages instead of
+ * estimating them.
+ *
+ * Shippable only since Docket's fill became opt-in and defaulted off. Before
+ * that the homepage rendered two reveals, so two dockets, so two fills, and
+ * this gate would have shipped already failing.
+ */
+
+if (existsSync(DIST)) {
+  // The class attribute, not the bare word: a class list carrying stamp counts,
+  // and a page that merely says "stamp" in prose does not.
+  const FILL = /class="[^"]*\bstamp\b[^"]*"/g;
+
+  let total = 0;
+  let worst = 0;
+  const over = [];
+
+  for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+    const fills = [...readFileSync(page, "utf8").matchAll(FILL)].length;
+    total += fills;
+    worst = Math.max(worst, fills);
+    if (fills > 1) over.push(`${rel(page)}  ${fills} Seal fills on one page`);
+  }
+
+  for (const o of over) fail("V8b", o);
+  if (over.length) {
+    fail("V8b", "  Seal means closed exactly as long as it is rare. Pass detail only");
+    fail("V8b", "  where a single product is under examination; every other surface");
+    fail("V8b", "  reads the Stock row as --fg-muted mono with no fill.");
+  }
+
+  console.log(`  V8b Seal fills        ${total} across the site, ${worst} the most on any page (max 1)`);
+} else {
+  notes.push("dist/ absent — V8b not counted. Run npm run build.");
+}
+
+/* ---------- V9 — the pairings table is complete ----------
+ *
+ * Numbered V9 because V8 is the closed-stamp check above.
+ *
+ * Every token that resolves as --fg, --fg-muted or --accent must have a row in
+ * contrast.mjs against every token that can resolve as --bg or --surface in the
+ * same scope. Not the pairings someone remembered to add — the pairings the
+ * scoping in tokens.css makes reachable.
+ *
+ * Four tokens have now failed on a surface nobody thought to check: --sisal on
+ * Kraft Board, --kraft-deep on kraft, and --muted and --dispatch on kraft. That
+ * is not four oversights, it is one gap in the table, and it is the wrong shape
+ * of thing to fix four times. contrast.mjs proves the listed pairings pass; this
+ * proves the list is the right list.
+ *
+ * The mechanism the misses share: --fg-muted and --accent are scoped aliases, so
+ * one class puts them on two grounds per system without naming either. Nothing
+ * in the component says "sisal on kraft board" — the docket says --fg-muted on
+ * --surface, and which surface that is depends on where it renders. So the
+ * reachable set has to be derived from the scope blocks, never enumerated by
+ * hand, because enumerating by hand is the failure.
+ *
+ * Borders are excluded on purpose. --border is not text, and WCAG's non-text
+ * 3:1 does not apply to the hairlines here — a docket edge is not a control
+ * boundary, and a disabled control is explicitly exempt.
+ */
+
+{
+  const TEXT_ROLES = ["fg", "fg-muted", "accent"];
+  const SURFACE_ROLES = ["bg", "surface"];
+
+  const tokensSrc = stripComments(readFileSync(TOKENS, "utf8"));
+  const contrastPath = join(ROOT, "scripts", "contrast.mjs");
+  const contrastSrc = stripComments(readFileSync(contrastPath, "utf8"));
+
+  // Every block opened by `selector {`, sliced to its matching close brace so a
+  // :root nested inside an @media is read as the :root scope it is.
+  const blocksFor = (pattern) => {
+    const out = [];
+    const re = new RegExp(`${pattern}\\s*\\{`, "g");
+    let m;
+    while ((m = re.exec(tokensSrc))) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      const start = i;
+      while (i < tokensSrc.length && depth > 0) {
+        if (tokensSrc[i] === "{") depth++;
+        else if (tokensSrc[i] === "}") depth--;
+        i++;
+      }
+      out.push(tokensSrc.slice(start, i - 1));
+    }
+    return out;
+  };
+
+  // Only `--role: var(--token)` counts. The palette block assigns raw hex, which
+  // is a definition rather than a mapping, and must not be read as one.
+  const mapping = (label, pattern) => {
+    const roles = {};
+    const blocks = blocksFor(pattern);
+    for (const block of blocks) {
+      for (const [, role, token] of block.matchAll(/--([a-z-]+)\s*:\s*var\(\s*--([a-z0-9-]+)\s*\)/g)) {
+        roles[role] = token;
+      }
+    }
+    return { label, roles, present: blocks.length > 0 };
+  };
+
+  const scopes = [
+    // Bare :root is the fail-safe light system, not a theoretical scope. An
+    // element that never receives data-system renders from it, so its pairings
+    // are as reachable as either explicit system's.
+    mapping(":root", ":root"),
+    mapping('[data-system="dark"]', '\\[data-system="dark"\\]'),
+    mapping('[data-system="light"]', '\\[data-system="light"\\]'),
+  ];
+
+  // The table, read out of contrast.mjs rather than restated here. Only the two
+  // token names of each row matter; the ratio is contrast.mjs's job.
+  const pairingsBlock = contrastSrc.match(/const PAIRINGS\s*=\s*\[([\s\S]*?)\n\];/);
+  const have = new Set();
+  let rowsSeen = 0;
+
+  if (!pairingsBlock) {
+    fail("V9", `could not find the PAIRINGS table in ${rel(contrastPath)} — this check is blind`);
+  } else {
+    rowsSeen = [...pairingsBlock[1].matchAll(/\[\s*"/g)].length;
+    const parsed = [...pairingsBlock[1].matchAll(/\[\s*"([a-z0-9-]+)"\s*,\s*"([a-z0-9-]+)"/g)];
+    for (const [, fg, bg] of parsed) have.add(`${fg} on ${bg}`);
+    // A regex that silently stops matching turns this into a check that passes
+    // because it found nothing. Count the rows two ways and compare.
+    if (parsed.length !== rowsSeen) {
+      fail("V9", `parsed ${parsed.length} of ${rowsSeen} PAIRINGS rows — the parser lost rows, fix it before trusting this`);
+    }
+  }
+
+  // Distinct pairings. :root and [data-system="light"] map the same six tokens,
+  // deliberately — light is the fail-safe — so counting both would overstate.
+  const required = new Set();
+  const missing = new Map();
+
+  for (const { label, roles, present } of scopes) {
+    const texts = TEXT_ROLES.filter((r) => roles[r]);
+    const surfaces = SURFACE_ROLES.filter((r) => roles[r]);
+
+    // A scope that exists but yields nothing is this check going quietly blind
+    // on that scope — the selector was renamed, or the roles were, and the
+    // derivation silently narrowed instead of failing. Cheap to assert, and the
+    // failure it prevents is the whole point of deriving rather than listing.
+    if (present && (!texts.length || !surfaces.length)) {
+      fail("V9", `${label} is declared in tokens.css but yields no pairing`);
+      fail("V9", `  text roles found: ${texts.join(", ") || "none"} — ground roles: ${surfaces.join(", ") || "none"}`);
+      fail("V9", `  A scope this check cannot read is a scope it is not checking.`);
+      continue;
+    }
+    if (!present) continue;
+
+    for (const textRole of texts) {
+      for (const surfaceRole of surfaces) {
+        const key = `${roles[textRole]} on ${roles[surfaceRole]}`;
+        required.add(key);
+        if (!have.has(key) && !missing.has(key)) {
+          missing.set(key, `--${textRole} on --${surfaceRole} in ${label}`);
+        }
+      }
+    }
+  }
+
+  if (!required.size) {
+    fail("V9", "derived no pairings from tokens.css — the scope blocks moved and this check is blind");
+  }
+
+  for (const [key, where] of missing) {
+    fail("V9", `${key} is reachable and has no PAIRINGS row — ${where}`);
+  }
+  if (missing.size) {
+    fail("V9", "  Add the row to scripts/contrast.mjs and let it compute the ratio.");
+    fail("V9", "  If it fails, correct the token against every surface it sits on.");
+  }
+
+  console.log(
+    `  V9  pairings table    ${required.size} reachable, ${rowsSeen} listed, ${missing.size} unchecked`
+  );
+}
+
+/* ---------- V10 — tag-specific attributes follow the tag ----------
+ *
+ * A component that picks its own element must derive every attribute belonging
+ * to that element from the same condition. Button.astro picked the tag on
+ * `href && !disabled` and then emitted `href` unconditionally with `type` keyed
+ * off `href`, so <Button href disabled> rendered <button href> with no type —
+ * and a button with no type defaults to submit.
+ *
+ * Nothing was broken, because no caller passed both. That is exactly why this is
+ * a source check and not only a built-output one: the defect was in the
+ * contract, not in any rendered page, and a dist scan would have sat green over
+ * it until step 7 put a button inside a form. V10b below scans dist anyway,
+ * because source containment cannot see what a future component renders. Neither
+ * half is sufficient alone — the same shape as V8 and V8b.
+ *
+ * The condition must be a bare identifier. `const Tag = a && !b ? "a" : "button"`
+ * is unparseable against an attribute expression without an AST, so the rule is
+ * that you name it. Naming it is also what makes the guard legible at each
+ * attribute, which is the actual fix.
+ */
+
+{
+  // Attributes that mean something on one of these elements and not the other.
+  const TAG_SPECIFIC = ["href", "target", "rel", "download", "type"];
+
+  const openingTag = (src, name) => {
+    const start = src.indexOf(`<${name}`);
+    if (start < 0) return null;
+    let depth = 0;
+    for (let i = start; i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}") depth--;
+      else if (src[i] === ">" && depth === 0) return src.slice(start, i + 1);
+    }
+    return null;
+  };
+
+  // name -> raw expression, brace-balanced so a ternary inside an attribute is
+  // read whole rather than truncated at its first closing brace.
+  const attrsOf = (open) => {
+    const out = {};
+    const re = /([a-zA-Z:-]+)=\{/g;
+    let m;
+    while ((m = re.exec(open))) {
+      let depth = 1;
+      let i = re.lastIndex;
+      while (i < open.length && depth > 0) {
+        if (open[i] === "{") depth++;
+        else if (open[i] === "}") depth--;
+        i++;
+      }
+      out[m[1]] = open.slice(re.lastIndex, i - 1);
+      re.lastIndex = i;
+    }
+    return out;
+  };
+
+  let components = 0;
+  let guarded = 0;
+
+  for (const file of sourceFiles.filter((f) => f.endsWith(".astro"))) {
+    const src = stripAllComments(readFileSync(file, "utf8"));
+    const decl = /const\s+([A-Z][\w$]*)\s*=\s*([^;]*?)\s*\?\s*"([a-z]+)"\s*:\s*"([a-z]+)"\s*;/g;
+    let m;
+
+    while ((m = decl.exec(src))) {
+      const [, name, rawCond, tagA, tagB] = m;
+      components++;
+      const guard = rawCond.trim();
+
+      if (!/^[A-Za-z_$][\w$]*$/.test(guard)) {
+        fail("V10", `${rel(file)}  ${name} picks <${tagA}> or <${tagB}> on an inline condition: ${guard}`);
+        fail("V10", `  Extract it to a named const and guard each tag-specific attribute with it.`);
+        fail("V10", `  An inline condition cannot be matched against an attribute expression here.`);
+        continue;
+      }
+
+      const open = openingTag(src, name);
+      if (!open) {
+        fail("V10", `${rel(file)}  ${name} is declared as a conditional tag but never rendered`);
+        continue;
+      }
+
+      const attrs = attrsOf(open);
+      const word = new RegExp(`\\b${guard}\\b`);
+
+      for (const attr of TAG_SPECIFIC) {
+        if (!(attr in attrs)) continue;
+        if (!word.test(attrs[attr])) {
+          fail("V10", `${rel(file)}  <${name}> emits ${attr}={${attrs[attr]}} without consulting ${guard}`);
+          fail("V10", `  ${attr} belongs to one of <${tagA}>/<${tagB}>. Derive it from ${guard}, not from a prop.`);
+        }
+      }
+
+      // A <button> with no type attribute defaults to submit. If either branch
+      // renders one, the attribute has to be there.
+      if ((tagA === "button" || tagB === "button") && !("type" in attrs)) {
+        fail("V10", `${rel(file)}  <${name}> can render a <button> and never emits type — an omitted type defaults to submit`);
+      }
+
+      guarded++;
+    }
+  }
+
+  // Counted from clean passes, not from the loop reaching the end — a summary
+  // line that reads "all guarded" while failures are queued below it is the
+  // report lying about its own result.
+  const clean = components === guarded && !failures.some((f) => f.startsWith("V10 "));
+  console.log(
+    `  V10 tag attributes    ${components} conditional-tag component(s)${clean ? ", all guarded" : `, ${components - guarded || "some"} unguarded`}`
+  );
+}
+
+/* ---------- V10b — the rendered elements agree ----------
+ *
+ * What actually reached the browser. V10 constrains the components in src/;
+ * this constrains every element in dist/, including ones written straight into
+ * a page without going through a component.
+ */
+
+if (existsSync(DIST)) {
+  const ANCHOR_ONLY = ["href", "target", "rel", "download"];
+  let buttons = 0;
+  let anchors = 0;
+
+  for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+    const html = readFileSync(page, "utf8");
+
+    for (const [tag] of html.matchAll(/<button\b[^>]*>/g)) {
+      buttons++;
+      for (const attr of ANCHOR_ONLY) {
+        if (new RegExp(`\\s${attr}[=\\s>]`).test(tag)) {
+          fail("V10b", `${rel(page)}  <button> carries ${attr} — that attribute belongs to an anchor`);
+        }
+      }
+      if (!/\stype[=\s>]/.test(tag)) {
+        fail("V10b", `${rel(page)}  <button> with no type — an omitted type defaults to submit`);
+      }
+    }
+
+    for (const [tag] of html.matchAll(/<a\b[^>]*>/g)) {
+      anchors++;
+      if (/\stype[=\s>]/.test(tag)) {
+        fail("V10b", `${rel(page)}  <a> carries type — that attribute belongs to a button`);
+      }
+    }
+  }
+
+  const bad = failures.filter((f) => f.startsWith("V10b ")).length;
+  console.log(
+    `  V10b rendered tags    ${buttons} button(s), ${anchors} anchor(s), ${bad === 0 ? "attributes agree" : `${bad} mismatched`}`
+  );
+} else {
+  notes.push("dist/ absent — V10b not counted. Run npm run build.");
+}
+
+/* ---------- V11 — CLAUDE.md's palette matches tokens.css ----------
+ *
+ * CLAUDE.md prints the palette as a table of token names and hex values, and it
+ * is the file every session is told to read first. When a token is corrected in
+ * tokens.css and the table is not, the authoritative document states a colour
+ * the source contradicts — and it stated two: --muted and --dispatch sat at
+ * their pre-correction values while the real ones had already shipped.
+ *
+ * That is the exact failure CLAUDE.md documents twice in its own contrast
+ * section, reproduced in the document doing the documenting. The only reason it
+ * survived is that every gate here reads code and none read markdown.
+ *
+ * One direction only. Everything the table claims must be true; tokens.css is
+ * free to hold tokens the table does not print, because it holds type, space and
+ * structure tokens that are not palette entries.
+ *
+ * WHERE THIS COVERAGE ENDS, and it ends early.
+ *
+ * This reads hex values in the palette tables. Nothing else. Every prose claim
+ * CLAUDE.md makes about a token is unchecked: which token a component uses, what
+ * a rule is for, which surface something sits on, what the disabled state is
+ * outlined in. Those are the sentences that go stale, and both drifts found so
+ * far were found by review rather than by a gate — the palette hexes, and then
+ * the Buttons spec still saying the disabled outline was --border after the code
+ * had moved to --fg-muted.
+ *
+ * Do not extend this into a prose checker. Deciding whether a sentence about a
+ * token still describes the code needs judgement about what the sentence means,
+ * and a gate that guesses at meaning produces confident wrong answers and then
+ * gets muted — which costs more than the checking is worth. The hex table is
+ * mechanical and therefore checkable; the prose around it is not, and stays a
+ * job for whoever reads the diff.
+ */
+
+{
+  const paletteOf = (source) => {
+    const out = {};
+    for (const [, name, hex] of stripComments(source).matchAll(
+      /--([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g
+    )) {
+      out[name] = hex.toLowerCase();
+    }
+    return out;
+  };
+
+  const tokens = paletteOf(readFileSync(TOKENS, "utf8"));
+  const doc = readFileSync(join(ROOT, "CLAUDE.md"), "utf8");
+
+  // Table rows read `--token-name   #hex   description`, one per line.
+  const claims = [...doc.matchAll(/^--([a-z0-9-]+)\s+(#[0-9a-fA-F]{3,8})\b/gm)];
+
+  if (claims.length === 0) {
+    fail("V11", "no palette rows found in CLAUDE.md — the table moved and this check is blind");
+  }
+
+  let mismatched = 0;
+  for (const [, name, claimed] of claims) {
+    const actual = tokens[name];
+    if (!actual) {
+      mismatched++;
+      fail("V11", `CLAUDE.md documents --${name}, which tokens.css does not define`);
+      continue;
+    }
+    if (actual !== claimed.toLowerCase()) {
+      mismatched++;
+      fail("V11", `CLAUDE.md says --${name} is ${claimed}, tokens.css says ${actual}`);
+    }
+  }
+  if (mismatched) {
+    fail("V11", "  Correct the table. It is the file every session reads first, and a");
+    fail("V11", "  palette it prints wrongly is worse than one it does not print at all.");
+  }
+
+  console.log(
+    `  V11 documented hexes  ${claims.length} row(s) in CLAUDE.md, ${mismatched === 0 ? "all match tokens.css" : `${mismatched} wrong`}`
+  );
 }
 
 /* ---------- V4 — build output shape and weight ---------- */
