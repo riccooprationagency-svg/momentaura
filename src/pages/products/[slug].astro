@@ -108,7 +108,9 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
              has handled one would be inventing facts. -->
         {product.description && <p class="prose detail__prose">{product.description}</p>}
 
-        <Docket product={product} />
+        <!-- detail — the one place the Seal fill is spent. Every other surface
+             composing Docket leaves it off by default. -->
+        <Docket product={product} detail />
 
         <!--
           The out-of-stock ruling. The button renders disabled, never absent.

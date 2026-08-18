@@ -175,6 +175,14 @@ component's whole job. Everywhere else — cards, product page actions, listings
 status is stated in **`--fg-muted` mono, uppercase, no fill**. Mono keeps it in the data
 register without spending the colour.
 
+**And the docket only spends it in a detail view.** `Docket` takes `detail`, which defaults
+to **off**; the product page passes it and nothing else does. A homepage reveal is not a
+detail view — it carries a *See the details* button pointing at the page that is. The
+default is the load-bearing part, not the prop: it fails toward the muted state the way
+tokens fail toward light and V7 fails toward requiring a background, so a new surface
+composing `Docket` renders quietly rather than loudly. A component that forgets to opt in
+costs nothing; one that spends the colour by accident costs it everywhere.
+
 This is not a style preference. On a grid of three or nine sold-out cards the fills stop
 reading as exceptional and start reading as the page's colour scheme, and a second stamp
 80px below the first says the same thing twice. Both drain the one colour that means
@@ -332,9 +340,10 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   change them there and in the queries together. Media preludes are the one place a
   raw pixel value is expected
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
-  accent reference in the whole source tree, the closed stamp contained to `Docket.astro`,
-  the `PAIRINGS` table complete against the reachable set, the banned-construct list, and
-  page weight against budget. Both scripts run on every commit via `.git/hooks/pre-commit`
+  accent reference in the whole source tree, the closed stamp contained to `Docket.astro`
+  and counted at no more than one Seal fill per built page, the `PAIRINGS` table complete
+  against the reachable set, the banned-construct list, and page weight against budget.
+  Both scripts run on every commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 

@@ -8,6 +8,7 @@
  *   V4  build output shape and page weight
  *   V6  banned constructs
  *   V8  the closed stamp is contained to the docket
+ *   V8b at most one Seal fill on any rendered page
  *   V9  every reachable text-on-surface pairing has a contrast.mjs row
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
@@ -290,10 +291,10 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
  * Seal stops meaning closed. It cost a category page three fills and a product
  * page four before anyone counted them.
  *
- * Containment in source, not a count per built page. The stronger check is one
- * stamp per rendered page, and it is not here yet because the homepage renders
- * two product reveals and therefore two dockets — see BUILD-ORDER section 6. Add
- * it once that is ruled on rather than shipping a gate that is already failing.
+ * Containment in source. V8b below counts the fills per built page, which is the
+ * rule itself; this one keeps the class from spreading to a second component in
+ * the first place, where the fix is cheap and obvious rather than a page count
+ * someone has to trace back to a component.
  */
 
 {
@@ -325,6 +326,53 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
   console.log(
     `  V8  closed stamp      ${uses.length} use(s)${strays.length === 0 ? `, ${HOME} only` : `, ${strays.length} outside ${HOME}`}`
   );
+}
+
+/* ---------- V8b — one Seal fill per rendered page ----------
+ *
+ * The check V8 defers to, and the one that actually states the rule: at most one
+ * Seal fill on any page a buyer can load. V8 constrains which component may spend
+ * the colour; only this one constrains how often it gets spent, because one
+ * component rendered three times spends it three times and source containment
+ * cannot see that.
+ *
+ * It is countable from dist/ and nowhere else. /apparel renders one component
+ * nine times, a product page renders two dockets and a grid of cards, and no
+ * amount of reading src/ tells you the totals. That is why this is measured, not
+ * reasoned about — the same reason V4 weighs the built pages instead of
+ * estimating them.
+ *
+ * Shippable only since Docket's fill became opt-in and defaulted off. Before
+ * that the homepage rendered two reveals, so two dockets, so two fills, and
+ * this gate would have shipped already failing.
+ */
+
+if (existsSync(DIST)) {
+  // The class attribute, not the bare word: a class list carrying stamp counts,
+  // and a page that merely says "stamp" in prose does not.
+  const FILL = /class="[^"]*\bstamp\b[^"]*"/g;
+
+  let total = 0;
+  let worst = 0;
+  const over = [];
+
+  for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+    const fills = [...readFileSync(page, "utf8").matchAll(FILL)].length;
+    total += fills;
+    worst = Math.max(worst, fills);
+    if (fills > 1) over.push(`${rel(page)}  ${fills} Seal fills on one page`);
+  }
+
+  for (const o of over) fail("V8b", o);
+  if (over.length) {
+    fail("V8b", "  Seal means closed exactly as long as it is rare. Pass detail only");
+    fail("V8b", "  where a single product is under examination; every other surface");
+    fail("V8b", "  reads the Stock row as --fg-muted mono with no fill.");
+  }
+
+  console.log(`  V8b Seal fills        ${total} across the site, ${worst} the most on any page (max 1)`);
+} else {
+  notes.push("dist/ absent — V8b not counted. Run npm run build.");
 }
 
 /* ---------- V9 — the pairings table is complete ----------

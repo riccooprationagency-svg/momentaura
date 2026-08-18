@@ -303,6 +303,15 @@ a {
   color: var(--accent);
 }
 
+/* Closed, without the fill. What the Stock row reads on every surface except the
+   product page: the docket is already mono at --t-docket with docket tracking, so
+   this is colour and case only. Zero stock is a fact either way — the fill is the
+   emphasis, and emphasis belongs to the detail view. See Docket.astro. */
+.docket__value--closed {
+  color: var(--fg-muted);
+  text-transform: uppercase;
+}
+
 /* Honest placeholder for a product with no real photograph.
 
    Reads as a blank dispatch label, not a broken image: kraft ground, the product
@@ -333,13 +342,17 @@ a {
    closed run should read as stamped rather than tinted. The product stays
    visible — visible sold-out history is evidence that other people bought.
 
-   THIS CLASS BELONGS TO THE DOCKET'S STOCK ROW AND NOWHERE ELSE. One per page,
-   always. Everywhere else — cards, product page actions, listings — sold-out
-   status is --fg-muted mono, uppercase, no fill. Nine fills on a grid read as
-   the page's colour scheme rather than as an exception, and a second fill 80px
-   below the first says the same thing twice. Either one drains the only colour
-   that means closed. If you are reaching for this class outside Docket.astro,
-   the answer is muted mono. */
+   THIS CLASS BELONGS TO THE DOCKET'S STOCK ROW AND NOWHERE ELSE, and only when
+   that docket is rendering a detail view — Docket takes detail, defaulting off,
+   and the product page is the only caller that passes it. One per page, always.
+
+   Everywhere else — cards, product page actions, listings, homepage reveals —
+   sold-out status is --fg-muted mono, uppercase, no fill, via
+   .docket__value--closed above. Nine fills on a grid read as the page's colour
+   scheme rather than as an exception, and a second fill 80px below the first
+   says the same thing twice. Either one drains the only colour that means
+   closed. If you are reaching for this class outside Docket.astro, the answer is
+   muted mono. verify.mjs V8 and V8b enforce both halves. */
 .stamp {
   display: inline-block;
   background-color: var(--seal);

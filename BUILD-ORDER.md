@@ -114,21 +114,30 @@ while `/products/crew-tee` rendered four, two of them 80px apart. The ruling:
 | Product page action | No stamp. The disabled button under a stamped docket already says it twice; a third instance is the redundancy that drains the colour. The one line naming the product stays, as plain `--fg-muted` text |
 | `ProductCard` | "Sold out" in `--fg-muted` mono, no fill. On a grid of three or nine, Seal fills stop reading as exceptional and start reading as the page's colour scheme |
 
-Counted after the change: category pages 0, product pages 1, homepage 2. CLAUDE.md's
-Closed stamp spec now states this, and `verify.mjs` V8 contains the class to
-`Docket.astro` — the rule erodes exactly the way the accent rule does, silently and with
-every gate still green.
+**And the docket only spends the fill in a detail view.** `Docket` takes `detail`,
+defaulting to **off**. The product page passes it; the homepage reveal does not, because a
+reveal is not a detail view — it carries a *See the details* button pointing at the page
+that is. Its Stock row reads `--fg-muted` mono via `.docket__value--closed`, the same as a
+card.
 
-**STILL OPEN — the homepage renders two.** `index.astro` composes two `ProductReveal`
-sections, each with its own docket, each product `stock: 0`. That is two Seal fills on one
-page, so "one per page, always" does not yet hold there. It is a step 5 surface and the fix
-is a design decision, so it is flagged rather than taken:
+The default is the load-bearing part, not the prop. It fails toward the muted state the way
+`tokens.css` fails toward light and V7 fails toward requiring a background: a surface that
+forgets to opt in renders quietly, never loudly. Forgetting costs nothing; spending the
+colour by accident costs it everywhere.
 
-- the ruling reserves the fill for "the detail view, where a single product is under examination", and a homepage reveal is not that — it carries a *See the details* button pointing at the page that is. By that reasoning the reveal's docket should read muted mono, which means `Docket` gains a `detail` prop defaulting to **off**, so it fails toward the muted state the way `tokens.css` fails toward light
-- or the homepage drops to one reveal, which changes the rhythm section 5 chose deliberately
+The homepage keeps both reveals. Step 5 chose two deliberately — enough to establish the
+rhythm without five identical placeholder screens — and changing a layout decision to
+satisfy a colour rule is the wrong direction of fit.
 
-The stronger gate — one stamp per *rendered* page, not just one component using the class —
-goes in once this is settled. Shipping it now would ship a failing gate.
+**Counted from `dist/` after the change: homepage 0, category pages 0, product pages 1.**
+
+Both halves are now gated. `verify.mjs` **V8** contains the class to `Docket.astro`, which
+keeps it from spreading to a second component where the fix is cheap. **V8b** counts Seal
+fills per built page and fails above one, which is the rule itself — one component rendered
+three times spends the colour three times, and source containment cannot see that. It is
+countable from `dist/` and nowhere else: `/apparel` renders one component nine times, so no
+amount of reading `src/` gives you the totals. Negative-tested by passing `detail` from
+`ProductReveal`, which reports `dist/index.html  2 Seal fills on one page`.
 
 **Two contrast failures found and corrected.** `--muted` was 3.32:1 and `--dispatch`
 3.44:1 on `--kraft`. Both are live on every docket on the site: in the light system
