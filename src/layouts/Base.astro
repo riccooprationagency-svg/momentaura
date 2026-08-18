@@ -24,8 +24,18 @@ const path = Astro.url.pathname;
 const isCurrent = (href: string) =>
   href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
 
+// Shop is gone. It was a placeholder for a listing page that no longer exists in
+// the plan — every other dead link here is scheduled in BUILD-ORDER section 10,
+// and /shop was scheduled nowhere. Categories are reached from the homepage
+// tiles, which is what EXPERIENCE stage 3 specifies, and a nav link to a page
+// nobody intends to build is worse than one fewer link.
+//
+// It also cost aria-current: with category pages at the root, isCurrent("/shop")
+// could never match a category or product URL, so the nav marked nothing as the
+// current section. Two links plus the order count is a defensible nav for a
+// five-product store. Revisit past roughly twenty products, when a real /shop
+// listing earns its place.
 const NAV = [
-  { href: "/shop", label: "Shop" },
   { href: "/delivery", label: "Delivery" },
   { href: "/contact", label: "Contact" },
 ];
