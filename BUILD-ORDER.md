@@ -169,6 +169,35 @@ with the first true lead time.
 
 `src/pages/components.astro` deleted. Its own header said step 6 replaced it.
 
+**Reviewed, and what the review found.** Devin raised two, both real, both mine: `Button`
+derived its attributes from `href` while picking its tag from `href && !disabled`, so
+`<Button href disabled>` rendered `<button href>` with no `type` — and a button with no
+type defaults to submit; and `/shop` in the nav pointed at a page scheduled by no step.
+Both fixed. `verify.mjs` **V10** now asserts that a component picking its tag conditionally
+derives every tag-specific attribute from the same named condition, and **V10b** asserts
+the rendered elements in `dist/` carry only their own attributes. A dist check alone would
+have stayed green over the original bug, because no caller rendered the broken combination.
+
+Four areas were checked by hand afterwards, by construction rather than by reading:
+
+| Area | Finding |
+|---|---|
+| `Docket` field combinations | Holds across all seven, including only `Stock` surviving at zero, at one and at twelve, and everything null including stock, which renders nothing. A one-row docket reads as a small fact card, not as a mistake |
+| Docket with full data | **Three of six rows render in the accent** — lead time, dispatch and stock are each permitted, so this is within the rule, but a half-green docket is the same dilution the Seal fill had. Invisible today at one or two rows. Look again when the first product carries real data |
+| `CATEGORY_COPY` failure | Fails during `getStaticPaths`, exit code 1, **zero pages written** — no partial site can ship. The message names the offending category, both files and the fix. The stack trace points into bundled output, so the message carrying the source path is what makes it actionable |
+| Disabled button | `<button type="button">`, `aria-disabled`, no native `disabled`, `tabIndex` 0, and it **took focus when asked** — reachable and announceable, which was the intent. Accessible name "Add to order" from contents, nothing overriding it |
+| `aria-hidden` placeholders | Correct. Removed from the tree, **zero focusable descendants** — the trap this attribute usually creates is absent — and the product name is carried by the `h1` and the card `h3`, so nothing is lost |
+
+**OPEN — the disabled button states no reason to a screen reader.** The line explaining why
+it cannot be ordered is a sibling `<p>` with no association to the control. Tabbing between
+controls gives "Add to order, unavailable" and no cause. `aria-describedby` pointing at
+`.detail__closed` would carry the reason with the control.
+
+**UNVERIFIED — narrow widths.** The two-column product page and both grids have never been
+seen below 1242px. The rules were read out of built CSS, which has twice proved a weaker
+signal than looking, and the browser extension cannot resize this window. This needs the
+real phone on Safaricom data that this file already requires before deploy.
+
 **Check:** measured, not estimated. Category page 3,662 bytes gzipped, product page 4,514,
 plus 75,332 bytes of fonts shared across the site. Zero JS, zero images. Both page types
 land near 80KB on a cold first view against a 1MB budget.

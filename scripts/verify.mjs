@@ -10,6 +10,8 @@
  *   V8  the closed stamp is contained to the docket
  *   V8b at most one Seal fill on any rendered page
  *   V9  every reachable text-on-surface pairing has a contrast.mjs row
+ *   V10 tag-specific attributes derive from the condition that picks the tag
+ *   V10b the rendered elements in dist/ carry only their own attributes
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -510,6 +512,162 @@ if (existsSync(DIST)) {
   console.log(
     `  V9  pairings table    ${required.size} reachable, ${rowsSeen} listed, ${missing.size} unchecked`
   );
+}
+
+/* ---------- V10 — tag-specific attributes follow the tag ----------
+ *
+ * A component that picks its own element must derive every attribute belonging
+ * to that element from the same condition. Button.astro picked the tag on
+ * `href && !disabled` and then emitted `href` unconditionally with `type` keyed
+ * off `href`, so <Button href disabled> rendered <button href> with no type —
+ * and a button with no type defaults to submit.
+ *
+ * Nothing was broken, because no caller passed both. That is exactly why this is
+ * a source check and not only a built-output one: the defect was in the
+ * contract, not in any rendered page, and a dist scan would have sat green over
+ * it until step 7 put a button inside a form. V10b below scans dist anyway,
+ * because source containment cannot see what a future component renders. Neither
+ * half is sufficient alone — the same shape as V8 and V8b.
+ *
+ * The condition must be a bare identifier. `const Tag = a && !b ? "a" : "button"`
+ * is unparseable against an attribute expression without an AST, so the rule is
+ * that you name it. Naming it is also what makes the guard legible at each
+ * attribute, which is the actual fix.
+ */
+
+{
+  // Attributes that mean something on one of these elements and not the other.
+  const TAG_SPECIFIC = ["href", "target", "rel", "download", "type"];
+
+  const openingTag = (src, name) => {
+    const start = src.indexOf(`<${name}`);
+    if (start < 0) return null;
+    let depth = 0;
+    for (let i = start; i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}") depth--;
+      else if (src[i] === ">" && depth === 0) return src.slice(start, i + 1);
+    }
+    return null;
+  };
+
+  // name -> raw expression, brace-balanced so a ternary inside an attribute is
+  // read whole rather than truncated at its first closing brace.
+  const attrsOf = (open) => {
+    const out = {};
+    const re = /([a-zA-Z:-]+)=\{/g;
+    let m;
+    while ((m = re.exec(open))) {
+      let depth = 1;
+      let i = re.lastIndex;
+      while (i < open.length && depth > 0) {
+        if (open[i] === "{") depth++;
+        else if (open[i] === "}") depth--;
+        i++;
+      }
+      out[m[1]] = open.slice(re.lastIndex, i - 1);
+      re.lastIndex = i;
+    }
+    return out;
+  };
+
+  let components = 0;
+  let guarded = 0;
+
+  for (const file of sourceFiles.filter((f) => f.endsWith(".astro"))) {
+    const src = stripAllComments(readFileSync(file, "utf8"));
+    const decl = /const\s+([A-Z][\w$]*)\s*=\s*([^;]*?)\s*\?\s*"([a-z]+)"\s*:\s*"([a-z]+)"\s*;/g;
+    let m;
+
+    while ((m = decl.exec(src))) {
+      const [, name, rawCond, tagA, tagB] = m;
+      components++;
+      const guard = rawCond.trim();
+
+      if (!/^[A-Za-z_$][\w$]*$/.test(guard)) {
+        fail("V10", `${rel(file)}  ${name} picks <${tagA}> or <${tagB}> on an inline condition: ${guard}`);
+        fail("V10", `  Extract it to a named const and guard each tag-specific attribute with it.`);
+        fail("V10", `  An inline condition cannot be matched against an attribute expression here.`);
+        continue;
+      }
+
+      const open = openingTag(src, name);
+      if (!open) {
+        fail("V10", `${rel(file)}  ${name} is declared as a conditional tag but never rendered`);
+        continue;
+      }
+
+      const attrs = attrsOf(open);
+      const word = new RegExp(`\\b${guard}\\b`);
+
+      for (const attr of TAG_SPECIFIC) {
+        if (!(attr in attrs)) continue;
+        if (!word.test(attrs[attr])) {
+          fail("V10", `${rel(file)}  <${name}> emits ${attr}={${attrs[attr]}} without consulting ${guard}`);
+          fail("V10", `  ${attr} belongs to one of <${tagA}>/<${tagB}>. Derive it from ${guard}, not from a prop.`);
+        }
+      }
+
+      // A <button> with no type attribute defaults to submit. If either branch
+      // renders one, the attribute has to be there.
+      if ((tagA === "button" || tagB === "button") && !("type" in attrs)) {
+        fail("V10", `${rel(file)}  <${name}> can render a <button> and never emits type — an omitted type defaults to submit`);
+      }
+
+      guarded++;
+    }
+  }
+
+  // Counted from clean passes, not from the loop reaching the end — a summary
+  // line that reads "all guarded" while failures are queued below it is the
+  // report lying about its own result.
+  const clean = components === guarded && !failures.some((f) => f.startsWith("V10 "));
+  console.log(
+    `  V10 tag attributes    ${components} conditional-tag component(s)${clean ? ", all guarded" : `, ${components - guarded || "some"} unguarded`}`
+  );
+}
+
+/* ---------- V10b — the rendered elements agree ----------
+ *
+ * What actually reached the browser. V10 constrains the components in src/;
+ * this constrains every element in dist/, including ones written straight into
+ * a page without going through a component.
+ */
+
+if (existsSync(DIST)) {
+  const ANCHOR_ONLY = ["href", "target", "rel", "download"];
+  let buttons = 0;
+  let anchors = 0;
+
+  for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+    const html = readFileSync(page, "utf8");
+
+    for (const [tag] of html.matchAll(/<button\b[^>]*>/g)) {
+      buttons++;
+      for (const attr of ANCHOR_ONLY) {
+        if (new RegExp(`\\s${attr}[=\\s>]`).test(tag)) {
+          fail("V10b", `${rel(page)}  <button> carries ${attr} — that attribute belongs to an anchor`);
+        }
+      }
+      if (!/\stype[=\s>]/.test(tag)) {
+        fail("V10b", `${rel(page)}  <button> with no type — an omitted type defaults to submit`);
+      }
+    }
+
+    for (const [tag] of html.matchAll(/<a\b[^>]*>/g)) {
+      anchors++;
+      if (/\stype[=\s>]/.test(tag)) {
+        fail("V10b", `${rel(page)}  <a> carries type — that attribute belongs to a button`);
+      }
+    }
+  }
+
+  const bad = failures.filter((f) => f.startsWith("V10b ")).length;
+  console.log(
+    `  V10b rendered tags    ${buttons} button(s), ${anchors} anchor(s), ${bad === 0 ? "attributes agree" : `${bad} mismatched`}`
+  );
+} else {
+  notes.push("dist/ absent — V10b not counted. Run npm run build.");
 }
 
 /* ---------- V4 — build output shape and weight ---------- */
