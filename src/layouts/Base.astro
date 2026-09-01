@@ -93,10 +93,20 @@ const year = new Date().getFullYear();
           }
         </nav>
 
-        <!-- Static until step 7 wires the cart. Zero is true. -->
-        <a class="nav__order" href="/cart">
+        <!--
+          Server-renders hidden, and stays hidden until the cart script has read
+          storage and found something. Hidden entirely at zero: an empty
+          indicator on a first visit is noise advertising a feature they have
+          not used, and a hardcoded "(0)" on a page where the buyer has three
+          items would be the nav lying.
+
+          Hidden is also the honest state with JavaScript off — there is no
+          order to count, because there is nothing that could have added to one.
+        -->
+        <a class="nav__order" href="/order" data-order-count hidden>
           <span class="sr-only">Items in order:</span>
-          <span aria-hidden="true">(</span>0<span aria-hidden="true">)</span>
+          <span aria-hidden="true">(</span><span data-order-units>0</span><span
+            aria-hidden="true">)</span>
         </a>
       </div>
     </header>
@@ -121,6 +131,24 @@ const year = new Date().getFullYear();
         <p class="foot__legal">&copy; {year} MomentAura</p>
       </div>
     </footer>
+
+    <!--
+      The one script on the site. Astro hoists and bundles it into a single
+      named module in dist/, referenced by the identical URL from every page —
+      type="module", so it is deferred and never render-blocking. Everything
+      inside it is deferred again behind requestIdleCallback.
+
+      It loads from the shell rather than per page because the order count is
+      in the shell. Confining it to /order and the product pages would leave
+      the count silent on the homepage and the category pages, which is where
+      the buyer actually browses; a count that is only true on two page types
+      out of five is worse than no count. verify.mjs V4 holds the containment
+      line instead: exactly one script, named, under 5KB, the same URL
+      everywhere, and no inline script body anywhere in the output.
+    -->
+    <script>
+      import "../scripts/cart.ts";
+    </script>
   </body>
 </html>
 

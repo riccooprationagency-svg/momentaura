@@ -5,7 +5,7 @@
  *   V1  dependency surface — Astro and nothing else
  *   V2  no raw hex outside tokens.css
  *   V3  --accent referenced exactly once in the whole source tree
- *   V4  build output shape and page weight
+ *   V4  build output shape, the one script, and page weight
  *   V6  banned constructs
  *   V8  the closed stamp is contained to the docket
  *   V8b at most one Seal fill on any rendered page
@@ -764,7 +764,32 @@ if (existsSync(DIST)) {
   );
 }
 
-/* ---------- V4 — build output shape and weight ---------- */
+/* ---------- V4 — build output shape, the one script, and page weight ----------
+ *
+ * This check used to assert zero JavaScript: no <script> tag in any page, no .js
+ * in dist/. Step 7 shipped the cart, which CLAUDE.md has always named as the one
+ * permitted exception, so the old assertion could not survive as written.
+ *
+ * It was not simply loosened. "Zero scripts" is trivially checkable and needs no
+ * judgement; "one script" is a budget, and a budget nobody counts becomes a
+ * comment. So the assertion moved from absence to containment, and it is
+ * strictly more work to violate by accident than the old one was:
+ *
+ *   - exactly one .js file in the whole of dist/
+ *   - it is named, so a second entry chunk cannot quietly take its place in the
+ *     count. astro.config.mjs names it; two would collide and fail the build
+ *   - under 5KB, so the cart cannot grow into an application
+ *   - every page references that same one URL, and no page references a second
+ *     script. One file, cached once, across the several product pages a buyer
+ *     opens in a session
+ *   - no inline <script> body anywhere in the output. Astro inlines a small
+ *     hoisted script by default, which put a copy of the cart into all ten
+ *     pages and left dist/ with no .js file for a gate to find. An inline body
+ *     is how "one script" silently becomes ten
+ *
+ * The old rule survives where it still applies: a page may not carry executable
+ * markup of its own, only a reference to the one bundle.
+ */
 
 if (existsSync(DIST)) {
   const files = walkAll(DIST);
@@ -774,19 +799,74 @@ if (existsSync(DIST)) {
   const js = files.filter((f) => f.endsWith(".js"));
   const fonts = files.filter((f) => f.endsWith(".woff2"));
 
+  const SCRIPT_BUDGET = 5 * 1024;
+  const CART = /^cart\.[A-Za-z0-9_-]+\.js$/;
+
+  // The one bundle.
+  let cartUrl = null;
+  if (js.length !== 1) {
+    fail("V4", `expected exactly 1 .js in dist/, found ${js.length}${js.length ? `: ${js.map(rel).join(", ")}` : ""}`);
+    fail("V4", "  The cart is the only client-side JavaScript on the site. If a feature");
+    fail("V4", "  needs a second script, CLAUDE.md says it does not ship.");
+  } else {
+    const bundle = js[0];
+    const name = basename(bundle);
+    if (!CART.test(name)) {
+      fail("V4", `the emitted script is ${name} — expected cart.<hash>.js`);
+      fail("V4", "  astro.config.mjs names it. An unnamed chunk means the naming plugin");
+      fail("V4", "  stopped matching, and the count above stops meaning 'the cart'.");
+    }
+    const size = bytes(bundle);
+    if (size > SCRIPT_BUDGET) {
+      fail("V4", `${rel(bundle)} is ${size} bytes against a ${SCRIPT_BUDGET} budget`);
+    }
+    cartUrl = `/${rel(bundle).replace(/^dist\//, "")}`;
+    console.log(`  V4  the one script    ${name}  ${size} bytes / ${SCRIPT_BUDGET}  ${size <= SCRIPT_BUDGET ? "within budget" : "OVER"}`);
+  }
+
+  // Every page carries a reference to that bundle and nothing else executable.
+  const TAG = /<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi;
+  let referencing = 0;
   for (const page of html) {
     const source = readFileSync(page, "utf8");
-    if (/<script/i.test(source)) fail("V4", `${rel(page)} contains a <script> tag — zero render-blocking JS`);
+    const tags = [...source.matchAll(TAG)];
+
+    for (const [, attrs, body] of tags) {
+      if (body.trim() !== "") {
+        fail("V4", `${rel(page)} carries an inline <script> body — a page references the bundle, never inlines it`);
+        continue;
+      }
+      const src = /(?:^|\s)src=["']([^"']+)["']/.exec(attrs);
+      if (!src) {
+        fail("V4", `${rel(page)} has a <script> with neither a body nor a src`);
+        continue;
+      }
+      if (cartUrl && src[1] !== cartUrl) {
+        fail("V4", `${rel(page)} loads ${src[1]} — the only script any page may load is ${cartUrl}`);
+      }
+    }
+
+    const srcs = tags.filter(([, , body]) => body.trim() === "").length;
+    if (srcs > 1) fail("V4", `${rel(page)} loads ${srcs} scripts — one file, referenced once`);
+    if (srcs === 1) referencing++;
   }
-  if (js.length) fail("V4", `JavaScript emitted: ${js.map(rel).join(", ")}`);
+
+  if (cartUrl && referencing !== html.length) {
+    fail("V4", `${referencing} of ${html.length} pages reference the cart`);
+    fail("V4", "  The order count is in the shell, so it is on every page or it is lying");
+    fail("V4", "  on the ones it is missing from. One bundle, one URL, every page.");
+  }
+
   if (fonts.length !== 2) fail("V4", `expected 2 woff2 in dist/, found ${fonts.length}`);
 
-  // Shared cost every page pays: the fonts, plus any stylesheet not inlined.
-  const shared =
-    files.filter((f) => f.endsWith(".css") || f.endsWith(".woff2")).reduce((n, f) => n + bytes(f), 0);
+  // Shared cost every page pays: the fonts, any stylesheet not inlined, and now
+  // the cart — every page loads it, so every page is charged for it.
+  const shared = files
+    .filter((f) => f.endsWith(".css") || f.endsWith(".woff2") || f.endsWith(".js"))
+    .reduce((n, f) => n + bytes(f), 0);
 
   console.log(
-    `  V4  output            ${files.length} files, ${html.length} page(s), ${js.length} js, ${fonts.length} fonts`
+    `  V4  output            ${files.length} files, ${html.length} page(s), ${js.length} js, ${fonts.length} fonts, ${referencing}/${html.length} referencing`
   );
   for (const page of html) {
     const total = bytes(page) + shared;

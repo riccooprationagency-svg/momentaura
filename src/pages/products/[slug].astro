@@ -16,7 +16,10 @@
 //                    whether this shop works
 //   Quantity         BUILD-ORDER named it, the step 6 ruling does not, and it
 //                    belongs with the cart in step 7 where a quantity has
-//                    somewhere to go
+//                    somewhere to go. Step 7 put it there: the steppers live on
+//                    /order, not here. Adding twice from this page adds two,
+//                    which is the same answer with one fewer control on the
+//                    page where the buyer is still deciding
 //
 // KNOWN, and blocked on data: the docket renders lead time as a duration, and
 // CLAUDE.md requires a date on a product page. leadTimeDays is null on every
@@ -124,16 +127,37 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
           Seal fill this page gets, and a second instance 80px below it is the
           redundancy that drains the colour.
         -->
-        <Button variant="filled" disabled={soldOut}>Add to order</Button>
+        <Button
+          variant="filled"
+          disabled={soldOut}
+          data-add
+          data-slug={product.slug}
+          describedby={soldOut ? "detail-closed" : undefined}
+        >
+          Add to order
+        </Button>
 
         {
           soldOut && (
-            <p class="detail__closed">
+            <p class="detail__closed" id="detail-closed">
               {product.name} is in the catalogue. It cannot be ordered until there is stock
               to send.
             </p>
           )
         }
+
+        <!--
+          Prose, not mono. A sentence explaining state is Archivo at --t-body-sm
+          in --fg-muted, the same register as the line above — the mono rule
+          covers short status labels, not sentences.
+
+          Hidden until the order holds this product, and revealed by the cart.
+          It is the route onward: the button keeps its verb and says "Added to
+          order", and this says how many and where they are.
+        -->
+        <p class="detail__added" data-added hidden>
+          <span data-added-count>0</span> in your order. <a href="/order">See your order</a>.
+        </p>
 
         <hr class="detail__hair" />
 
@@ -245,6 +269,7 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
   }
 
   .detail__closed,
+  .detail__added,
   .detail__terms {
     color: var(--fg-muted);
     max-width: var(--measure);

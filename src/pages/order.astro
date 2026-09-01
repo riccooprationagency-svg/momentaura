@@ -1,0 +1,385 @@
+---
+// The order. Line items, quantity steppers, per-line and running total in mono,
+// delivery terms restated, one filled button to checkout.
+//
+// STATIC FIRST, REVEALED SECOND. Every product in the catalogue renders here as
+// a hidden line at build time; the cart reveals the ones that are in the order.
+// Nothing is templated in the browser. That is not a performance trick — it is
+// what keeps a name, a price and a stock figure from ever crossing out of
+// localStorage into the DOM. Storage is the buyer's own disk and anyone can
+// edit it; the only thing it is trusted for here is a quantity, and even that
+// is capped. With five products the hidden lines cost a few hundred bytes.
+//
+// It also means the page has a truthful state with JavaScript off: the empty
+// state renders, and it is accurate, because a browser that cannot read storage
+// is a browser that could never have added anything to it.
+//
+// Not built, and each one a decision rather than a gap:
+//
+//   Delivery date    CLAUDE.md requires a date at checkout, not a duration.
+//                    leadTimeDays is null on every product, so there is no lead
+//                    time to convert and no working-day arithmetic to do. It
+//                    lands with the first true lead time, alongside the same
+//                    omission on the product page
+//   Quote threshold  PRD FR-1.5 redirects an order of ten units or more to the
+//                    bulk path. That path is step 9. A threshold that routes
+//                    nowhere is worse than no threshold
+//   Phone number     CLAUDE.md wants a number on an error. There is no real one
+//                    in this repo, and inventing one is the exact dishonesty
+//                    the whole system exists to remove. The blocked message
+//                    says what happened and how to fix it, which the buyer can
+//                    do alone in one click, and /contact carries the number
+//                    once it exists
+import Base from "../layouts/Base.astro";
+import Button from "../components/Button.astro";
+import { products, price } from "../lib/products";
+
+// Light. Every product renders light while photography is missing, and an order
+// page in the dark system over a set of kraft placeholders would be the two
+// systems arguing on one screen. It follows the products it lists.
+---
+
+<Base
+  title="Your order — MomentAura"
+  description="The items in your order, with quantities and a running total. Dispatched from Nairobi."
+  system="light"
+>
+  <section class="order">
+    <div class="wrap">
+      <h1 class="order__heading">Your order</h1>
+
+      <!--
+        One line and a route back. Not a mood, not an illustration, not "your
+        cart is feeling lonely" — EXPERIENCE.md part 5. This is also the state
+        the page ships in, so it is what a browser with no JavaScript sees.
+      -->
+      <p class="order__empty" data-order-empty>
+        Nothing in your order yet. <a href="/">Start from the categories</a>.
+      </p>
+
+      <div data-order-live hidden>
+        <ul class="order__lines" role="list">
+          {
+            products.map((product) => (
+              <li
+                class="line"
+                data-line
+                data-slug={product.slug}
+                data-name={product.name}
+                data-price={product.price}
+                data-stock={product.stock}
+                hidden
+              >
+                <div class="line__id">
+                  <a class="line__name" href={`/products/${product.slug}`}>
+                    {product.name}
+                  </a>
+                  <p class="line__unit">{price(product.price)} each</p>
+                  {/* Muted mono, uppercase, no fill. The Seal fill belongs to
+                      the docket's Stock row in a detail view and nowhere else —
+                      a list of sold-out lines stamped in Seal reads as the
+                      page's colour scheme rather than as an exception. */}
+                  {product.stock === 0 && <p class="line__closed">Sold out</p>}
+                </div>
+
+                {/* The steppers. Labelled per product, because "increase
+                    quantity" three times over in a list is three identical
+                    announcements and no way to tell which line is which. */}
+                <div class="line__qty">
+                  <button
+                    type="button"
+                    class="step"
+                    data-qty-down
+                    aria-label={`Reduce quantity of ${product.name}`}
+                  >
+                    <span aria-hidden="true">&minus;</span>
+                  </button>
+                  <span class="line__count" data-qty aria-live="polite">0</span>
+                  <button
+                    type="button"
+                    class="step"
+                    data-qty-up
+                    aria-label={`Increase quantity of ${product.name}`}
+                  >
+                    <span aria-hidden="true">+</span>
+                  </button>
+                </div>
+
+                <p class="line__total" data-line-total />
+
+                <button
+                  type="button"
+                  class="line__remove"
+                  data-remove
+                  aria-label={`Remove ${product.name} from your order`}
+                >
+                  Remove
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+
+        <hr class="order__hair" />
+
+        <p class="order__total">
+          <span class="order__total-label">Total</span>
+          <span class="order__total-value" data-order-total>KSh 0</span>
+        </p>
+
+        <!--
+          The blocked state. Specific, and it names the product — a general
+          "some items are unavailable" makes the buyer audit the list themselves.
+          Prose in Archivo, never mono: this is a sentence, not a status label.
+          Written by the cart, which is why it ships empty rather than stubbed.
+        -->
+        <p class="order__blocked" id="order-blocked" data-order-blocked hidden></p>
+
+        <div class="order__actions">
+          <!--
+            One filled button, and it is an anchor. When an out-of-stock line
+            blocks the order the cart sets aria-disabled AND drops the href —
+            an <a href> with aria-disabled still navigates on click and on
+            Enter, and pointer-events: none would hide that rather than fix it.
+            Same rule Button.astro encodes at build time, applied at runtime.
+          -->
+          <Button variant="filled" href="/checkout" data-checkout>Go to checkout</Button>
+
+          <button type="button" class="order__clear" data-clear>Clear the order</button>
+        </div>
+
+        <hr class="order__hair" />
+
+        <!--
+          Delivery terms restated. Dispatch point is a fact and it is stated as
+          one; there is no lead time in the data yet, so none is claimed. No
+          accent here: --accent appears exactly once in the whole source tree,
+          on the docket's fact row, and V3 counts it.
+        -->
+        <!-- "the <a" stays on one line. Astro drops the whitespace between a
+             line break and an element, so breaking before the link rendered
+             "on thedelivery terms page". -->
+        <p class="order__terms">
+          Dispatched from Nairobi. Delivery dates and returns are on the <a
+            href="/delivery">delivery terms</a> page. Nothing is charged until you confirm
+          payment.
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  /* Paints --bg because Base sets data-system on body for this page. The
+     section restates it so the ground and the text can never come from
+     different systems. verify.mjs V7. */
+  .order {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .order__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .order__empty,
+  .order__terms {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  /* ---------- lines ---------- */
+
+  .order__lines {
+    list-style: none;
+    display: grid;
+    gap: var(--s-28);
+  }
+
+  /* One column on a phone; the quantity and the totals sit under the name
+     rather than crushing four columns into 335px. */
+  .line {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-12);
+    align-items: center;
+    padding-block-end: var(--s-28);
+    border-block-end: 1px dashed var(--border);
+  }
+
+  .line__id {
+    display: grid;
+    gap: var(--s-8);
+  }
+
+  /* Sentence case. A product name says what the thing is. */
+  .line__name {
+    font-size: var(--t-body-sm);
+    text-decoration: none;
+  }
+
+  .line__name:hover {
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+  }
+
+  .line__unit {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Short status label, so mono is the right register. Muted, no fill. */
+  .line__closed {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .line__qty {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  /* Square, 44px, 0 radius — the input radius, because a stepper is closer to
+     an input than to a button. 1px border, no fill, like everything else that
+     is not the one filled pill on the page. */
+  .step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--tap-target);
+    min-height: var(--tap-target);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    background-color: transparent;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    line-height: var(--lh-ui);
+    transition: border-color var(--dur) var(--ease);
+  }
+
+  .step:hover {
+    border-color: var(--fg);
+  }
+
+  .line__count {
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+    min-width: var(--tap-target);
+    text-align: center;
+  }
+
+  .line__total {
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A text control, not a pill. Removing a line is not an equal action to
+     going to checkout, and giving it a pill would say it was. */
+  .line__remove {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-target);
+    justify-self: start;
+    transition: color var(--dur) var(--ease);
+  }
+
+  .line__remove:hover {
+    color: var(--fg);
+  }
+
+  /* ---------- totals and actions ---------- */
+
+  .order__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-28);
+  }
+
+  .order__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-20);
+    font-family: var(--font-mono);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .order__total-label {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .order__total-value {
+    font-size: var(--t-body-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Prose. A sentence explaining why the order cannot be sent is Archivo at
+     body-sm in muted, the same as every other explanatory line on the site. */
+  .order__blocked {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-start: var(--s-20);
+  }
+
+  .order__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-20);
+    margin-block-start: var(--s-28);
+  }
+
+  .order__clear {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-target);
+    transition: color var(--dur) var(--ease);
+  }
+
+  .order__clear:hover {
+    color: var(--fg);
+  }
+
+  @media (min-width: 640px) {
+    /* Name, quantity, line total, remove. The totals column is right-aligned so
+       the figures stack digit over digit down the list. */
+    .line {
+      grid-template-columns: 1fr auto auto auto;
+      gap: var(--s-20);
+    }
+
+    .line__total {
+      text-align: end;
+      min-width: var(--card-min);
+    }
+  }
+</style>

@@ -10,9 +10,26 @@ interface Props {
   href?: string;
   type?: "button" | "submit";
   disabled?: boolean;
+  id?: string;
+  /**
+   * id of the element explaining why this control cannot be operated. A screen
+   * reader announcing "Add to order, unavailable" tells the buyer the button is
+   * dead and nothing about why, which is precisely the ambiguity the disabled
+   * state exists to remove — the reason is already on the page in one line, and
+   * this is what points at it.
+   */
+  describedby?: string;
 }
 
-const { variant = "filled", href, type = "button", disabled = false } = Astro.props;
+const {
+  variant = "filled",
+  href,
+  type = "button",
+  disabled = false,
+  id,
+  describedby,
+  ...rest
+} = Astro.props;
 
 // A disabled control is never an anchor. An <a href> with aria-disabled still
 // navigates on click and on Enter, and the only thing that stopped it here was
@@ -29,8 +46,18 @@ const isAnchor = Boolean(href) && !disabled;
 const Tag = isAnchor ? "a" : "button";
 ---
 
+<!--
+  rest carries the data-* hooks the cart script binds to, and it is spread FIRST
+  so that every attribute below overrides it. A caller cannot smuggle href or
+  type past the isAnchor guard: whatever rest holds, the explicit attributes are
+  written afterwards and win, and undefined removes the attribute outright. The
+  V10 contract survives the spread rather than depending on callers behaving.
+-->
 <Tag
+  {...rest}
   class:list={["btn", `btn--${variant}`]}
+  id={id}
+  aria-describedby={describedby}
   href={isAnchor ? href : undefined}
   type={isAnchor ? undefined : type}
   aria-disabled={disabled ? "true" : undefined}

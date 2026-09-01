@@ -293,7 +293,15 @@ Kenyan mobile traffic on metered bundles.
 - LCP **under 2.5s on throttled 3G**
 - Text renders before any image completes. Zero render-blocking JS
 - No hero video below 480px — a still renders instead
-- Cart is the only client-side JS. `client:idle`, never `client:load`
+- Cart is the only client-side JS. `client:idle`, never `client:load`. There is no
+  framework here, so `client:idle` is a guarantee to build rather than a directive to
+  write: the cart is a plain `<script>` in `Base.astro`, which Astro bundles and
+  references as `type="module"`, and everything it does is deferred again behind
+  `requestIdleCallback`. It ships as one named file — `dist/_astro/cart.<hash>.js`,
+  named by a plugin in `astro.config.mjs` because Astro's own name records which
+  template held the tag and not what the file is. `assetsInlineLimit: 0` keeps it a
+  file at all; Astro inlines a small hoisted script by default, which is how one
+  script silently becomes one copy per page
 - Touch targets 44px minimum
 
 Test on a real phone on mobile data before every deploy. Not on wifi.
@@ -356,7 +364,30 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   accent reference in the whole source tree, the closed stamp contained to `Docket.astro`
   and counted at no more than one Seal fill per built page, the `PAIRINGS` table complete
   against the reachable set, the banned-construct list, and page weight against budget.
-  Both scripts run on every commit via `.git/hooks/pre-commit`
+- **V4 counts the scripts, and it is a budget rather than an absence.** It asserted zero
+  JavaScript until step 7 shipped the cart — the one exception this file has always
+  named — so it moved from absence to containment rather than being relaxed: exactly one
+  `.js` in `dist/`, named `cart.<hash>.js`, under 5KB, referenced by that same one URL
+  from every page, and no inline `<script>` body anywhere in the output. Absence needs no
+  judgement and a budget nobody counts becomes a comment, which is why the loosening had
+  to buy a tighter rule somewhere else
+- **The cart stores slug and quantity only. Never a name, a price or a stock figure.**
+  This is a security property, not an implementation detail, and step 8 must not weaken
+  it. localStorage is the buyer's own disk: anything the cart writes there, a buyer can
+  edit, and anything the site later reads back it has to distrust. Storing only a slug and
+  an integer means a tampered value can inflate a quantity and nothing else — it cannot
+  invent a product, move a price, or claim stock that does not exist, because those three
+  are rendered into the page from `products.json` at build time and looked up by slug.
+  Cache a price into storage and the tampering surface stops being a quantity and becomes
+  the order total.
+  It is also why `/order` renders every product as a hidden line and reveals what is in
+  the order, rather than building markup in the browser. Nothing crosses out of storage
+  into the DOM: the only values the script writes are numbers it computed and text the
+  page itself handed it. No `innerHTML`, anywhere, ever.
+  The quantity is still a client value and still not trusted. It is capped on read, and
+  step 8 re-prices server-side from our own catalogue regardless. This is the client-side
+  half of the Security section's "never trust a client price", not a substitute for it
+- Both scripts run on every commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 
