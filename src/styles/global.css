@@ -129,6 +129,16 @@ p {
   overflow-wrap: break-word;
 }
 
+/* The hidden attribute has to win. Its user-agent rule is display: none at the
+   lowest possible specificity, so any class that sets display — .nav__order is
+   flex, an order line is grid — silently defeats it and renders an element the
+   markup says is not there. The cart toggles visibility with el.hidden and
+   nothing else, so this one line is what makes "hidden entirely at zero" true.
+   Placed in the reset, before anything that sets display. */
+[hidden] {
+  display: none !important;
+}
+
 /* Deliberately absent: scroll-behavior: smooth — motion the constraints do not
    sanction. And no outline reset of any kind, at any point, ever. */
 
