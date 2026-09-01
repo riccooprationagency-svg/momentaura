@@ -276,5 +276,20 @@ Idempotent by `CheckoutRequestID`.
 Delivery, About, Contact, Privacy, `/track`. `/track` takes order reference plus phone —
 no accounts, no passwords.
 
+**Depends on this section:** the blocked message on `/order`. CLAUDE.md requires a phone
+number on an error, and step 7 shipped that message without one because no real number
+exists anywhere in the repo — inventing one is the dishonesty the whole system exists to
+remove, and a number that does not ring is worse than no number. The message says what
+happened and how to fix it, which the buyer can do alone in one click, so it is not a dead
+end in the meantime.
+
+When Contact lands with the real number, add it there. Same dependency, same reason, as the
+checkout and payment-declined errors in section 8 — none of them can carry a number until
+this section supplies one, so it is one edit across all of them rather than three
+rediscoveries.
+
+Also still owed here: `/delivery` is linked from the product page, from `/order` and from
+the footer, and does not exist yet.
+
 ## 11 — Ship
 Sitemap, Open Graph images, Search Console. Test on a real phone on Safaricom data.
