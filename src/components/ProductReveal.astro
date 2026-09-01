@@ -10,14 +10,31 @@ import { systemFor, price, type Product } from "../lib/products";
 
 interface Props {
   product: Product;
+  /** The band's ground. Defaults to the product's own system, which is the
+   *  honest default — a reveal that is not told otherwise looks like its
+   *  product. Pass "dark" to run a light card on a dark band: that is page
+   *  rhythm and it says nothing about the product. */
+  band?: "dark" | "light";
 }
 
-const { product } = Astro.props;
+const { product, band } = Astro.props;
 const system = systemFor(product);
+const ground = band ?? system;
+
+// The card keeps the product's own system whatever the band is set to, so a
+// product without a photograph stays light and its kraft placeholder stays
+// inside a light card. The rule CLAUDE.md states outright — never render a
+// product dark with a placeholder inside it — cannot be broken by setting a
+// band, because the band never reaches the card.
+const split = ground !== system;
 ---
 
-<section class="reveal" data-system={system}>
-  <div class="wrap reveal__inner">
+<section class="reveal" data-system={ground}>
+  <div class="wrap">
+    <div
+      class:list={["reveal__inner", split && "reveal__inner--card"]}
+      data-system={split ? system : undefined}
+    >
     <h2 class="reveal__heading">{product.name}</h2>
 
     <div class="reveal__object">
@@ -45,6 +62,7 @@ const system = systemFor(product);
       <p class="reveal__price">{price(product.price)}</p>
       <Docket product={product} />
       <Button variant="filled" href={`/products/${product.slug}`}>See the details</Button>
+      </div>
     </div>
   </div>
 </section>
@@ -64,6 +82,18 @@ const system = systemFor(product);
     grid-template-columns: 1fr;
     gap: var(--s-40);
     align-items: center;
+  }
+
+  /* Only when the band and the product disagree. Inset from the gutter rather
+     than full-bleed, or it would simply be a light band and the dark one would
+     have been pointless. No shadow and no border: depth here is the single
+     luminance step from the band to the card, which is the only depth the
+     system has. */
+  .reveal__inner--card {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding: var(--s-28);
+    border-radius: var(--radius-surface);
   }
 
   .reveal__heading {
