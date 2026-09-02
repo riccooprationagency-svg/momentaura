@@ -43,5 +43,12 @@ node scripts/verify.mjs
 # guards the money path and is never run is a comment, so it runs here too.
 node scripts/checkout-test.mjs
 
+# The M-Pesa endpoints, for the same reason and one more: the callback is public
+# and unauthenticated, and the three things that keep it safe — the secret path,
+# the IP allowlist failing closed, and the amount re-verified against KV — are
+# all invisible when they work. A gate is the only thing that notices one of
+# them being removed.
+node scripts/mpesa-test.mjs
+
 echo "  gates passed."
 echo ""

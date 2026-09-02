@@ -30,35 +30,24 @@
  * payloads back at you, and that is how a key or a customer's phone number ends
  * up in a response someone can read.
  *
- * Everything gateway-shaped lives in _gateway.js. Step 9 replaces that file with
- * Daraja and does not touch this one.
+ * Everything gateway-shaped lives in _gateway.js. The request validation and the
+ * re-pricing live in _order.js, shared with step 9's STK endpoint so the stock
+ * and price rules exist once rather than once per gateway.
+ *
+ * STEP 9 DID NOT REPLACE THIS FILE, and the note that used to sit here saying it
+ * would was wrong about the shape of the problem. A hosted-page gateway hands
+ * back a URL and the buyer is redirected; Daraja STK Push hands back nothing to
+ * redirect to and settles asynchronously against a callback. That is a different
+ * flow, not a different implementation of this one, so it lives beside this file
+ * rather than inside it. See BUILD-ORDER section 9.
  */
 
-import catalogue from "../../src/data/products.json";
 import { GATEWAY_NAME, GatewayError, createHostedCheckout } from "./_gateway.js";
+import { MESSAGES, readOrder, reference } from "./_order.js";
 
-/* Same ceiling the cart applies on read. A request is not the cart, so it is
-   restated here rather than assumed. */
-const MAX_QTY = 99;
-
-/* A basket, not a wholesale order. Ten distinct lines is far past what this
-   catalogue can produce; past that it is someone probing, and the bulk route is
-   a conversation with a person. */
-const MAX_LINES = 10;
-
-/* Kenyan mobile numbers, the shapes people actually type: 07XXXXXXXX,
-   01XXXXXXXX, +2547XXXXXXXX, 2541XXXXXXXX. Whitespace is stripped first because
-   people type it and rejecting a valid number over a space is a checkout that
-   loses an order for nothing. */
-const PHONE = /^(?:\+?254|0)[17]\d{8}$/;
-
-/* Deliberately loose. An address this rejects is a customer lost, and the only
-   thing riding on it is a receipt the buyer asked for. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
-
-/* Every message the browser can ever see. What happened, and what to do.
+/* What happened to the money, as opposed to what was wrong with the request.
+ * The request messages are in _order.js because both endpoints share them;
+ * these two are this gateway's outcomes and stay here.
  *
  * PHONE NUMBER: CLAUDE.md requires one on an error. There is no real number
  * anywhere in this repo and inventing one is the dishonesty the whole site
@@ -66,12 +55,7 @@ const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
  * route to /contact, which BUILD-ORDER section 10 owns, and the number lands in
  * all of them at once when that page does. Recorded there as a dependency so it
  * is not rediscovered. */
-const MESSAGES = {
-  bad_request: "That order could not be read. Go back to your order and try again.",
-  empty: "There is nothing in your order yet.",
-  name: "Enter the name the order is for.",
-  phone: "Enter a Kenyan phone number, like 0712 345 678. M-Pesa sends the prompt to it.",
-  email: "That email address does not look right. Leave it blank if you would rather not give one.",
+const OUTCOME = {
   unavailable:
     `Payments are not going through right now. Nothing has been charged. ` +
     `Message us on the contact page and the order can be taken another way.`,
@@ -94,20 +78,6 @@ const json = (status, body) =>
   });
 
 const fail = (status, message, field) => json(status, field ? { message, field } : { message });
-
-/* Order reference. Unambiguous read-aloud alphabet: no O/0, no I/1, no S/5,
-   because this number gets read down a phone line and screenshotted into
-   WhatsApp. crypto.getRandomValues, not Math.random — a guessable reference is
-   a lookup key for someone else's order the moment /track exists in step 10. */
-const ALPHABET = "ABCDEFGHJKLMNPQRTUVWXYZ2346789";
-
-function reference() {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  let out = "";
-  for (const b of bytes) out += ALPHABET[b % ALPHABET.length];
-  return `MA-${out.slice(0, 4)}-${out.slice(4)}`;
-}
 
 /* A single onRequest, not onRequestPost alongside it. Cloudflare Pages treats
    onRequest as the catch-all for every method, so exporting both leaves which
@@ -134,80 +104,12 @@ export async function onRequest({ request, env }) {
     return fail(400, MESSAGES.bad_request);
   }
 
-  const { items, name, phone, email } = payload;
+  /* Validation, stock rules and re-pricing, shared with the STK endpoint so
+     they cannot drift apart. Nothing past this point reads the payload again. */
+  const order = readOrder(payload);
+  if (!order.ok) return fail(order.status, order.message, order.field);
 
-  if (!Array.isArray(items) || items.length === 0) return fail(400, MESSAGES.empty, "items");
-  if (items.length > MAX_LINES) return fail(400, MESSAGES.bad_request, "items");
-
-  /* ---------- the customer ---------- */
-
-  const cleanName = typeof name === "string" ? name.trim() : "";
-  if (cleanName.length < 2 || cleanName.length > 80) return fail(400, MESSAGES.name, "name");
-
-  const cleanPhone = typeof phone === "string" ? phone.replace(/[\s-]/g, "") : "";
-  if (!PHONE.test(cleanPhone)) return fail(400, MESSAGES.phone, "phone");
-
-  /* Optional, and blank is a valid answer rather than an error. */
-  let cleanEmail = null;
-  if (typeof email === "string" && email.trim() !== "") {
-    cleanEmail = email.trim();
-    if (cleanEmail.length > 254 || !EMAIL.test(cleanEmail)) {
-      return fail(400, MESSAGES.email, "email");
-    }
-  }
-
-  /* Normalised to 2547XXXXXXXX / 2541XXXXXXXX. One shape reaches the gateway
-     however the buyer typed it. */
-  const msisdn = cleanPhone.replace(/^\+/, "").replace(/^0/, "254");
-
-  /* ---------- re-price from our own catalogue ----------
-   *
-   * The request carries slugs and quantities. It does not carry prices, and if
-   * it did they would be ignored: every figure below is read from the catalogue
-   * this function imported at build time. */
-
-  const lines = [];
-  const seen = new Set();
-  let total = 0;
-
-  for (const item of items) {
-    if (item === null || typeof item !== "object") return fail(400, MESSAGES.bad_request, "items");
-
-    const slug = item.slug;
-    if (typeof slug !== "string") return fail(400, MESSAGES.bad_request, "items");
-
-    /* One line per product. Two lines for the same slug would otherwise let a
-       quantity cap be stepped around by repeating the slug. */
-    if (seen.has(slug)) return fail(400, MESSAGES.bad_request, "items");
-    seen.add(slug);
-
-    const product = BY_SLUG.get(slug);
-    /* Not in the catalogue: rejected, never skipped. Silently dropping a line
-       sends the buyer to a payment page for less than they asked for. */
-    if (!product) {
-      return fail(422, "One of the items in your order is no longer available. Go back to your order and remove it.", "items");
-    }
-
-    const qty = item.qty;
-    if (typeof qty !== "number" || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
-      return fail(400, MESSAGES.bad_request, "items");
-    }
-
-    /* Named, and blocking. Never silently dropped. */
-    if (product.stock === 0) {
-      return fail(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it.`, "items");
-    }
-
-    if (qty > product.stock) {
-      return fail(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again.`, "items");
-    }
-
-    const amount = product.price * qty;
-    total += amount;
-    lines.push({ slug, name: product.name, qty, price: product.price, amount });
-  }
-
-  if (total <= 0) return fail(400, MESSAGES.empty, "items");
+  const { total } = order;
 
   /* ---------- hand off to the gateway ---------- */
 
@@ -220,7 +122,7 @@ export async function onRequest({ request, env }) {
       env,
       reference: ref,
       amount: total,
-      customer: { name: cleanName, phone: msisdn, email: cleanEmail },
+      customer: { name: order.name, phone: order.msisdn, email: order.email },
       redirectUrl: redirectUrl.toString(),
     });
 
@@ -247,11 +149,11 @@ export async function onRequest({ request, env }) {
       );
       const declined = error.code === "gateway_rejected";
       return json(declined ? 402 : 503, {
-        message: declined ? MESSAGES.declined : MESSAGES.unavailable,
+        message: declined ? OUTCOME.declined : OUTCOME.unavailable,
       });
     }
 
     console.log(JSON.stringify({ at: "checkout", reference: ref, code: "unhandled", detail: String(error) }));
-    return json(503, { message: MESSAGES.unavailable });
+    return json(503, { message: OUTCOME.unavailable });
   }
 }
