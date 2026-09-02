@@ -405,24 +405,90 @@ docs say; and every production-credential behaviour, since none have been issued
 Delivery, About, Contact, Privacy, `/track`. `/track` takes order reference plus phone —
 no accounts, no passwords.
 
-**Depends on this section:** the blocked message on `/order`. CLAUDE.md requires a phone
-number on an error, and step 7 shipped that message without one because no real number
-exists anywhere in the repo — inventing one is the dishonesty the whole system exists to
-remove, and a number that does not ring is worse than no number. The message says what
-happened and how to fix it, which the buyer can do alone in one click, so it is not a dead
-end in the meantime.
+### Built. `/track` first, and it works today
 
-When Contact lands with the real number, add it there. Same dependency, same reason, as the
-checkout and payment-declined errors in section 8 — none of them can carry a number until
-this section supplies one, so it is one edit across all of them rather than three
-rediscoveries.
+All five pages exist; the nav and footer had linked to every one of them since section 2
+and all five 404'd until now.
 
-Also still owed here, and the list grew at step 8: `/delivery` is linked from the product
-page, from `/order`, from `/checkout`, from `/order-received` and from the footer, and
-`/contact` is linked from `/order-received` — twice, once from the lead paragraph anyone
-arriving without a reference sees. Neither page exists yet. The confirmation screen is the
-one a buyer screenshots and comes back to, so its dead links are the most expensive on the
-site.
+`/track` was built first because it is the only trust page that needs no fact Ric holds.
+It closes the gap that opens the moment someone pays — money gone, then silence until a
+parcel arrives — and it needs nothing invented to do it. Reference plus the phone the
+order was placed with. No account, because an account is a password to forget and a
+credential store to protect in exchange for nothing this needs.
+
+**A wrong phone and a reference that does not exist return the identical response**,
+byte for byte. Distinguishing them would make the phone check an oracle for which
+references exist. `scripts/track-test.mjs` asserts it, in the pre-commit hook.
+
+**What `/track` cannot find yet, and the page says so:** only the M-Pesa path records an
+outcome, because it is the only one with a callback that settles anything. Step 8's
+gateway has no webhook and writes nothing to KV. Until section 9 has credentials there is
+nothing to look up, and the page states that rather than shrugging at a real reference.
+Delete that paragraph when section 9 goes live.
+
+### The gaps are data, not prose
+
+Everything only Ric can supply lives in `src/data/site.json`, every value `null`, typed
+and documented in `src/lib/site.ts`. The same rule as `products.json`: **a null renders as
+an omission or as a stated absence, never as a placeholder and never as a guess.**
+
+| Key | What is needed |
+|---|---|
+| `owner.name` | The real name of the person who packs and sends orders |
+| `owner.photo` | A real photograph of that person. No AI, no stock, no avatar |
+| `owner.area` | The part of Nairobi they work from |
+| `contact.phone` | **A number that rings and is answered** |
+| `contact.whatsapp` | The WhatsApp number, if it differs |
+| `contact.hours` | When a person is actually there |
+| `delivery.zones` | Areas with real costs and real working-day counts |
+| `delivery.returnsWindowDays` | How many days to return something |
+| `delivery.returnsCondition` | What condition it has to be in |
+
+`GAPS` in `src/lib/site.ts` is derived from which of those are still null, so the list
+cannot claim something is missing after it has been supplied. `Gap.astro` renders one
+**in development only**, gated on `import.meta.env.DEV`, naming the key and what it
+blocks. Production never sees it: a page showing "[PHONE NUMBER]" says the shop was
+assembled from a template and left unfinished, which is the exact suspicion the site
+exists to reduce. Production says only true things or says nothing.
+
+**`contact.phone` is the most expensive missing value in the repo.** Every error message
+on the payment path — `/api/checkout`, `/api/mpesa/stk`, the blocked order on `/order`,
+the confirmation screen, `/track` — ends by routing someone to `/contact`, because
+CLAUDE.md requires a phone number on an error and there has never been a real one. Each
+of those is currently a route to a page that cannot finish the sentence. **One value
+unblocks all of them at once**, which is why it was recorded as one dependency in section
+7 rather than rediscovered five times.
+
+### Privacy is complete, because it describes code rather than facts
+
+It is the one trust page that could be written in full today: no analytics, no cookies,
+no third-party scripts, self-hosted fonts, no accounts, order held in the browser as
+product codes and quantities only, name and phone passed to the payment provider and
+nobody else, no card form anywhere, pending orders expiring after seven days. Every
+sentence is checkable against this repo, and the browser check asserts the page loads no
+third-party resource while promising none.
+
+The marketing opt-out CLAUDE.md requires takes its honest form: there is no mailing list
+and nothing subscribes anyone to one, so the only use of an email address is the receipt
+the buyer asked for. **If a mailing list is ever added, this page changes first.**
+
+### `/track` cost no budget rise
+
+The cart script went 7,486 bytes against a 6,656 ceiling when the tracking form landed,
+and the budget did not move — CLAUDE.md's rule is shrink before raising, and there was
+slack to find. Thirty-one `document.querySelector` calls became a helper, nine
+`"aria-disabled"` literals became a constant, the two forms' shared fetch-and-busy-button
+dance became one `send()`, and their two identical error-clearing blocks became one
+`clearErrors(fields, slot)`. It ships at **6,616 of 6,656**.
+
+### Still open
+
+- **No rate limit on `/api/track`.** The reference is 8 characters from a 30-character
+  alphabet and the phone must match, so brute force over HTTP is impractical, but
+  impractical is not the same as bounded. Worth a KV attempt counter when there is traffic
+  to justify the writes
+- `about` and `delivery` become substantially shorter pages the moment their data lands;
+  neither is padded to look finished in the meantime
 
 ## 11 — Ship
 Sitemap, Open Graph images, Search Console. Test on a real phone on Safaricom data.

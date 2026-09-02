@@ -1,0 +1,42 @@
+---
+// A missing fact, marked where it is missing — IN DEVELOPMENT ONLY.
+//
+// Nothing this renders ever reaches a buyer. It is gated on import.meta.env.DEV,
+// which Vite folds to false at build time, so the markup is not emitted into
+// dist/ at all — the same mechanism dev-guards.css uses, and its styles live
+// there for the same reason.
+//
+// THE POINT IS THE ASYMMETRY. A gap has two audiences and they need opposite
+// things. Ric needs it unmissable: which key, on which page, blocking what. A
+// buyer must never see it — a page showing "[PHONE NUMBER]" or "TBD" is worse
+// than one that simply does not make the claim, because it says the shop was
+// assembled from a template and left unfinished, which is the exact suspicion
+// this whole site exists to reduce.
+//
+// So production says only true things or says nothing, and development shouts.
+// What a buyer sees in place of a gap is decided by the page: either the section
+// is omitted, or it states the absence plainly, which is itself a true sentence.
+//
+// The text is not written here. It comes from GAPS in lib/site.ts, derived from
+// which values in site.json are still null, so this cannot claim a fact is
+// missing after it has been supplied.
+import { GAPS } from "../lib/site";
+
+interface Props {
+  /** A key from site.json, e.g. "contact.phone". */
+  field: string;
+}
+
+const { field } = Astro.props;
+const gap = GAPS.find((g) => g.key === field);
+---
+
+{
+  import.meta.env.DEV && gap && (
+    <p class="dev-gap">
+      <span class="dev-gap__key">{gap.key}</span>
+      <span class="dev-gap__what">{gap.what}</span>
+      <span class="dev-gap__blocks">blocks: {gap.blocks}</span>
+    </p>
+  )
+}

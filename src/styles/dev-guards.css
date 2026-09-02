@@ -33,3 +33,40 @@
   line-height: var(--lh-ui);
   padding: var(--s-8) var(--s-12);
 }
+
+/* A fact site.json is still missing, marked where the page would have used it.
+   Rendered only by Gap.astro, which is itself gated on import.meta.env.DEV, so
+   neither the markup nor these rules exist in a production build.
+
+   Loud on purpose. The failure this guards against is a gap becoming invisible
+   because the page reads fine without it — an omission is quiet by nature, which
+   is exactly why it needs something noisy standing where it should be. */
+.dev-gap {
+  display: grid;
+  gap: var(--s-8);
+  border: 1px dashed var(--seal);
+  border-inline-start: 2px solid var(--seal);
+  padding: var(--s-12);
+  margin-block: var(--s-12);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  line-height: var(--lh-ui);
+  letter-spacing: var(--tr-docket);
+  color: var(--fg);
+  max-width: var(--measure);
+}
+
+/* Seal as a FILL, never as text. CLAUDE.md is explicit that it fails contrast
+   on both grounds as a text colour, and a dev-only file does not get an
+   exemption from the rule it exists to help enforce. */
+.dev-gap__key {
+  text-transform: uppercase;
+  background-color: var(--seal);
+  color: var(--tissue-cream);
+  padding: var(--s-8);
+  justify-self: start;
+}
+
+.dev-gap__blocks {
+  color: var(--fg-muted);
+}

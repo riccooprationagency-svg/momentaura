@@ -104,6 +104,19 @@ function write(order: Order): void {
 
 let order = read();
 
+/* Thirty-one calls to document.querySelector, nine string literals reading
+ * OFF. Neither is interesting, and together they were most of a
+ * kilobyte of a budget that exists to keep this file from becoming an
+ * application. Shrinking before raising the budget is the rule CLAUDE.md
+ * records, and this is where the slack was. */
+const q = <T extends HTMLElement = HTMLElement>(selector: string, root: ParentNode = document): T | null =>
+  root.querySelector<T>(selector);
+
+const qa = (selector: string): HTMLElement[] =>
+  Array.from(document.querySelectorAll<HTMLElement>(selector));
+
+const OFF = "aria-disabled";
+
 /* ---------- the nav count ----------
  *
  * Present on every page, because a count that is live on two page types and
@@ -113,8 +126,8 @@ let order = read();
  *
  * It server-renders hidden, so a browser with JavaScript off never sees a count
  * of zero standing in for a count it cannot compute. */
-const countLink = document.querySelector<HTMLElement>("[data-order-count]");
-const countValue = document.querySelector<HTMLElement>("[data-order-units]");
+const countLink = q("[data-order-count]");
+const countValue = q("[data-order-units]");
 
 function paintCount(): void {
   if (!countLink || !countValue) return;
@@ -125,9 +138,9 @@ function paintCount(): void {
 
 /* ---------- the product page ---------- */
 
-const addButton = document.querySelector<HTMLElement>("[data-add]");
-const addedNote = document.querySelector<HTMLElement>("[data-added]");
-const addedCount = document.querySelector<HTMLElement>("[data-added-count]");
+const addButton = q("[data-add]");
+const addedNote = q("[data-added]");
+const addedCount = q("[data-added-count]");
 
 function paintAdded(): void {
   if (!addButton || !addedNote || !addedCount) return;
@@ -147,7 +160,7 @@ if (addButton) {
      * from this codebase deliberately, because it suppressed the not-allowed
      * cursor while leaving the keyboard path wide open. Without this branch a
      * disabled "Add to order" adds to the order, on click and on Enter. */
-    if (addButton.getAttribute("aria-disabled") === "true") {
+    if (addButton.getAttribute(OFF) === "true") {
       event.preventDefault();
       return;
     }
@@ -177,15 +190,15 @@ if (addButton) {
  * branches on whether this page is the confirmation screen. Which painter owns
  * the [data-line] rows is a property of the page, so it is settled once, here,
  * rather than inferred at each call. */
-const received = document.querySelector<HTMLElement>("[data-received]");
-const receivedNone = document.querySelector<HTMLElement>("[data-received-none]");
+const received = q("[data-received]");
+const receivedNone = q("[data-received-none]");
 
-const lines = Array.from(document.querySelectorAll<HTMLElement>("[data-line]"));
-const emptyState = document.querySelector<HTMLElement>("[data-order-empty]");
-const liveState = document.querySelector<HTMLElement>("[data-order-live]");
-const totalValue = document.querySelector<HTMLElement>("[data-order-total]");
-const blockedNote = document.querySelector<HTMLElement>("[data-order-blocked]");
-const checkout = document.querySelector<HTMLElement>("[data-checkout]");
+const lines = qa("[data-line]");
+const emptyState = q("[data-order-empty]");
+const liveState = q("[data-order-live]");
+const totalValue = q("[data-order-total]");
+const blockedNote = q("[data-order-blocked]");
+const checkout = q("[data-checkout]");
 
 /* Read once, before anything can strip it. A blocked checkout drops its href
  * rather than leaning on aria-disabled to stop navigation — the rule
@@ -193,7 +206,7 @@ const checkout = document.querySelector<HTMLElement>("[data-checkout]");
 const checkoutHref = checkout ? checkout.getAttribute("href") : null;
 
 const text = (root: HTMLElement, selector: string, value: string): void => {
-  const node = root.querySelector<HTMLElement>(selector);
+  const node = q(selector, root);
   if (node) node.textContent = value;
 };
 
@@ -229,15 +242,18 @@ function paintLines(quantities: Order): HTMLElement[] {
 function paintOrder(): void {
   if (!lines.length) return;
 
-  /* THE RECEIPT OWNS ITS OWN LINES. /order-received renders the same
-   * [data-line] rows as /order and /checkout, but it paints them from the
-   * snapshot taken at submit — and by the time it is on screen the order
-   * itself has been cleared, because the order was placed. Letting this
-   * painter also run there walks every line back to a quantity of zero and
-   * writes "KSh 0" over the total, blanking the one screen a buyer keeps and
-   * screenshots. The two painters share the markup; they must never share a
-   * page. */
-  if (received) return;
+  /* ONLY THE PAGES THAT SHOW THE LIVE ORDER. Three other screens now render the
+   * same [data-line] rows and fill them from somewhere else: /order-received
+   * from the snapshot taken at submit, /track from what the server returned.
+   * Letting this painter loose on those walks every line back to whatever is in
+   * the cart right now — zero on the confirmation screen, because the order was
+   * cleared when it was placed, and somebody else's basket on a tracked order.
+   *
+   * The guard is the presence of the live-order UI rather than a list of pages
+   * to skip, so a fourth screen composing these rows is excluded by default
+   * instead of by remembering to add it here. Same direction of failure as
+   * Docket's `detail` prop: opting in is the loud thing. */
+  if (!liveState && !emptyState) return;
 
   /* The first sold-out line only. Naming one product is a specific
    * instruction; listing three is a wall to parse before they can act. */
@@ -263,11 +279,11 @@ function paintOrder(): void {
 
   if (checkout) {
     if (blocked === null) {
-      checkout.removeAttribute("aria-disabled");
+      checkout.removeAttribute(OFF);
       checkout.removeAttribute("aria-describedby");
       if (checkoutHref !== null) checkout.setAttribute("href", checkoutHref);
     } else {
-      checkout.setAttribute("aria-disabled", "true");
+      checkout.setAttribute(OFF, "true");
       checkout.setAttribute("aria-describedby", "order-blocked");
       checkout.removeAttribute("href");
     }
@@ -312,9 +328,9 @@ if (lines.length) {
       paintOrder();
     };
 
-    const down = line.querySelector("[data-qty-down]");
-    const up = line.querySelector("[data-qty-up]");
-    const remove = line.querySelector("[data-remove]");
+    const down = q("[data-qty-down]", line);
+    const up = q("[data-qty-up]", line);
+    const remove = q("[data-remove]", line);
 
     if (down) down.addEventListener("click", () => step(-1));
     if (up) up.addEventListener("click", () => step(1));
@@ -350,9 +366,9 @@ if (lines.length) {
  * carries the same [data-line] rows as /order. One painter, both pages.
  */
 
-const form = document.querySelector<HTMLFormElement>("[data-checkout-form]");
-const submitButton = document.querySelector<HTMLElement>("[data-checkout-submit]");
-const formError = document.querySelector<HTMLElement>("[data-checkout-error]");
+const form = q<HTMLFormElement>("[data-checkout-form]");
+const submitButton = q("[data-checkout-submit]");
+const formError = q("[data-checkout-error]");
 
 /* What was ordered, kept only so the confirmation screen can show it after the
  * order itself has been cleared. Slug and quantity, exactly like the order — no
@@ -373,78 +389,112 @@ const PLACED = "momentaura.placed.v1";
  * whole, the same way read() drops a quantity that is not an integer. */
 const REFERENCE = /^MA-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
+/* Sets or clears the message under one field. When there is a message it also
+ * moves focus there, because the two callers wanted exactly that and each was
+ * looking the same input up a second time to do it — the correction and the
+ * caret belong together anyway: a message under a field the buyer has scrolled
+ * past is a form that looks like it did nothing. */
 const setFieldError = (field: string, message: string | null) => {
-  const input = document.querySelector<HTMLElement>(`[data-field="${field}"]`);
-  const slot = document.querySelector<HTMLElement>(`[data-field-error="${field}"]`);
+  const input = q(`[data-field="${field}"]`);
+  const slot = q(`[data-field-error="${field}"]`);
   if (slot) {
     slot.textContent = message ?? "";
     slot.hidden = message === null;
   }
   if (input) {
     if (message === null) input.removeAttribute("aria-invalid");
-    else input.setAttribute("aria-invalid", "true");
+    else {
+      input.setAttribute("aria-invalid", "true");
+      input.focus();
+    }
   }
 };
 
-const clearErrors = () => {
-  for (const field of ["name", "phone", "email"]) setFieldError(field, null);
-  if (formError) {
-    formError.textContent = "";
-    formError.hidden = true;
+/* Both forms clear the same way: every field message off, then the one above
+ * the button. Taking the fields and the slot as arguments is what stops that
+ * being written twice with two chances to forget the second half. */
+const clearErrors = (fields: string[], slot: HTMLElement | null) => {
+  for (const field of fields) setFieldError(field, null);
+  if (slot) {
+    slot.textContent = "";
+    slot.hidden = true;
   }
 };
+
+/* The two forms on this site do the same five things around one fetch: refuse a
+ * second tap, say what is happening on the button, post JSON, read JSON back,
+ * and put the connection failure somewhere the buyer can read it. Written twice
+ * that is most of a kilobyte of the script budget spent saying the same thing,
+ * and two places for a retry rule to drift apart.
+ *
+ * It does NOT restore the button on success. /checkout navigates away, and a
+ * button that becomes live again while the page is still leaving is a second
+ * checkout one impatient tap later. The caller restores when it stays put. */
+type Sent = { status: number; body: Record<string, unknown>; restore: () => void };
+
+async function send(
+  button: HTMLElement,
+  busy: string,
+  url: string,
+  payload: unknown,
+  slot: HTMLElement | null,
+  dropped: string
+): Promise<Sent | null> {
+  const label = button.textContent;
+  button.setAttribute(OFF, "true");
+  button.textContent = busy;
+
+  const restore = () => {
+    button.removeAttribute(OFF);
+    button.textContent = label;
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return { status: response.status, body: await response.json(), restore };
+  } catch {
+    /* The connection, not the far end. Which one it was matters: "the payment
+     * failed" would be a claim about the buyer's money we are not in a position
+     * to make. */
+    restore();
+    if (slot) {
+      slot.textContent = dropped;
+      slot.hidden = false;
+    }
+    return null;
+  }
+}
 
 if (form && submitButton) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (submitButton.getAttribute("aria-disabled") === "true") return;
+    if (submitButton.getAttribute(OFF) === "true") return;
 
-    clearErrors();
+    clearErrors(["name", "phone", "email"], formError);
 
     const data = new FormData(form);
     const items = Object.entries(order).map(([slug, qty]) => ({ slug, qty }));
     if (!items.length) return;
 
-    /* Disabled while the request is out, so a second tap cannot open a second
-     * checkout. The label says what is happening rather than spinning. */
-    const label = submitButton.textContent;
-    submitButton.setAttribute("aria-disabled", "true");
-    submitButton.textContent = "Contacting the payment page";
+    const sent = await send(
+      submitButton,
+      "Contacting the payment page",
+      "/api/checkout",
+      { items, name: data.get("name"), phone: data.get("phone"), email: data.get("email") },
+      formError,
+      "The connection dropped before the payment page could be reached. " +
+        "Nothing has been charged. Check your connection and try again."
+    );
+    if (!sent) return;
 
-    const restore = () => {
-      submitButton.removeAttribute("aria-disabled");
-      submitButton.textContent = label;
-    };
+    const { restore } = sent;
+    const body = sent.body as { url?: string; message?: string; field?: string; reference?: string };
 
-    let response: Response;
-    let body: { url?: string; message?: string; field?: string; reference?: string };
-
-    try {
-      response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items,
-          name: data.get("name"),
-          phone: data.get("phone"),
-          email: data.get("email"),
-        }),
-      });
-      body = await response.json();
-    } catch {
-      /* The connection, not the gateway. Says which, because "the payment
-       * failed" would be a claim about the buyer's money we cannot make. */
-      restore();
-      if (formError) {
-        formError.textContent =
-          "The connection dropped before the payment page could be reached. " +
-          "Nothing has been charged. Check your connection and try again.";
-        formError.hidden = false;
-      }
-      return;
-    }
-
-    if (response.ok && body.url && body.reference) {
+    if (sent.status === 200 && body.url && body.reference) {
       /* Snapshot, then clear, then leave — in that order. If the tab dies
        * part-way the buyer keeps their order rather than losing it to a
        * confirmation screen that never rendered. */
@@ -470,12 +520,94 @@ if (form && submitButton) {
     const message = body.message ?? "That did not go through. Nothing has been charged.";
     if (body.field && body.field !== "items") {
       setFieldError(body.field, message);
-      const input = document.querySelector<HTMLElement>(`[data-field="${body.field}"]`);
-      if (input) input.focus();
     } else if (formError) {
       formError.textContent = message;
       formError.hidden = false;
     }
+  });
+}
+
+/* ---------- tracking an order ----------
+ *
+ * Reference plus phone, no account. The server decides whether those two match
+ * an order; this only asks and paints the answer.
+ *
+ * NONE OF THE PROSE IS HERE. The four outcomes are written into track.astro as
+ * hidden blocks and this reveals the one the server named, so the copy stays
+ * reviewable in the file it belongs to and the script carries a status word
+ * rather than four paragraphs. It also keeps the rule that nothing crosses from
+ * a response into the DOM as markup: the status picks a selector, it is never
+ * written into the page.
+ */
+
+const trackForm = q<HTMLFormElement>("[data-track-form]");
+const trackButton = q("[data-track-submit]");
+const trackError = q("[data-track-error]");
+const trackResult = q("[data-track-result]");
+
+if (trackForm && trackButton && trackResult) {
+  trackForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (trackButton.getAttribute(OFF) === "true") return;
+
+    clearErrors(["reference", "trackphone"], trackError);
+    trackResult.hidden = true;
+
+    const data = new FormData(trackForm);
+
+    const sent = await send(
+      trackButton,
+      "Looking for the order",
+      "/api/track",
+      { reference: data.get("reference"), phone: data.get("trackphone") },
+      trackError,
+      "The connection dropped before the order could be looked up. Check your connection and try again."
+    );
+    if (!sent) return;
+
+    sent.restore();
+
+    const body = sent.body as {
+      status?: string;
+      reference?: string;
+      amount?: number;
+      items?: { slug: string; qty: number }[];
+      message?: string;
+      field?: string;
+    };
+
+    if (sent.status !== 200 || !body.reference || !body.status) {
+      const message = body.message ?? "That order could not be looked up.";
+      /* The server names a field only for the two the buyer typed. Everything
+       * else — including the deliberately identical answer for a wrong
+       * reference and a wrong phone — belongs above the button. */
+      if (body.field === "reference" || body.field === "phone") {
+        const field = body.field === "phone" ? "trackphone" : "reference";
+        setFieldError(field, message);
+      } else if (trackError) {
+        trackError.textContent = message;
+        trackError.hidden = false;
+      }
+      return;
+    }
+
+    const ref = q("[data-track-ref]");
+    if (ref) ref.textContent = body.reference;
+
+    /* One of four, and only one. Hiding them all first means an unknown status
+     * from a future version of the endpoint shows no outcome rather than the
+     * previous buyer's. */
+    for (const state of qa("[data-status]")) {
+      state.hidden = state.dataset.status !== body.status;
+    }
+
+    const placed: Order = {};
+    for (const item of body.items ?? []) {
+      if (typeof item.slug === "string" && Number.isInteger(item.qty)) placed[item.slug] = item.qty;
+    }
+    paintLines(placed);
+
+    trackResult.hidden = false;
   });
 }
 
@@ -537,7 +669,7 @@ function paintReceived(): void {
     const placed: Order = {};
     for (const item of snapshot.items) placed[item.slug] = item.qty;
 
-    const refSlot = document.querySelector<HTMLElement>("[data-received-ref]");
+    const refSlot = q("[data-received-ref]");
     if (refSlot) refSlot.textContent = snapshot.reference ?? "";
 
     let longest = 0;
@@ -552,9 +684,9 @@ function paintReceived(): void {
     /* A DATE, never a duration. Rendered only when every line in the order has a
      * real lead time — one null and the order's arrival is unknown, and the
      * longest of the known ones would be a guess dressed as a commitment. */
-    const dateLine = document.querySelector<HTMLElement>("[data-received-date]");
-    const dateValue = document.querySelector<HTMLElement>("[data-received-date-value]");
-    const noDate = document.querySelector<HTMLElement>("[data-received-nodate]");
+    const dateLine = q("[data-received-date]");
+    const dateValue = q("[data-received-date-value]");
+    const noDate = q("[data-received-nodate]");
     if (everyLineHasLead && longest > 0 && dateLine && dateValue && noDate) {
       dateValue.textContent = LONG_DATE.format(workingDaysFrom(new Date(), longest));
       dateLine.hidden = false;

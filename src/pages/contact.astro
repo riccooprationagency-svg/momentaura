@@ -1,0 +1,182 @@
+---
+// Contact.
+//
+// THIS IS THE MOST EXPENSIVE GAP IN THE REPO, and the page says so to Ric in
+// development rather than hiding it behind a tidy layout.
+//
+// Every error message on the payment path — /api/checkout, /api/mpesa/stk, the
+// blocked order on /order, the confirmation screen, the tracking page — ends by
+// sending someone here, because CLAUDE.md requires a phone number on an error
+// and there has never been a real one to print. Each of those messages is
+// currently a route to a page that cannot finish the sentence.
+//
+// It is still not invented. A number that does not ring is worse than no number:
+// it converts a buyer who was merely stuck into one who has been lied to, at the
+// exact moment they were already worried about their money. The honest version
+// says there is no published number yet and does not pretend otherwise.
+//
+// One value in site.json unblocks all of it at once.
+import Base from "../layouts/Base.astro";
+import Gap from "../components/Gap.astro";
+import { site, known } from "../lib/site";
+
+const phone = site.contact.phone;
+const whatsapp = site.contact.whatsapp;
+const hours = site.contact.hours;
+
+const hasPhone = known(phone);
+const hasWhatsapp = known(whatsapp);
+const reachable = hasPhone || hasWhatsapp;
+
+// Digits only, for the tel: and wa.me hrefs. Never rendered as the label.
+const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
+---
+
+<Base
+  title="Contact — MomentAura"
+  description="How to reach a person about an order."
+  system="light"
+>
+  <section class="page">
+    <div class="wrap page__inner">
+      <h1 class="page__heading">Contact</h1>
+
+      {
+        reachable ? (
+          <p class="page__body">
+            A person answers these. If it is about an order, have the order reference
+            ready — it is on your confirmation screen and looks like MA-4KLM-2XQP.
+          </p>
+        ) : (
+          <p class="page__body">
+            There is no published phone number for this shop yet. Rather than print one
+            that does not ring, this page says so: if you have paid for something and need
+            a person, that route is still being set up.
+          </p>
+        )
+      }
+
+      {
+        hasPhone && (
+          <p class="reach">
+            <span class="reach__label">Phone</span>
+            <a class="reach__value" href={`tel:${digits(phone)}`}>
+              {phone}
+            </a>
+          </p>
+        )
+      }
+
+      {
+        hasWhatsapp && (
+          <p class="reach">
+            <span class="reach__label">WhatsApp</span>
+            <a class="reach__value" href={`https://wa.me/${digits(whatsapp).replace(/^\+/, "")}`}>
+              {whatsapp}
+            </a>
+          </p>
+        )
+      }
+
+      {
+        hasWhatsapp === false && hasPhone && (
+          <p class="page__body">WhatsApp is on the same number.</p>
+        )
+      }
+
+      {
+        known(hours) ? (
+          <p class="reach">
+            <span class="reach__label">Hours</span>
+            <span class="reach__value">{hours}</span>
+          </p>
+        ) : (
+          <p class="page__body">
+            Hours are not published yet, so no promise is made about how quickly a message
+            is answered.
+          </p>
+        )
+      }
+
+      <Gap field="contact.phone" />
+      <Gap field="contact.whatsapp" />
+      <Gap field="contact.hours" />
+
+      <hr class="page__hair" />
+
+      <h2 class="page__sub">About an order</h2>
+      <p class="page__body">
+        An order can be checked with its reference and the phone number it was placed
+        with, without an account, on the <a href="/track">track an order</a> page.
+      </p>
+
+      <p class="page__body">
+        Delivery and returns are on the <a href="/delivery">delivery terms</a> page.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__inner {
+    max-width: var(--max-width);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .page__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-16);
+  }
+
+  .page__body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  .page__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-40);
+  }
+
+  /* A way to reach a person is a checkable fact, so it sits in the data
+     register — but the accent stays off it. --accent means "you can verify
+     this" and is confined to two sanctioned sites; a phone number is an
+     instruction to act, not a lead time to check. */
+  .reach {
+    display: grid;
+    gap: var(--s-8);
+    margin-block-end: var(--s-20);
+  }
+
+  .reach__label {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+  }
+
+  .reach__value {
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+</style>

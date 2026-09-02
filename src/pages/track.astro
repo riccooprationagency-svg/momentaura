@@ -1,0 +1,308 @@
+---
+// Track an order. Reference plus phone, no account.
+//
+// NO ACCOUNTS, AND THAT IS THE DESIGN RATHER THAN A SHORTCUT. An account is a
+// password to forget, a credential store to protect and a reason to abandon a
+// purchase, in exchange for nothing this page needs. The reference on the
+// confirmation screen and the phone the prompt went to are both already in the
+// buyer's hand, and together they identify one order and nothing else.
+//
+// This page closes the gap that opens the moment someone pays: they have parted
+// with money and the next thing that happens is silence until a parcel arrives.
+// It is the one trust page that needs no fact only Ric can supply — no phone
+// number, no photograph, no delivery zone — which is why it is built first.
+//
+// EVERY SENTENCE THE BUYER CAN SEE IS WRITTEN HERE, not in the cart script. The
+// four outcomes render as hidden blocks and the script reveals one. That keeps
+// prose out of a byte budget, keeps copy reviewable in the file it belongs to,
+// and holds the rule that nothing crosses from a response into the DOM as
+// markup — the only values the script writes are numbers it computed and text
+// this page handed it.
+//
+// WHAT IT CANNOT FIND YET, said plainly on the page rather than discovered by a
+// buyer typing a real reference into a page that shrugs: only the M-Pesa path
+// records an outcome, because it is the only one with a callback that settles
+// anything. Step 8's gateway has no webhook. Until step 9's credentials exist,
+// there is nothing here to find.
+import Base from "../layouts/Base.astro";
+import Button from "../components/Button.astro";
+import Field from "../components/Field.astro";
+import { products, price } from "../lib/products";
+---
+
+<Base
+  title="Track an order — MomentAura"
+  description="Check an order with its reference and the phone number it was placed with. No account needed."
+  system="light"
+>
+  <section class="track">
+    <div class="wrap track__inner">
+      <h1 class="track__heading">Track an order</h1>
+
+      <p class="track__lead">
+        Your order reference and the phone number the payment prompt was sent to. There
+        is no account and no password — those two are enough.
+      </p>
+
+      <form class="track__form" data-track-form novalidate>
+        <Field
+          name="reference"
+          label="Order reference"
+          autocomplete="off"
+          required
+          hint="On your confirmation screen. It looks like MA-4KLM-2XQP."
+        />
+
+        <Field
+          name="trackphone"
+          label="Phone"
+          type="tel"
+          inputmode="tel"
+          autocomplete="tel"
+          required
+          hint="The number the payment prompt was sent to."
+        />
+
+        <p class="track__error" data-track-error role="alert" hidden></p>
+
+        <div class="track__actions">
+          <Button variant="filled" type="submit" data-track-submit>Find the order</Button>
+        </div>
+      </form>
+
+      <!-- Everything below is revealed by the cart script when an order is
+           found. It ships hidden and empty rather than stubbed. -->
+      <div class="track__result" data-track-result hidden>
+        <hr class="track__hair" />
+
+        <p class="track__ref-label">Order</p>
+        <p class="track__ref" data-track-ref></p>
+
+        <!--
+          The four outcomes, one revealed. Written here in full because they are
+          prose, and prose is reviewed in the file it lives in rather than
+          assembled from fragments in a script.
+        -->
+        <div class="track__state" data-status="pending" hidden>
+          <h2 class="track__state-heading">Payment not confirmed yet</h2>
+          <p class="track__state-body">
+            The order is recorded and the payment has not been confirmed. If you completed
+            the prompt on your phone, check again shortly. Nothing is sent until the
+            payment is confirmed, and nothing more is needed from you in the meantime.
+          </p>
+        </div>
+
+        <div class="track__state" data-status="paid" hidden>
+          <h2 class="track__state-heading">Payment confirmed</h2>
+          <p class="track__state-body">
+            The payment is confirmed and the order is being packed. It is dispatched from
+            Nairobi.
+          </p>
+        </div>
+
+        <div class="track__state" data-status="failed" hidden>
+          <h2 class="track__state-heading">The payment did not complete</h2>
+          <p class="track__state-body">
+            Nothing was charged. The prompt was cancelled, timed out, or was not
+            completed. Place the order again to get a new prompt.
+          </p>
+        </div>
+
+        <!--
+          Set when a callback claimed an amount that did not match the one this
+          site computed. The buyer is not told the mechanics — that is our
+          problem, not theirs — but they are told plainly that it needs a person,
+          because the one thing that must not happen is a buyer with a real
+          payment being shown a shrug.
+        -->
+        <div class="track__state" data-status="mismatch" hidden>
+          <h2 class="track__state-heading">This order needs checking by a person</h2>
+          <p class="track__state-body">
+            Something about this payment does not add up and it has been flagged rather
+            than settled either way. Get in touch with the reference above and it will be
+            sorted out by hand.
+          </p>
+        </div>
+
+        <h2 class="track__sub">What was ordered</h2>
+
+        <ul class="track__lines" role="list">
+          {
+            products.map((product) => (
+              <li
+                class="tline"
+                data-line
+                data-slug={product.slug}
+                data-price={product.price}
+                hidden
+              >
+                <span class="tline__name">{product.name}</span>
+                <span class="tline__qty">
+                  <span data-qty>0</span> &times; {price(product.price)}
+                </span>
+                <span class="tline__amount" data-line-total />
+              </li>
+            ))
+          }
+        </ul>
+
+        <p class="track__total">
+          <span class="track__total-label">Total</span>
+          <span class="track__total-value" data-order-total>KSh 0</span>
+        </p>
+      </div>
+
+      <hr class="track__hair" />
+
+      <!--
+        Said on the page, not left for a buyer to discover by typing a real
+        reference into something that cannot answer. This paragraph is deleted
+        the day step 9 has credentials, and BUILD-ORDER section 10 says so.
+      -->
+      <p class="track__note">
+        Orders placed before M-Pesa payment is live cannot be looked up here yet — the
+        payment route that records an outcome is not switched on. Until then, an order is
+        found by its reference through the contact page.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .track {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  /* One column, capped. This is a form and a record, not a layout. */
+  .track__inner {
+    max-width: var(--max-width);
+  }
+
+  .track__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-20);
+  }
+
+  .track__lead,
+  .track__note,
+  .track__error,
+  .track__state-body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  .track__lead {
+    margin-block-end: var(--s-40);
+  }
+
+  .track__form {
+    display: grid;
+    gap: var(--s-28);
+    max-width: var(--measure);
+  }
+
+  .track__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s-20);
+  }
+
+  .track__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-40);
+  }
+
+  .track__ref-label,
+  .track__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-8);
+  }
+
+  .track__ref {
+    font-family: var(--font-mono);
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    letter-spacing: var(--tr-docket);
+    margin-block-end: var(--s-28);
+  }
+
+  .track__state-heading {
+    font-size: var(--t-body-sm);
+    font-weight: var(--w-medium);
+    margin-block-end: var(--s-8);
+  }
+
+  .track__state {
+    margin-block-end: var(--s-40);
+  }
+
+  .track__sub {
+    margin-block-end: var(--s-20);
+  }
+
+  .track__lines {
+    list-style: none;
+    display: grid;
+    gap: var(--s-16);
+    margin-block-end: var(--s-20);
+  }
+
+  .tline {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-8) var(--s-20);
+    align-items: baseline;
+  }
+
+  .tline__name {
+    font-size: var(--t-body-sm);
+  }
+
+  .tline__qty {
+    grid-column: 1;
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tline__amount {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .track__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-20);
+    font-family: var(--font-mono);
+    letter-spacing: var(--tr-docket);
+    border-block-start: 1px dashed var(--border);
+    padding-block-start: var(--s-16);
+  }
+
+  .track__total-label {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .track__total-value {
+    font-size: var(--t-body-sm);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

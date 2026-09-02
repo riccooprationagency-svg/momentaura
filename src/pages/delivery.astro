@@ -1,0 +1,173 @@
+---
+// Delivery and returns.
+//
+// TWO OF THE THREE SECTIONS CANNOT BE WRITTEN YET, and neither is filled with a
+// plausible-looking guess. Delivery zones with invented costs and a returns
+// window picked because fourteen days sounds standard are exactly the failure
+// this site is built against: a buyer who is quoted KSh 300 and charged KSh 550
+// has been taught that everything else on the page is decorative too.
+//
+// So each section states what is true, and where nothing is true yet it says so
+// in a sentence. A stated absence is a fact. A placeholder is a lie with a
+// typeface. The dev-only marker names the exact key in site.json.
+import Base from "../layouts/Base.astro";
+import Gap from "../components/Gap.astro";
+import { site, known } from "../lib/site";
+import { price } from "../lib/products";
+
+const zones = site.delivery.zones;
+const hasZones = known(zones);
+const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery.returnsCondition);
+---
+
+<Base
+  title="Delivery and returns — MomentAura"
+  description="Where orders are dispatched from, what delivery costs, and how returns work."
+  system="light"
+>
+  <section class="page">
+    <div class="wrap page__inner">
+      <h1 class="page__heading">Delivery and returns</h1>
+
+      <h2 class="page__sub">Dispatch</h2>
+      <p class="page__body">
+        Every order is packed and sent from {site.delivery.dispatchFrom}. Nothing is
+        dispatched until the payment is confirmed.
+      </p>
+      <p class="page__body">
+        The delivery date is shown as a date — not a number of days — at checkout and again
+        on your confirmation, because that is where you are deciding whether to trust a
+        commitment, and a duration asks you to do the arithmetic yourself.
+      </p>
+
+      <hr class="page__hair" />
+
+      <h2 class="page__sub">What delivery costs</h2>
+
+      {
+        hasZones ? (
+          <table class="zones">
+            <thead>
+              <tr>
+                <th scope="col">Area</th>
+                <th scope="col">Cost</th>
+                <th scope="col">Working days</th>
+              </tr>
+            </thead>
+            <tbody>
+              {zones.map((zone) => (
+                <tr>
+                  <td>{zone.name}</td>
+                  <td class="zones__figure">{price(zone.cost)}</td>
+                  <td class="zones__figure">{zone.days}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p class="page__body">
+            Delivery areas and their costs are not published yet. Rather than print a
+            figure that might not hold, the cost is agreed before anything is sent — ask
+            on the contact page and you will be told the figure for your area before you
+            pay.
+          </p>
+        )
+      }
+
+      <Gap field="delivery.zones" />
+
+      <hr class="page__hair" />
+
+      <h2 class="page__sub">Returns</h2>
+
+      {
+        hasReturns ? (
+          <p class="page__body">
+            Anything can be returned within {site.delivery.returnsWindowDays} days of
+            arriving, {site.delivery.returnsCondition}.
+          </p>
+        ) : (
+          <p class="page__body">
+            The returns window is not published yet. It is not a way of avoiding returns —
+            if something arrives wrong, damaged, or not what the page described, say so on
+            the contact page and it will be put right.
+          </p>
+        )
+      }
+
+      <Gap field="delivery.returnsWindowDays" />
+      <Gap field="delivery.returnsCondition" />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__inner {
+    max-width: var(--max-width);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .page__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-16);
+  }
+
+  .page__body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  .page__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-40);
+  }
+
+  /* Figures in mono, names in Archivo. The typeface switch is the signal that
+     the reader is looking at a fact. */
+  .zones {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: var(--measure);
+    text-align: start;
+  }
+
+  .zones th {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    font-weight: var(--w-medium);
+    text-align: start;
+    padding-block-end: var(--s-12);
+    border-block-end: 1px solid var(--border);
+  }
+
+  .zones td {
+    font-size: var(--t-body-sm);
+    padding-block: var(--s-12);
+    border-block-end: 1px dashed var(--border);
+  }
+
+  .zones__figure {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+</style>
