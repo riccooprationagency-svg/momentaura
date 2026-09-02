@@ -127,11 +127,20 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
           Seal fill this page gets, and a second instance 80px below it is the
           redundancy that drains the colour.
         -->
+        <!--
+          data-stock is what the cart clamps the add handler against. It is a
+          courtesy so an honest buyer is not walked into a refusal at checkout,
+          not a control — it is rendered here from products.json at build time
+          and everything past that is the buyer's own machine to edit.
+          functions/api/checkout.js re-reads stock from the catalogue and is
+          what actually stops the order.
+        -->
         <Button
           variant="filled"
           disabled={soldOut}
           data-add
           data-slug={product.slug}
+          data-stock={product.stock}
           describedby={soldOut ? "detail-closed" : undefined}
         >
           Add to order

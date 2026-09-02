@@ -264,6 +264,28 @@ No quote path in v1. This is an apparel store with a cart. The 10-unit quote rou
 and the Order Bar's "Request a quote" behaviour in `docs/STYLE-dark-editorial.md`
 are both gifting-era and do not apply.
 
+**Found here, deferred to section 8 on purpose: nothing stopped a quantity above
+stock.** The cart caps at 99 and never consults stock, so the steppers would take
+a six-stock item to twenty and the order page would total it up and offer a
+checkout button.
+
+It was deferred rather than fixed here because the fix that matters is not a cart
+change. A quantity is a client value, and a client value is never trusted for a
+decision that costs money — the same rule as never trusting a client price. The
+enforcement therefore belongs in `functions/api/checkout.js`, which re-reads stock
+from the catalogue and rejects the line by name with the real figure, and that
+file does not exist until section 8. Building the clamp here first would have put
+the whole guard on the buyer's own machine and left the endpoint trusting it,
+which is the wrong shape however well the clamp is written.
+
+Both halves land together in section 8: the server check that actually stops the
+order, and a courtesy clamp on the stepper and the add handler at
+`min(99, stock)` so an honest buyer is not walked into a refusal at the worst
+moment in the flow. The clamp refuses an increase and never lowers a quantity
+already in the order — a line that sold out while it sat there stays visible and
+blocked rather than being quietly trimmed, because silently dropping part of an
+order is the failure this shop exists to not commit.
+
 ## 8 — Checkout
 Cloudflare Function. Re-price server-side. Redirect to the hosted gateway page.
 **No card field on our domain.**

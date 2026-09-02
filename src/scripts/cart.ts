@@ -30,6 +30,29 @@ const MAX_QTY = 99;
 
 type Order = Record<string, number>;
 
+/* How high this product can honestly go: the lower of the hard ceiling and what
+ * is actually in stock, read from the figure the page rendered out of
+ * products.json at build time.
+ *
+ * COURTESY, NOT A CONTROL, AND THE DISTINCTION IS THE WHOLE POINT. Clamping here
+ * stops an honest buyer being walked to checkout with a quantity that will be
+ * refused there, which is a failure at the worst moment in the flow. It is not
+ * what stops the order. Everything on this side of the wire is the buyer's own
+ * machine to edit, so a clamp here decides nothing that costs money:
+ * functions/api/checkout.js re-reads stock from the catalogue and rejects the
+ * line by name with the real figure. That check is the enforcement. This one
+ * must never be mistaken for it, and must never be the reason the server check
+ * is thought unnecessary — same division as re-pricing, for the same reason.
+ *
+ * A missing or unreadable figure falls back to MAX_QTY rather than to zero. This
+ * is the convenience layer, and a convenience that blocks a real order because a
+ * data attribute went missing has done more damage than the refusal it exists to
+ * prevent. Failing open is correct here precisely because the server does not. */
+const ceiling = (stock: string | undefined): number => {
+  const figure = Number(stock);
+  return stock && Number.isFinite(figure) ? Math.min(MAX_QTY, figure) : MAX_QTY;
+};
+
 /* Matches price() in src/lib/products.ts. Integer KSh in the data, formatted
  * only at the edge, and the same locale on both sides so a line total and the
  * unit price above it can never disagree about how a thousand is punctuated. */
@@ -130,7 +153,13 @@ if (addButton) {
     }
     const slug = addButton.dataset.slug;
     if (!slug) return;
-    order[slug] = Math.min((order[slug] ?? 0) + 1, MAX_QTY);
+
+    /* Courtesy clamp — see ceiling(). At the limit this does nothing rather
+       than adding a unit that checkout would refuse. */
+    const next = (order[slug] ?? 0) + 1;
+    if (next > ceiling(addButton.dataset.stock)) return;
+
+    order[slug] = next;
     write(order);
     paintCount();
     paintAdded();
@@ -264,9 +293,20 @@ if (lines.length) {
     const slug = line.dataset.slug ?? "";
 
     const step = (by: number) => {
-      const next = (order[slug] ?? 0) + by;
-      if (next < 1) delete order[slug];
-      else order[slug] = Math.min(next, MAX_QTY);
+      const current = order[slug] ?? 0;
+
+      /* Courtesy clamp — see ceiling(). It refuses an increase past what is in
+       * stock and NEVER LOWERS WHAT IS ALREADY THERE. A line that sold out
+       * while it sat in the order, or one already above stock, stays visible at
+       * the quantity the buyer chose and is blocked by the order page and named
+       * by the server. Trimming it to fit would be silently dropping part of an
+       * order, which is the one thing this must not do. Going down is always
+       * allowed: that is the buyer removing the problem themselves. */
+      const capped =
+        by > 0 && current + by > ceiling(line.dataset.stock) ? current : current + by;
+
+      if (capped < 1) delete order[slug];
+      else order[slug] = capped;
       write(order);
       paintCount();
       paintOrder();
