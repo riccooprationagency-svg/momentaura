@@ -264,9 +264,48 @@ No quote path in v1. This is an apparel store with a cart. The 10-unit quote rou
 and the Order Bar's "Request a quote" behaviour in `docs/STYLE-dark-editorial.md`
 are both gifting-era and do not apply.
 
+**Found here, deferred to section 8 on purpose: nothing stopped a quantity above
+stock.** The cart caps at 99 and never consults stock, so the steppers would take
+a six-stock item to twenty and the order page would total it up and offer a
+checkout button.
+
+It was deferred rather than fixed here because the fix that matters is not a cart
+change. A quantity is a client value, and a client value is never trusted for a
+decision that costs money — the same rule as never trusting a client price. The
+enforcement therefore belongs in `functions/api/checkout.js`, which re-reads stock
+from the catalogue and rejects the line by name with the real figure, and that
+file does not exist until section 8. Building the clamp here first would have put
+the whole guard on the buyer's own machine and left the endpoint trusting it,
+which is the wrong shape however well the clamp is written.
+
+Both halves land together in section 8: the server check that actually stops the
+order, and a courtesy clamp on the stepper and the add handler at
+`min(99, stock)` so an honest buyer is not walked into a refusal at the worst
+moment in the flow. The clamp refuses an increase and never lowers a quantity
+already in the order — a line that sold out while it sat there stays visible and
+blocked rather than being quietly trimmed, because silently dropping part of an
+order is the failure this shop exists to not commit.
+
 ## 8 — Checkout
 Cloudflare Function. Re-price server-side. Redirect to the hosted gateway page.
 **No card field on our domain.**
+
+IntaSend is the interim gateway and everything gateway-shaped is confined to
+`functions/api/_gateway.js`. Step 9 rewrites that one file's body for Daraja: the import
+in `checkout.js`, the client, both pages and every error state stay as they are.
+
+**Check:** `node scripts/checkout-test.mjs` — 43 cases over the shipped handler. A client
+price is ignored, an unknown slug is rejected rather than skipped, a sold-out product is
+named, a quantity above stock is refused with the real figure, a repeated slug cannot step
+around either cap, and no gateway detail or internal code reaches the browser on any of
+the seven failure paths. Misconfiguration reads as "unavailable" and never as "declined",
+because telling a buyer their payment was refused when our own key was missing is a false
+statement about them.
+
+**Untested, and stated rather than implied: the live gateway.** There are no IntaSend
+sandbox credentials in this repo, so no request has ever left the machine. The request
+body's shape against IntaSend's actual API, and Cloudflare's bundler accepting the JSON
+import, are both unproven until someone runs it with real keys.
 
 ## 9 — M-Pesa (only once the business shortcode exists)
 Cloudflare KV for pending orders. STK Push → callback → status-query fallback.
@@ -288,8 +327,12 @@ checkout and payment-declined errors in section 8 — none of them can carry a n
 this section supplies one, so it is one edit across all of them rather than three
 rediscoveries.
 
-Also still owed here: `/delivery` is linked from the product page, from `/order` and from
-the footer, and does not exist yet.
+Also still owed here, and the list grew at step 8: `/delivery` is linked from the product
+page, from `/order`, from `/checkout`, from `/order-received` and from the footer, and
+`/contact` is linked from `/order-received` — twice, once from the lead paragraph anyone
+arriving without a reference sees. Neither page exists yet. The confirmation screen is the
+one a buyer screenshots and comes back to, so its dead links are the most expensive on the
+site.
 
 ## 11 — Ship
 Sitemap, Open Graph images, Search Console. Test on a real phone on Safaricom data.

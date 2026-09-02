@@ -1,0 +1,146 @@
+---
+// Underline input. 1px bottom border, no box, no fill, 0 radius.
+//
+// THE SECOND OF TWO ACCENT REFERENCES IN THE SOURCE TREE. The focus state's 2px
+// bottom border is the one place the accent touches an interactive element, and
+// CLAUDE.md sanctions it by name: "it is a state, not a fill". The other is the
+// docket's fact row in global.css. verify.mjs V3 asserts both, by site and not
+// only by count, so a third cannot arrive by accident.
+//
+// The global cream focus ring is NOT suppressed. global.css says "no outline
+// reset of any kind, at any point, ever", and that rule does not have a local
+// exception for a component that would rather draw its own indicator. So a
+// focused field shows both: the outline every focusable thing on the site
+// shows, and the accent underline that says this one is a field. Belt and
+// braces on the screen where a buyer is typing their phone number.
+interface Props {
+  name: string;
+  label: string;
+  type?: "text" | "tel" | "email";
+  required?: boolean;
+  autocomplete?: string;
+  inputmode?: "text" | "tel" | "email";
+  /** One line under the label. Says what is wanted, never what went wrong. */
+  hint?: string;
+}
+
+const {
+  name,
+  label,
+  type = "text",
+  required = false,
+  autocomplete,
+  inputmode,
+  hint,
+} = Astro.props;
+
+const id = `field-${name}`;
+const hintId = hint ? `${id}-hint` : undefined;
+const errorId = `${id}-error`;
+
+// The error element is always in the DOM and always referenced, rather than
+// being added when a message appears. An aria-describedby pointing at an id
+// that does not exist yet is a reference to nothing, and screen readers differ
+// on whether they re-read a describedby that changes after focus. It ships
+// empty and hidden; the cart fills it.
+const describedby = [hintId, errorId].filter(Boolean).join(" ");
+---
+
+<div class="field">
+  <label class="field__label" for={id}>
+    {label}
+    {
+      /* Optional is stated, not required. Marking the two required fields with
+         an asterisk and leaving the third bare makes the buyer decode a legend;
+         saying "optional" once on the only optional field does not. */
+      !required && <span class="field__optional">optional</span>
+    }
+  </label>
+
+  {hint && <p class="field__hint" id={hintId}>{hint}</p>}
+
+  <input
+    class="field__input"
+    id={id}
+    name={name}
+    type={type}
+    required={required}
+    autocomplete={autocomplete}
+    inputmode={inputmode}
+    aria-describedby={describedby}
+    data-field={name}
+  />
+
+  <!-- Filled and revealed by the cart. aria-live so the message is announced
+       when it appears rather than only on the next focus. -->
+  <p class="field__error" id={errorId} data-field-error={name} role="alert" hidden></p>
+</div>
+
+<style>
+  .field {
+    display: grid;
+    gap: var(--s-8);
+  }
+
+  .field__label {
+    font-size: var(--t-label);
+    font-weight: var(--w-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+  }
+
+  /* Lower case against the uppercase label, so it reads as an aside rather than
+     as part of the field's name. */
+  .field__optional {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    text-transform: none;
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+  }
+
+  .field__hint {
+    font-size: var(--t-caption);
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  /* Underline only. No box, no fill, 0 radius — --radius-input exists for
+     exactly this and resolves to 0. The 44px min-height is the touch target;
+     the border is the whole visible control. */
+  .field__input {
+    background-color: transparent;
+    color: var(--fg);
+    border: 0;
+    border-block-end: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    min-height: var(--tap-target);
+    width: 100%;
+    padding: 0;
+    font-size: var(--t-body-sm);
+    transition: border-color var(--dur) var(--ease);
+  }
+
+  /* THE ACCENT. A state, never a fill. Two pixels, bottom border only.
+     Not :focus-visible — a text input that has been clicked into is being typed
+     in, and the person typing needs to see which field has the caret whether
+     the browser decided the focus was "visible" or not. */
+  .field__input:focus {
+    border-block-end: 2px solid var(--accent);
+  }
+
+  /* A field the server rejected. Muted, not Seal: Seal is a fill that means
+     closed, and a mistyped phone number is neither closed nor a fill. */
+  .field__error {
+    font-size: var(--t-caption);
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  .field__input[aria-invalid="true"] {
+    border-block-end-color: var(--fg-muted);
+  }
+</style>

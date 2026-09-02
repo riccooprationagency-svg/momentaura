@@ -360,17 +360,32 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   breakpoint cannot be a token. There are three — 640px, 900px and 1100px. Read them there,
   change them there and in the queries together. Media preludes are the one place a
   raw pixel value is expected
-- `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, exactly one
-  accent reference in the whole source tree, the closed stamp contained to `Docket.astro`
+- `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, the accent
+  confined to its sanctioned sites, the closed stamp contained to `Docket.astro`
   and counted at no more than one Seal fill per built page, the `PAIRINGS` table complete
   against the reachable set, the banned-construct list, and page weight against budget.
+- **V3 pins the accent to named selectors, not to a count.** There are two sanctioned
+  uses and CLAUDE.md names both in prose: the docket's fact row in `global.css`, and the
+  2px focus underline on `Field.astro`'s input — "the one place the accent touches an
+  interactive element, and it is a state, not a fill". The check was "exactly one
+  reference" until step 8 added the second, and a bare count of two would then have
+  accepted any two references anywhere. Two wrong ones pass a count; they do not pass a
+  table of file plus selector. A new use fails whatever the total, and moving a sanctioned
+  one fails until the table is edited on purpose — which is the point, because editing it
+  is the decision being made out loud
 - **V4 counts the scripts, and it is a budget rather than an absence.** It asserted zero
   JavaScript until step 7 shipped the cart — the one exception this file has always
   named — so it moved from absence to containment rather than being relaxed: exactly one
-  `.js` in `dist/`, named `cart.<hash>.js`, under 5KB, referenced by that same one URL
+  `.js` in `dist/`, named `cart.<hash>.js`, under 6.5KB, referenced by that same one URL
   from every page, and no inline `<script>` body anywhere in the output. Absence needs no
   judgement and a budget nobody counts becomes a comment, which is why the loosening had
-  to buy a tighter rule somewhere else
+  to buy a tighter rule somewhere else.
+  **The byte budget has moved exactly once — 5KB to 6.5KB at step 8** — to pay for the
+  checkout submit and the confirmation screen, most of it the error copy this file
+  requires. The raise is argued in `verify.mjs` beside the constant, and that is the only
+  place it may ever be argued. Shrink before raising: the two line painters were one loop
+  written twice until step 8 merged them. A budget that follows whatever the file happens
+  to weigh is not a budget, and that starts with one raise nobody wrote down
 - **The cart stores slug and quantity only. Never a name, a price or a stock figure.**
   This is a security property, not an implementation detail, and step 8 must not weaken
   it. localStorage is the buyer's own disk: anything the cart writes there, a buyer can
@@ -387,7 +402,30 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   The quantity is still a client value and still not trusted. It is capped on read, and
   step 8 re-prices server-side from our own catalogue regardless. This is the client-side
   half of the Security section's "never trust a client price", not a substitute for it
-- Both scripts run on every commit via `.git/hooks/pre-commit`
+- **Step 8 added a second key, `momentaura.placed.v1`, and it obeys the same rule.** It
+  holds the slugs and quantities of the order just placed, plus the order reference the
+  server minted, so the confirmation screen can still say what was bought after the order
+  itself has been cleared. Still no name, no price, no stock: the amounts on that screen
+  are looked up from the catalogue rendered into the page, exactly as `/order` does.
+  The reference is the one value that crosses from storage into the DOM, so it is checked
+  against the shape `checkout.js` mints before it is written, and a snapshot that fails
+  discards whole. It goes in through `textContent`, which cannot inject markup — the test
+  is not about injection but about proving that what appears under "your order reference"
+  is a reference. **A reference is never trusted as an assertion that an order was paid.**
+  Nothing on the confirmation screen claims the money arrived, because a redirect is a URL
+  and anyone can type one; only step 9's callback can say that
+- **`node scripts/checkout-test.mjs` guards the money path, and it runs on every commit
+  too.** `functions/` sits outside the Astro build: `contrast.mjs` reads `tokens.css` and
+  `verify.mjs` walks `src/` and `dist/`, so a `checkout.js` broken in half passes every
+  other gate in this repo. It runs the shipped handler on Node's own fetch primitives —
+  the same ones the Workers runtime supplies — rewriting exactly two imports: the
+  catalogue, so a case can set real stock without the shipped `products.json` ever being
+  edited to make a test pass, and `createHostedCheckout`, so a gateway failure is
+  deterministic. `GatewayError` stays real, because `checkout.js` branches on
+  `instanceof` and a stubbed class would pass that branch for the wrong reason. What it
+  cannot prove is anything about a live gateway, and it says so rather than implying
+  otherwise
+- All three scripts run on every commit via `.git/hooks/pre-commit`
 
 ## Prompting note
 

@@ -1,0 +1,295 @@
+---
+// Checkout. Name and phone, an order summary, and one button that leaves for
+// the gateway's hosted page.
+//
+// NO CARD FIELD EXISTS HERE, and none may ever be added. The card details are
+// entered on the gateway's own domain, which is what keeps PCI scope at the
+// lightest tier. This page collects a name, a phone number and optionally an
+// email, and nothing else.
+//
+// The redirect is stated before it happens, in prose, above the button. An
+// unannounced jump to another domain at the moment money moves is the single
+// most suspicion-inducing event in the whole flow — the buyer arrived expecting
+// to be taken somewhere and abandoned, and a silent hop to a domain they have
+// never heard of is exactly what that would look like.
+//
+// The gateway's name comes from functions/api/_gateway.js, which is the file
+// step 9 replaces with Daraja. The import points from src/ into functions/ on
+// purpose: it is the difference between the swap being one file and being one
+// file plus whichever pages happened to name the gateway in prose.
+import Base from "../layouts/Base.astro";
+import Button from "../components/Button.astro";
+import Field from "../components/Field.astro";
+import { products, price } from "../lib/products";
+import { GATEWAY_NAME } from "../../functions/api/_gateway.js";
+
+// Light, following the products it lists, exactly as /order does.
+---
+
+<Base
+  title="Checkout — MomentAura"
+  description={`Name, phone number, and payment on ${GATEWAY_NAME}'s secure page. Dispatched from Nairobi.`}
+  system="light"
+>
+  <section class="checkout">
+    <div class="wrap">
+      <h1 class="checkout__heading">Checkout</h1>
+
+      <!-- Ships as the empty state, and it is the honest one: a browser that
+           cannot read storage has no order to check out. -->
+      <p class="checkout__empty" data-order-empty>
+        Nothing in your order yet. <a href="/">Start from the categories</a>.
+      </p>
+
+      <div class="checkout__grid" data-order-live hidden>
+        <form class="checkout__form" data-checkout-form novalidate>
+          <h2 class="checkout__sub">Where it is going</h2>
+
+          <Field
+            name="name"
+            label="Name"
+            autocomplete="name"
+            required
+            hint="The name the order is for."
+          />
+
+          <Field
+            name="phone"
+            label="Phone"
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            required
+            hint="M-Pesa sends the payment prompt to this number. Like 0712 345 678."
+          />
+
+          <Field
+            name="email"
+            label="Email"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            hint="Only for a receipt. Leave it blank if you would rather not."
+          />
+
+          <!--
+            STATE THE REDIRECT BEFORE IT HAPPENS. Prose, above the button,
+            naming the domain. Not a tooltip, not fine print under the fold,
+            and not after the click.
+          -->
+          <p class="checkout__redirect">
+            Payment is completed on {GATEWAY_NAME}'s secure page. You will come back here
+            when it is done. No card details are ever entered on this site.
+          </p>
+
+          <!-- Filled and revealed by the cart when the server rejects the
+               order as a whole — a gateway that is down, or a line that sold
+               out between the order page and here. Field-level messages go
+               under their own field instead. -->
+          <p class="checkout__error" id="checkout-error" data-checkout-error role="alert" hidden></p>
+
+          <div class="checkout__actions">
+            <Button variant="filled" type="submit" data-checkout-submit>
+              Continue to {GATEWAY_NAME}
+            </Button>
+            <a class="checkout__back" href="/order">Back to your order</a>
+          </div>
+        </form>
+
+        <aside class="checkout__summary" aria-labelledby="summary-heading">
+          <h2 class="checkout__sub" id="summary-heading">Your order</h2>
+
+          <ul class="summary__lines" role="list">
+            {
+              products.map((product) => (
+                <li
+                  class="summary__line"
+                  data-line
+                  data-slug={product.slug}
+                  data-name={product.name}
+                  data-price={product.price}
+                  data-stock={product.stock}
+                  hidden
+                >
+                  <span class="summary__name">{product.name}</span>
+                  <span class="summary__qty">
+                    <span data-qty>0</span> &times; {price(product.price)}
+                  </span>
+                  <span class="summary__amount" data-line-total />
+                </li>
+              ))
+            }
+          </ul>
+
+          <hr class="checkout__hair" />
+
+          <p class="summary__total">
+            <span class="summary__total-label">Total</span>
+            <span class="summary__total-value" data-order-total>KSh 0</span>
+          </p>
+
+          <p class="summary__terms">
+            Dispatched from Nairobi. Delivery dates and returns are on the <a
+              href="/delivery">delivery terms</a> page.
+          </p>
+        </aside>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .checkout {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .checkout__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .checkout__empty {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  .checkout__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-56);
+    align-items: start;
+  }
+
+  .checkout__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-20);
+  }
+
+  .checkout__form {
+    display: grid;
+    gap: var(--s-28);
+  }
+
+  /* Prose. It is the sentence that stops the redirect being a surprise, so it
+     is set as reading matter, not as a caption or a mono label. */
+  .checkout__redirect,
+  .checkout__error {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  .checkout__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-20);
+  }
+
+  .checkout__back {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+
+  .checkout__back:hover {
+    color: var(--fg);
+  }
+
+  /* ---------- summary ---------- */
+
+  .checkout__summary {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    padding: var(--s-20);
+  }
+
+  .summary__lines {
+    list-style: none;
+    display: grid;
+    gap: var(--s-16);
+  }
+
+  .summary__line {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-8) var(--s-20);
+    align-items: baseline;
+  }
+
+  .summary__name {
+    font-size: var(--t-body-sm);
+  }
+
+  .summary__qty {
+    grid-column: 1;
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary__amount {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .checkout__hair {
+    border: 0;
+    border-block-start: 1px dashed var(--border);
+    width: 100%;
+    margin-block: var(--s-20);
+  }
+
+  .summary__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-20);
+    font-family: var(--font-mono);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .summary__total-label {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .summary__total-value {
+    font-size: var(--t-body-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary__terms {
+    font-size: var(--t-caption);
+    color: var(--fg-muted);
+    margin-block-start: var(--s-20);
+  }
+
+  @media (min-width: 900px) {
+    /* Form leads, summary sits beside it. The summary is what they are paying
+       for, so it stays on screen while they type rather than above the fold
+       they have already scrolled past. */
+    .checkout__grid {
+      grid-template-columns: 1fr var(--reveal-object);
+    }
+  }
+</style>

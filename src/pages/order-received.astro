@@ -1,0 +1,248 @@
+---
+// Where the gateway sends the buyer back to.
+//
+// THIS SCREEN GETS SCREENSHOTTED AND SHOWN TO OTHER PEOPLE. It is read out of
+// context, by someone who did not place the order, on a phone, in a WhatsApp
+// thread. So it names the shop, states the reference, says what was ordered and
+// for how much, and says where it goes from here — without any of it depending
+// on the sentence before it.
+//
+// WHAT THIS PAGE MUST NOT CLAIM, and does not: that the money arrived.
+// CLAUDE.md is explicit — "An STK prompt is not a payment. Only a callback or a
+// successful status query marks an order paid." A redirect back from the gateway
+// is neither. It is a URL, and anyone can type it. So the wording is that the
+// order is placed and the payment is being confirmed, which is true whichever
+// way the payment actually went, and step 9's callback is what turns it into a
+// paid order.
+//
+// The step 8 brief asked for "items and amount paid". That is the one line of
+// the brief this page does not follow, because at this point in the flow the
+// site does not know it. Stated in the PR rather than papered over.
+//
+// KNOWN, and blocked on data: the delivery date. CLAUDE.md requires a date here
+// specifically, and the machinery to compute one is built and tested — the cart
+// takes the longest lead time in the order, counts forward in working days, and
+// renders a date. leadTimeDays is null on every product, so no date renders
+// today and the page says the date comes with the confirmation instead. It
+// appears the moment a real lead time exists. A date computed from a null would
+// be a made-up commitment on the one screen a buyer keeps.
+import Base from "../layouts/Base.astro";
+import { products, price } from "../lib/products";
+---
+
+<Base
+  title="Order received — MomentAura"
+  description="Your order reference, what you ordered, and what happens next."
+  system="light"
+>
+  <section class="received">
+    <div class="wrap received__inner">
+      <!-- The state a browser with no JavaScript sees, and the state anyone
+           following the link without a reference sees. It does not pretend an
+           order exists; it routes to the one place that can answer. -->
+      <div data-received-none>
+        <h1 class="received__heading">Order received</h1>
+        <p class="received__lead">
+          If you have just paid, your order reference was shown on the payment page. Keep
+          it — it is how the order is found. Message us on the <a href="/contact">contact</a
+          > page with that reference and it can be looked up.
+        </p>
+      </div>
+
+      <div data-received hidden>
+        <h1 class="received__heading">Order received</h1>
+
+        <!-- The reference. Mono, large, first, because it is the one thing on
+             this page a person is asked to keep. -->
+        <p class="received__ref-label">Your order reference</p>
+        <p class="received__ref" data-received-ref></p>
+
+        <p class="received__lead">
+          The payment is being confirmed. Nothing else is needed from you now — if the
+          payment did not complete, the order is not sent and nothing is charged.
+        </p>
+
+        <hr class="received__hair" />
+
+        <h2 class="received__sub">What you ordered</h2>
+
+        <ul class="received__lines" role="list">
+          {
+            products.map((product) => (
+              <li
+                class="rline"
+                data-line
+                data-slug={product.slug}
+                data-name={product.name}
+                data-price={product.price}
+                data-stock={product.stock}
+                data-lead={product.leadTimeDays ?? ""}
+                hidden
+              >
+                <span class="rline__name">{product.name}</span>
+                <span class="rline__qty"><span data-qty>0</span> &times; {price(product.price)}</span>
+                <span class="rline__amount" data-line-total />
+              </li>
+            ))
+          }
+        </ul>
+
+        <p class="received__total">
+          <span class="received__total-label">Total</span>
+          <span class="received__total-value" data-order-total>KSh 0</span>
+        </p>
+
+        <hr class="received__hair" />
+
+        <h2 class="received__sub">What happens next</h2>
+
+        <!-- Renders only when every line in the order has a real lead time.
+             Omitted otherwise, the same rule the docket applies to a null. -->
+        <p class="received__dispatch" data-received-date hidden>
+          Dispatched from Nairobi, arriving by <span data-received-date-value></span>.
+        </p>
+
+        <p class="received__dispatch" data-received-nodate>
+          Dispatched from Nairobi. The delivery date is confirmed together with the
+          payment, and comes to you with it.
+        </p>
+
+        <p class="received__human">
+          Something wrong, or a question about this order? Message us on the <a
+            href="/contact">contact</a
+          > page with the reference above and a person will answer. Delivery terms and
+          returns are on the <a href="/delivery">delivery terms</a> page.
+        </p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .received {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  /* Narrow. This is a document to be read, and on a wide screen a full-width
+     receipt reads as a page rather than as a record. */
+  .received__inner {
+    max-width: var(--max-width);
+  }
+
+  .received__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-28);
+  }
+
+  .received__ref-label,
+  .received__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-8);
+  }
+
+  /* The one thing on the page a person is asked to keep, so it is set larger
+     than anything else in the data register and given room around it. */
+  .received__ref {
+    font-family: var(--font-mono);
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    letter-spacing: var(--tr-docket);
+    margin-block-end: var(--s-28);
+  }
+
+  .received__lead,
+  .received__human,
+  .received__dispatch {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  .received__lead {
+    margin-block-end: var(--s-20);
+  }
+
+  .received__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-40);
+  }
+
+  .received__sub {
+    margin-block-end: var(--s-20);
+  }
+
+  .received__lines {
+    list-style: none;
+    display: grid;
+    gap: var(--s-16);
+    margin-block-end: var(--s-20);
+  }
+
+  .rline {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--s-8) var(--s-20);
+    align-items: baseline;
+    max-width: var(--max-width);
+  }
+
+  .rline__name {
+    font-size: var(--t-body-sm);
+  }
+
+  .rline__qty {
+    grid-column: 1;
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rline__amount {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: var(--t-body-sm);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .received__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--s-20);
+    font-family: var(--font-mono);
+    letter-spacing: var(--tr-docket);
+    border-block-start: 1px dashed var(--border);
+    padding-block-start: var(--s-16);
+  }
+
+  .received__total-label {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  .received__total-value {
+    font-size: var(--t-body-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .received__dispatch {
+    margin-block-end: var(--s-20);
+  }
+
+  /* No wide-screen variant. The prose is already capped at --measure and the
+     receipt rows sit against it, so the whole screen reads as one column at
+     every width — which is the shape it needs to hold when it is cropped into
+     a screenshot and read by someone who was not here. */
+</style>
