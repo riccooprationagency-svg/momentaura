@@ -23,15 +23,26 @@ given the Data Protection Act reasoning in `FONT-SETUP.md`.
 ```bash
 cp scripts/pre-commit .git/hooks/pre-commit   # once per clone — see below
 node scripts/contrast.mjs                     # WCAG, reads tokens.css directly
-node scripts/verify.mjs                        # hex, accent, banned list, budget
+node scripts/verify.mjs                       # hex, accent, banned list, budget
+node scripts/checkout-test.mjs                # the endpoint that touches money
 ```
 
-Both run on every commit. Zero dependencies, plain Node.
+All three run on every commit. Zero dependencies, plain Node.
 
 `scripts/contrast.mjs` asserts every specified colour pairing against the real token
-values. `scripts/verify.mjs` asserts no raw hex outside `tokens.css`, exactly one
-accent reference in the whole source tree, no banned constructs, and page weight
-against the 500KB homepage budget. Either failing refuses the commit.
+values. `scripts/verify.mjs` asserts no raw hex outside `tokens.css`, the accent only at
+its two sanctioned sites — the docket's fact row and the input focus underline, each
+pinned to its own selector rather than to a count — no banned constructs, one named
+script under budget, and page weight against the 500KB homepage budget.
+
+`scripts/checkout-test.mjs` exercises `functions/api/checkout.js`, which the other two
+never load: `functions/` is outside the Astro build, so a broken money endpoint passes
+every other gate. It runs the shipped handler on Node's own fetch primitives and proves
+the rules that matter there — a client price is ignored, an unknown slug is rejected, a
+sold-out product is named rather than dropped, and no gateway detail ever reaches the
+browser. It cannot prove anything about a live gateway and does not claim to.
+
+Any of the three failing refuses the commit.
 
 **`.git/hooks/` is not version controlled, so a fresh clone has no gates until you run
 that copy.** Do it first, before writing anything. The accent rule is the constraint

@@ -268,6 +268,23 @@ are both gifting-era and do not apply.
 Cloudflare Function. Re-price server-side. Redirect to the hosted gateway page.
 **No card field on our domain.**
 
+IntaSend is the interim gateway and everything gateway-shaped is confined to
+`functions/api/_gateway.js`. Step 9 rewrites that one file's body for Daraja: the import
+in `checkout.js`, the client, both pages and every error state stay as they are.
+
+**Check:** `node scripts/checkout-test.mjs` — 43 cases over the shipped handler. A client
+price is ignored, an unknown slug is rejected rather than skipped, a sold-out product is
+named, a quantity above stock is refused with the real figure, a repeated slug cannot step
+around either cap, and no gateway detail or internal code reaches the browser on any of
+the seven failure paths. Misconfiguration reads as "unavailable" and never as "declined",
+because telling a buyer their payment was refused when our own key was missing is a false
+statement about them.
+
+**Untested, and stated rather than implied: the live gateway.** There are no IntaSend
+sandbox credentials in this repo, so no request has ever left the machine. The request
+body's shape against IntaSend's actual API, and Cloudflare's bundler accepting the JSON
+import, are both unproven until someone runs it with real keys.
+
 ## 9 — M-Pesa (only once the business shortcode exists)
 Cloudflare KV for pending orders. STK Push → callback → status-query fallback.
 Idempotent by `CheckoutRequestID`.
@@ -288,8 +305,12 @@ checkout and payment-declined errors in section 8 — none of them can carry a n
 this section supplies one, so it is one edit across all of them rather than three
 rediscoveries.
 
-Also still owed here: `/delivery` is linked from the product page, from `/order` and from
-the footer, and does not exist yet.
+Also still owed here, and the list grew at step 8: `/delivery` is linked from the product
+page, from `/order`, from `/checkout`, from `/order-received` and from the footer, and
+`/contact` is linked from `/order-received` — twice, once from the lead paragraph anyone
+arriving without a reference sees. Neither page exists yet. The confirmation screen is the
+one a buyer screenshots and comes back to, so its dead links are the most expensive on the
+site.
 
 ## 11 — Ship
 Sitemap, Open Graph images, Search Console. Test on a real phone on Safaricom data.
