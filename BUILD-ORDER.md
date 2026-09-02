@@ -311,6 +311,96 @@ import, are both unproven until someone runs it with real keys.
 Cloudflare KV for pending orders. STK Push → callback → status-query fallback.
 Idempotent by `CheckoutRequestID`.
 
+### Status: built, sandbox-shaped, and NOT verified against Safaricom
+
+**No Daraja credentials exist in this repo and no request has left the machine.**
+Registration at developer.safaricom.co.ke needs a person with an account; it cannot be
+done from here. So the code is written and tested against a stub of Daraja's HTTP API,
+and that is a different claim from "it works". Nothing here ships until a real shortcode
+exists and the paths below are re-run against the real sandbox.
+
+**Sandbox and production credentials are entirely separate and nothing carries over.**
+Consumer key, consumer secret, shortcode and passkey are all different values on the two.
+The sandbox shortcode is a shared test paybill that is not ours. Going live is a full
+re-issue, not a host swap — the only thing `MPESA_ENV` changes is which host is called.
+
+**The go-live application needs live HTTPS callback URLs**, which means the site must be
+deployed before production Daraja can even be applied for. **Section 11 blocks this
+section**, not the other way round.
+
+### The architecture change
+
+This is where the site stops being purely static. STK Push is asynchronous: the request
+goes out, the phone prompts, and the answer arrives later in a different request. KV holds
+the order across that gap, keyed on `CheckoutRequestID`, carrying slugs, quantities, the
+amount **we** computed, and a status.
+
+### Env vars
+
+`MPESA_ENV`, `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_SHORTCODE`,
+`MPESA_PASSKEY`, `MPESA_TRANSACTION_TYPE`, `MPESA_CALLBACK_ORIGIN`,
+`MPESA_CALLBACK_TOKEN`, `MPESA_CALLBACK_IPS`, plus the KV binding `ORDERS`. Nothing is
+hardcoded: a paybill change must not need a code release.
+
+### Known gaps, stated rather than papered over
+
+- **The "write to KV before the push" rule cannot be fully obeyed.** The key a callback
+  arrives on is the `CheckoutRequestID`, and Daraja only issues it in its response — so
+  that key cannot exist beforehand. The order is written first under its own reference and
+  indexed afterwards, so a death between the two is a reconciliation rather than an
+  untraceable payment. Closing it needs a client-chosen idempotency key, which the STK API
+  does not offer
+- **KV has no compare-and-swap**, so `settle()` is read-then-write and two simultaneous
+  callbacks can both observe `pending`. Bounded here — both write the same terminal state
+  from the same stored amount — but it is not mutual exclusion. A Durable Object is the
+  right primitive if this ever drives stock decrement or a payout
+- **The IP allowlist default must be confirmed against current Daraja documentation before
+  production.** It is Safaricom's list to change. It fails closed, so a stale list rejects
+  real callbacks — which the status query then recovers
+- **The buyer-facing flow is not wired.** `/checkout` still posts to the IntaSend endpoint.
+  STK Push has no page to redirect to: it needs a "check your phone" screen that polls
+  `/api/mpesa/status`. That is a client change against a 6.5KB script budget with roughly
+  600 bytes spare, and it is not worth spending before a real shortcode proves the flow
+
+### Step 8's "one file swap" assumption was wrong, and is withdrawn
+
+Section 8 recorded that step 9 would replace the body of `_gateway.js` and touch nothing
+else. That held for a hosted-page gateway, which hands back a URL to redirect to. Daraja
+hands back nothing to redirect to and settles asynchronously against a callback — a
+different flow, not a different implementation of the same one. So the M-Pesa endpoints
+live beside `checkout.js` rather than inside it, and `checkout.js` is unchanged apart from
+the shared validation move below.
+
+`_order.js` now holds the request validation, the stock rules and the re-pricing, shared by
+`/api/checkout` and `/api/mpesa/stk`. Two copies of "never trust a client price" is how one
+of them gets a stock rule fixed and the other does not.
+
+### Which failure paths were actually exercised
+
+`scripts/mpesa-test.mjs` — 43 checks, in the pre-commit hook. The endpoints, `_pending.js`,
+`_order.js` and `_daraja.js` are all the shipped code; `fetch`, the catalogue and the KV
+binding are the only substitutions.
+
+Exercised: token cached across pushes; token failure reads as unavailable; EAT timestamp
+and base64 password; push stores `pending` and never `paid`; client price ignored; sold-out
+and over-stock refused by name with no push; Daraja refusing inside a 200 body; Daraja HTTP
+error; Daraja unreachable; missing shortcode; a 200 with no `CheckoutRequestID`; KV failing
+before the push, so nothing is pushed; wrong path token; wrong source IP; empty allowlist
+failing closed; successful callback; **duplicate callback**; **forged amount, high and low**;
+customer cancelled (1032); wrong PIN (2001); insufficient balance (1); no response from the
+phone (1037); callback for an unknown id; unreadable body; KV failure during settle
+returning 500 so Safaricom retries; status query requiring reference as well as id; the
+90-second grace; **callback never arrives, recovered by the query**; query returning a
+failure; query returning "still processing"; **query unreachable not turning a live payment
+into a failure**; a settled order answered from KV without a query; a callback arriving
+after the query already settled it; and the status response carrying no amount, phone
+number or receipt.
+
+**Reasoned about only, and untestable from here:** that Safaricom accepts these request
+bodies at all; that a real phone prompts; that real callbacks arrive from the allowlisted
+IPs; that Daraja's real timeout behaviour matches the stub; that `expires_in` is what the
+docs say; and every production-credential behaviour, since none have been issued.
+
 ## 10 — Trust pages
 Delivery, About, Contact, Privacy, `/track`. `/track` takes order reference plus phone —
 no accounts, no passwords.

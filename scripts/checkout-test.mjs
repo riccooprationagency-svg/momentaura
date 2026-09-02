@@ -36,25 +36,32 @@ import { tmpdir } from "node:os";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(ROOT, "functions", "api", "checkout.js");
+const ORDER = join(ROOT, "functions", "api", "_order.js");
 const GATEWAY = pathToFileURL(join(ROOT, "functions", "api", "_gateway.js")).href;
 
-/* ---------- load the real handler with two imports redirected ---------- */
+/* ---------- load the real handler with two imports redirected ----------
+ *
+ * The catalogue import lives in _order.js, which checkout.js imports relatively.
+ * So both files are written to the scratch directory: the copy of _order.js has
+ * its catalogue swapped, and checkout.js's `./_order.js` then resolves to that
+ * copy without the import itself being touched. The shared validation is
+ * therefore the shipped code, running against a fixed catalogue. */
 
-const original = readFileSync(SOURCE, "utf8");
-
-let patched = original.replace(
+const orderSource = readFileSync(ORDER, "utf8");
+const orderPatched = orderSource.replace(
   /^import catalogue from .*$/m,
   "const catalogue = globalThis.__catalogue;"
 );
-if (patched === original) throw new Error("could not find the catalogue import — has checkout.js moved it?");
+if (orderPatched === orderSource) throw new Error("could not find the catalogue import — has _order.js moved it?");
 
-const before = patched;
-patched = patched.replace(
+const original = readFileSync(SOURCE, "utf8");
+
+const patched = original.replace(
   /^import \{ GATEWAY_NAME, GatewayError, createHostedCheckout \} from .*$/m,
   `import { GATEWAY_NAME, GatewayError } from ${JSON.stringify(GATEWAY)};\n` +
     "const createHostedCheckout = (...args) => globalThis.__gateway(...args);"
 );
-if (patched === before) throw new Error("could not find the gateway import — has checkout.js moved it?");
+if (patched === original) throw new Error("could not find the gateway import — has checkout.js moved it?");
 
 /* A fixed catalogue. Prices and stock chosen so a wrong total is obvious:
    650 x 2 = 1300, and nothing else in the set sums to it by accident. */
@@ -64,9 +71,10 @@ globalThis.__catalogue = [
   { slug: "bullet-pendant", name: "Bullet pendant", price: 1400, stock: 2 },
 ];
 
-const scratch = join(tmpdir(), "momentaura-checkout-test");
+const scratch = join(tmpdir(), `momentaura-checkout-test-${Date.now()}`);
 mkdirSync(scratch, { recursive: true });
-const modulePath = join(scratch, `checkout.${Date.now()}.mjs`);
+writeFileSync(join(scratch, "_order.js"), orderPatched, "utf8");
+const modulePath = join(scratch, "checkout.mjs");
 writeFileSync(modulePath, patched, "utf8");
 
 const { onRequest } = await import(pathToFileURL(modulePath).href);
