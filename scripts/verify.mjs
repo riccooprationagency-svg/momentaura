@@ -887,9 +887,27 @@ if (existsSync(DIST)) {
  * step 8 raise left, deliberately. The next feature that needs a kilobyte fails
  * this check, which is the whole job.
  *
- * Before raising it a third time: shrink first, and if it must move, move it
- * here, in this comment, with the reason. Never by rounding up to whatever made
- * the build pass.
+ * THE BUDGET DOES NOT MOVE AGAIN. 7KB is the last number this constant takes in
+ * this project. Two raises in two consecutive steps is the pattern the rule was
+ * written to prevent, and a third would settle the question of what this gate
+ * is: not a budget, but a record of whatever the file happened to weigh on the
+ * day someone ran it. Both raises were argued honestly and both were reasonable
+ * on their own. That is exactly how the number gets to 12KB — no single step
+ * ever looks like the one that broke it.
+ *
+ * So the rule from here is a fixed ceiling, not a threshold to argue against.
+ * A future feature either fits in what remains, or it does not ship as
+ * client-side JavaScript. Those are the two outcomes. There is no third one
+ * where the constant goes up after the gate fails, and "it is only 400 bytes"
+ * is the argument this paragraph exists to refuse — it was the argument both
+ * previous times.
+ *
+ * If something genuinely needs more room, that is a conversation held before
+ * the code is written, about whether the feature belongs on the client at all
+ * — server-rendered, a form post, a link to a page. Not a number adjusted after
+ * the fact to accommodate work already done. Code written against a budget it
+ * has not been granted is not evidence that the budget was wrong; it is the
+ * cost of finding out that it was not.
  */
 
 if (existsSync(DIST)) {
@@ -900,9 +918,10 @@ if (existsSync(DIST)) {
   const js = files.filter((f) => f.endsWith(".js"));
   const fonts = files.filter((f) => f.endsWith(".woff2"));
 
-  // 7KB. Raised from 6.5KB at step 10, which was raised from 5KB at step 8 — see
-  // the note above for what each bought, what was shrunk first, and what has to
-  // happen before it moves again.
+  // 7KB, and this is the last value it takes. Raised from 6.5KB at step 10,
+  // which was raised from 5KB at step 8 — see the note above for what each
+  // bought and why there is no third raise. A feature that does not fit does
+  // not ship as client-side JavaScript.
   const SCRIPT_BUDGET = 7 * 1024;
   const CART = /^cart\.[A-Za-z0-9_-]+\.js$/;
 

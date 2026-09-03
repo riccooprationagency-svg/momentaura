@@ -399,7 +399,16 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   in an eight-parameter abstraction that this file requires to be read line by line. **A
   budget is never worth making the money code harder to read.** A budget that follows
   whatever the file happens to weigh is not a budget, and that starts with one raise
-  nobody wrote down
+  nobody wrote down.
+  **7KB is final. The budget does not move again in this project.** Two raises in two
+  consecutive steps is the pattern this rule exists to prevent, and both were argued
+  honestly — which is precisely how a number reaches 12KB without any single step
+  looking like the one that broke it. From here there are two outcomes and no third:
+  a feature fits in what remains, or it does not ship as client-side JavaScript.
+  "It is only 400 bytes" was the argument both previous times. If something genuinely
+  needs more room, that is a conversation held **before the code is written** — about
+  whether the work belongs on the client at all, or belongs in a form post, a server
+  render, a link to a page. Never a constant adjusted after the gate has failed
 - **The cart stores slug and quantity only. Never a name, a price or a stock figure.**
   This is a security property, not an implementation detail, and step 8 must not weaken
   it. localStorage is the buyer's own disk: anything the cart writes there, a buyer can
