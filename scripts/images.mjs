@@ -24,20 +24,29 @@
  *
  * ---------- sharp, and what V1 gave up to allow it ----------
  *
- * sharp is a devDependency, and V1 in verify.mjs was widened to permit exactly
- * that one name. That widening is a cost and it is recorded there, not here.
+ * sharp is a devDependency, pinned to an exact version, and V1 in verify.mjs was
+ * widened from an absence to a one-name allow-list to permit it. That widening
+ * is a cost. The full argument — the three options, what this one bought and
+ * what it cost — lives at V1 and in BUILD-ORDER section 12, not here, because
+ * that is where the next person adding a name will be reading.
  *
- * It was declared rather than borrowed. sharp is already on disk — Astro lists
- * it in its own optionalDependencies — so importing it without declaring it
- * would have worked today and cost nothing in package.json. It would also have
- * pinned our image pipeline to a version another project chose, silently, and
- * `optional` means a tree where the install skipped it is a valid tree. A tool
- * that decides what a photograph looks like should say which encoder it used.
+ * The short version: it was declared rather than borrowed. Astro carries sharp
+ * in its own optionalDependencies, so importing it undeclared would have worked
+ * today and cost nothing in package.json — while leaving V1 printing "astro and
+ * nothing else" over a build that depended on a package nothing here names, that
+ * Astro chose the version of, and that `optional` means an install may skip
+ * entirely. A gate confident about something it cannot see is the failure V3, V9
+ * and V11 each exist to correct. This is not the fourth.
+ *
+ * The pin is why RECIPE below does not have to record an encoder version: the
+ * encoder is fixed at 0.35.4 until someone changes it in package.json on
+ * purpose, and V1 fails if the declaration is a range. Change the pin and the
+ * bytes change, so change RECIPE with it.
  *
  * NOTHING ON THE SITE NEEDS SHARP. The renditions are committed to public/img/,
- * `npm run build` never imports this file, and a deploy from a tree with no
- * sharp in it builds and ships exactly the same bytes. If this script breaks it
- * breaks here, at a keyboard, with someone reading the error.
+ * `npm run build` never imports this file, and a deploy from a tree installed
+ * with --omit=dev builds and ships byte-identical output. If this script breaks
+ * it breaks here, at a keyboard, with someone reading the error.
  */
 
 import { createHash } from "node:crypto";

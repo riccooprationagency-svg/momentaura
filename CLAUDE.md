@@ -14,11 +14,22 @@ Astro (static output) · Cloudflare Pages · Cloudflare KV for order state · Cl
 Functions for anything touching money. No React, no Tailwind, no UI library. Plain CSS
 with custom properties. Ask before adding any dependency; the answer is almost always no.
 
-**Runtime dependencies: Astro, and nothing else. That half has never moved.** Step 12
-added the first and only devDependency — `sharp`, used by `scripts/images.mjs` and by
-nothing the site loads. V1 in `verify.mjs` now holds a named list rather than asserting
-an absence, which is a budget rather than a fact, and the argument for the one name in
-it lives beside the check. A second name is a decision made there, in writing.
+**Runtime: Astro, and nothing else. That half has never moved, and it is the half that
+matters** — it is what keeps the shipped output at zero JavaScript beyond the cart. V4
+holds the one script to a budget, but V4 only ever gets to count one file because this
+list has one name on it.
+
+**Build time: `sharp` only, pinned to an exact version.** Step 12 added it for
+`scripts/images.mjs`. It never reaches a browser: it runs at a keyboard to produce AVIF
+and WebP at three widths, and the renditions it writes are committed. `npm run build`
+never imports it, and a deploy installed with `--omit=dev` emits byte-identical output.
+It is pinned rather than ranged because it decides what a photograph looks like, and the
+same frame through a different libvips is different bytes.
+
+V1 in `verify.mjs` now holds a named list rather than asserting an absence — a budget
+rather than a fact — and asserts the pin. **The next name argues its case in that comment,
+with what it buys and what it costs, in the commit that adds it.** An allow-list of one is
+still a gate; one that grows without an argument each time is a comment.
 
 ## What this sells
 

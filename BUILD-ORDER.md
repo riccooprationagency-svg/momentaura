@@ -747,19 +747,66 @@ the one-year `immutable` header honest: change a photograph, a width or a qualit
 and every URL changes, so a returning buyer gets the new file because it is a different
 file rather than because a cache expired.
 
-**V1 stopped being an absence.** It asserted "astro, and no devDependencies at all", which
-needed no judgement. It now holds a named list containing `sharp`, which is a budget — the
-same thing that happened to V4 at step 7, and it had to buy something to be worth it.
+### V1 stopped being an absence, and what that bought
 
-sharp was already reachable: Astro carries it in its own `optionalDependencies`, so the
-import would have worked with no change to `package.json` and V1 would have stayed an
-absence. Declaring it costs a name and buys a version we chose rather than one another
-project picked from a dependency marked optional, where a tree that skipped the install is
-still a valid tree. **Nothing that ships depends on it.** `npm run build` never imports it,
-the renditions are committed, and a deploy from `--omit=dev` produces byte-identical
-output. If sharp breaks it breaks at a keyboard.
+It asserted "astro, and no devDependencies at all". An absence needs no judgement to check.
+It now holds a named list containing `sharp` at an exact version, which is a budget — the
+same move V4 made at step 7 when the cart arrived, and it carries the same obligation. The
+script budget was made to say what each raise bought, what was shrunk first, and what was
+rejected to avoid raising it further. This gets the same treatment.
 
-The runtime half did not move and is not negotiable: Astro, and nothing else.
+**Three options were on the table. Ric chose the second.**
+
+| | What it does | What it costs |
+|---|---|---|
+| 1. Borrow Astro's | `import "sharp"` with no change to `package.json` | V1 keeps printing "astro and nothing else" while the build depends on a package nothing here declares |
+| 2. **Declare it, pinned** | one name in `devDependencies`, V1 becomes a one-name allow-list | V1 stops being an absence and becomes a list someone has to keep honest |
+| 3. No sharp at all | process images by hand outside the repo | "one crop, one light, one angle, across every product" stops being enforced and becomes something someone recalls |
+
+**Why option 1 was rejected, and it is the important half.** sharp was genuinely already
+reachable — Astro carries it in its own `optionalDependencies` — so the import would have
+worked today and cost nothing visible. What it would actually have produced is a gate
+reporting a state it cannot see: V1 printing "astro and nothing else" while the image
+pipeline ran on a package Astro chose the version of, could drop in a minor release, and
+marks *optional*, meaning a tree where the install skipped it is a valid tree. Nothing
+would have said so until an encode silently produced different bytes.
+
+That is the one failure this repo keeps finding. **V3** counted accent references until it
+was pointed out that a count of two accepts any two. **V9** stopped maintaining `PAIRINGS`
+from memory after four tokens shipped unmeasured behind a comment claiming they had been
+corrected. **V11** exists because CLAUDE.md printed two hex values the source contradicted.
+Three corrections, one shape: a report confident about something it had no way to check. A
+borrowed sharp would have been the fourth, and introducing it deliberately after fixing it
+three times is not a trade worth the name it saves.
+
+**Why pinned rather than ranged.** `^0.35.4` lets a future install change the encoder, and
+the same source frame through a different libvips is different bytes at a different size —
+a silent change to the thing this repo is most careful about. V1 asserts the exact pin, so
+"pinned" is a fact rather than a sentence in a comment. Moving it is a commit that says so.
+
+**What it bought.** AVIF and WebP at three widths from one centred 3:4 crop, produced by a
+script that refuses to upscale, refuses to invent alt text and refuses to write a file over
+200KB — rather than by a person remembering six files per photograph. That is option 3's
+cost avoided.
+
+**What it cost.** "Astro and nothing else" stopped being true as written. It is now two
+rules — astro at runtime, one named tool at build time — and every future reader holds both.
+
+**What it did not cost, and this is why the price is as low as it is: nothing that ships.**
+`npm run build` never imports sharp, the renditions are committed to `public/img/`, and a
+deploy from a tree installed with `--omit=dev` produces byte-identical output. If sharp
+breaks, it breaks at a keyboard with someone reading the error.
+
+**The runtime half did not move and is not negotiable: Astro, and nothing else.** It is the
+half that matters — it is what keeps the shipped output at zero JavaScript beyond the cart.
+V4 holds that one script to a byte budget, but V4 only ever gets to count one file because
+this list has one name on it.
+
+**Adding a second name.** It argues its case in V1's comment, with what it buys and what it
+costs, in the commit that adds it. The check is a list and not `dev.length <= 1` for exactly
+that reason: a count accepts any one package and would let a swap happen silently, where a
+name has to be typed on purpose. An allow-list of one is still a gate. One that grows
+without an argument each time is a comment.
 
 ### `Gallery.astro`, and one placeholder
 
