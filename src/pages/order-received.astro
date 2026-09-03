@@ -102,10 +102,15 @@ import { products, price } from "../lib/products";
           Dispatched from Nairobi, arriving by <span data-received-date-value></span>.
         </p>
 
-        <p class="received__dispatch" data-received-nodate>
-          Dispatched from Nairobi. The delivery date is confirmed together with the
-          payment, and comes to you with it.
-        </p>
+        <p class="received__dispatch">Dispatched from Nairobi.</p>
+
+        <!--
+          There is no "the date comes later" line here. Step 10 settled the rule
+          for the whole site: a fact that does not exist is not rendered, and a
+          sentence explaining the gap is a stub with better manners. The dispatch
+          line above carries the date when there is one and is absent when there
+          is not.
+        -->
 
         <p class="received__human">
           Something wrong, or a question about this order? Message us on the <a

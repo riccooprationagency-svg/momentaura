@@ -1,0 +1,137 @@
+---
+// Privacy.
+//
+// THE ONE TRUST PAGE THAT CAN BE WRITTEN IN FULL TODAY, because it describes
+// what the code does rather than a fact only Ric holds. Every sentence below is
+// checkable against this repo, and that is the standard it is written to — a
+// privacy policy assembled from a template is the same lie as an invented
+// delivery cost, just longer and less likely to be read.
+//
+// CLAUDE.md requires this page and a working marketing opt-out with the first
+// deploy. The honest form of the opt-out here is that there is no marketing list
+// and nothing subscribes anyone to one: the only use of an email address is the
+// receipt the buyer asked for. That is a statement to keep true rather than a
+// box to tick — if a mailing list is ever added, this page changes first.
+//
+// Deliberately NOT dated. A "last updated" line is a fact like any other and it
+// is the first thing to rot; the file's history in the repo is the real record.
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Privacy — MomentAura"
+  description="What this site collects, what it does not, and how long anything is kept."
+  system="light"
+>
+  <section class="page">
+    <div class="wrap page__inner">
+      <h1 class="page__heading">Privacy</h1>
+
+      <p class="page__body">
+        This page describes what the site actually does. Everything here can be checked
+        against how the site behaves.
+      </p>
+
+      <hr class="page__hair" />
+
+      <h2 class="page__sub">What is not collected</h2>
+      <p class="page__body">
+        There are no analytics on this site. No tracking pixels, no advertising tags, no
+        session recording, no third-party scripts of any kind. The fonts are served from
+        this site rather than from a font network, so loading a page does not tell anyone
+        else that you did.
+      </p>
+      <p class="page__body">
+        There are no accounts and no passwords, so there is no store of credentials to
+        lose. There are no cookies. Checking an order needs its reference and the phone
+        number it was placed with, and nothing more.
+      </p>
+
+      <h2 class="page__sub">What your browser stores</h2>
+      <p class="page__body">
+        Your order is kept in your own browser's local storage while you shop, and it
+        holds only the product code and how many of each — never a name, a price or a
+        stock figure. It never leaves your device until you go to checkout. Clearing your
+        browser data removes it, and nothing here can read it back.
+      </p>
+
+      <h2 class="page__sub">What is collected when you order</h2>
+      <p class="page__body">
+        Your name, your phone number, and an email address if you choose to give one. The
+        email is optional and is only ever used to send you a receipt. Nothing subscribes
+        you to anything, because there is no mailing list to subscribe to.
+      </p>
+      <p class="page__body">
+        Your phone number is required because M-Pesa sends the payment prompt to it. Your
+        name and phone number are passed to the payment provider to take the payment, and
+        to nobody else.
+      </p>
+      <p class="page__body">
+        <strong>No card details are ever entered on this site.</strong> Payment happens on
+        the payment provider's own secure page. This site has no card form anywhere in it
+        and never will.
+      </p>
+
+      <h2 class="page__sub">How long it is kept</h2>
+      <p class="page__body">
+        A pending order — the product codes, the quantities, the amount, your name, your
+        phone number and the email if you gave one — is held for seven days so the payment
+        can be matched to the order and so you can look it up. After that it expires
+        automatically.
+      </p>
+
+      <h2 class="page__sub">Who else sees it</h2>
+      <p class="page__body">
+        The payment provider, because they are taking the payment. The company hosting
+        this site, because the pages and the order have to pass through it. Nobody else.
+        Nothing is sold, shared for advertising, or handed to a data broker.
+      </p>
+
+      <h2 class="page__sub">Asking for it to be removed</h2>
+      <p class="page__body">
+        Ask on the <a href="/contact">contact</a> page with your order reference and the
+        record will be deleted, except where a payment record has to be kept to account
+        for money that actually moved.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__inner {
+    max-width: var(--max-width);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .page__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-16);
+    margin-block-start: var(--s-40);
+  }
+
+  .page__body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  .page__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-40);
+  }
+</style>

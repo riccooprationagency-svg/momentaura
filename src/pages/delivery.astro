@@ -1,0 +1,191 @@
+---
+// Delivery and returns.
+//
+// OMISSION, NOT A STATED ABSENCE. Where a fact does not exist the element is not
+// rendered at all — no zone table, no returns heading, no sentence explaining
+// that a zone table would go here. A page missing a section is honest. A page
+// carrying "[areas]", "coming soon", or a paragraph apologising for the gap is a
+// stub that shipped, and it tells a buyer the shop was assembled from a template
+// and abandoned — which is precisely the suspicion this site exists to reduce.
+//
+// The absences are recorded in BUILD-ORDER section 10, with what each one needs,
+// so they read as decisions rather than as things nobody noticed. The dev-only
+// marker names the key in site.json; a production build never sees it.
+//
+// PAYMENT IS THE ONE SECTION THAT CAN BE WRITTEN IN FULL TODAY, because it
+// describes what the code does rather than a fact only Ric holds.
+import Base from "../layouts/Base.astro";
+import Gap from "../components/Gap.astro";
+import { site, known } from "../lib/site";
+import { price } from "../lib/products";
+
+const zones = site.delivery.zones;
+const hasZones = known(zones);
+const hasDispatch = known(site.delivery.dispatchFrom);
+// Both halves or neither. A window with no condition, or a condition with no
+// window, is half a promise.
+const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery.returnsCondition);
+---
+
+<Base
+  title="Delivery and returns — MomentAura"
+  description="How orders are paid for, where they are sent from, and how returns work."
+  system="light"
+>
+  <section class="page">
+    <div class="wrap page__inner">
+      <h1 class="page__heading">Delivery and returns</h1>
+
+      <h2 class="page__sub">Paying</h2>
+      <p class="page__body">
+        Payment is by M-Pesa. At checkout you give a name and the phone number the
+        payment should go through, and the payment itself is completed on the payment
+        provider's own secure page — you are told before you are taken there, and you come
+        back here when it is done.
+      </p>
+      <p class="page__body">
+        <strong>No card details are ever entered on this site.</strong> There is no card
+        form anywhere in it.
+      </p>
+      <p class="page__body">
+        Nothing is charged until you confirm the payment yourself, and nothing is
+        dispatched until that payment is confirmed. Prices are in Kenyan shillings and the
+        price on the product page is the price of the item.
+      </p>
+
+      {
+        hasDispatch && (
+          <>
+            <hr class="page__hair" />
+            <h2 class="page__sub">Dispatch</h2>
+            <p class="page__body">
+              Every order is packed and sent from {site.delivery.dispatchFrom}.
+            </p>
+            <p class="page__body">
+              Where a delivery date is given it is given as a date, not a number of days —
+              at checkout, on your confirmation, and when you look an order up. A duration
+              asks you to do the arithmetic yourself at the moment you are deciding
+              whether to trust a commitment.
+            </p>
+          </>
+        )
+      }
+
+      {
+        hasZones && (
+          <>
+            <hr class="page__hair" />
+            <h2 class="page__sub">Areas and cost</h2>
+            <table class="zones">
+              <thead>
+                <tr>
+                  <th scope="col">Area</th>
+                  <th scope="col">Cost</th>
+                  <th scope="col">Working days</th>
+                </tr>
+              </thead>
+              <tbody>
+                {zones.map((zone) => (
+                  <tr>
+                    <td>{zone.name}</td>
+                    <td class="zones__figure">{price(zone.cost)}</td>
+                    <td class="zones__figure">{zone.days}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )
+      }
+
+      <Gap field="delivery.zones" />
+
+      {
+        hasReturns && (
+          <>
+            <hr class="page__hair" />
+            <h2 class="page__sub">Returns</h2>
+            <p class="page__body">
+              Anything can be returned within {site.delivery.returnsWindowDays} days of
+              arriving, {site.delivery.returnsCondition}.
+            </p>
+          </>
+        )
+      }
+
+      <Gap field="delivery.returnsWindowDays" />
+      <Gap field="delivery.returnsCondition" />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__inner {
+    max-width: var(--max-width);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .page__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-16);
+  }
+
+  .page__body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  .page__hair {
+    border: 0;
+    border-block-start: 1px solid var(--border);
+    width: 100%;
+    margin-block: var(--s-40);
+  }
+
+  /* Figures in mono, area names in Archivo. The typeface switch is the signal
+     that the reader is looking at a fact. */
+  .zones {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: var(--measure);
+  }
+
+  .zones th {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    font-weight: var(--w-medium);
+    text-align: start;
+    padding-block-end: var(--s-12);
+    border-block-end: 1px solid var(--border);
+  }
+
+  .zones td {
+    font-size: var(--t-body-sm);
+    text-align: start;
+    padding-block: var(--s-12);
+    border-block-end: 1px dashed var(--border);
+  }
+
+  .zones__figure {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

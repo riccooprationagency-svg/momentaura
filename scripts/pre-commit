@@ -50,5 +50,11 @@ node scripts/checkout-test.mjs
 # them being removed.
 node scripts/mpesa-test.mjs
 
+# Order lookup. Not a money endpoint but an access one: it decides who gets to
+# see what somebody bought. The property worth a gate is that a wrong phone
+# number and a reference that does not exist answer identically, which is
+# invisible when it works and silent when it breaks.
+node scripts/track-test.mjs
+
 echo "  gates passed."
 echo ""

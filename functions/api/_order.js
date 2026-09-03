@@ -74,6 +74,17 @@ export function reference() {
   return `MA-${out.slice(0, 4)}-${out.slice(4)}`;
 }
 
+/* One shape reaches every gateway however the buyer typed it: 2547XXXXXXXX or
+ * 2541XXXXXXXX. Exported because /api/track matches a caller against the number
+ * an order was placed with, and two copies of this normalisation would mean a
+ * buyer who typed +254 at checkout and 07 at tracking failed to find their own
+ * order. Returns null if it is not a Kenyan mobile number at all. */
+export function msisdnFrom(value) {
+  const clean = typeof value === "string" ? value.replace(/[\s-]/g, "") : "";
+  if (!PHONE.test(clean)) return null;
+  return clean.replace(/^\+/, "").replace(/^0/, "254");
+}
+
 const no = (status, message, field) => ({ ok: false, status, message, field });
 
 /**
@@ -100,8 +111,8 @@ export function readOrder(payload) {
   const cleanName = typeof name === "string" ? name.trim() : "";
   if (cleanName.length < 2 || cleanName.length > 80) return no(400, MESSAGES.name, "name");
 
-  const cleanPhone = typeof phone === "string" ? phone.replace(/[\s-]/g, "") : "";
-  if (!PHONE.test(cleanPhone)) return no(400, MESSAGES.phone, "phone");
+  const msisdn = msisdnFrom(phone);
+  if (msisdn === null) return no(400, MESSAGES.phone, "phone");
 
   /* Optional, and blank is a valid answer rather than an error. */
   let cleanEmail = null;
@@ -111,10 +122,6 @@ export function readOrder(payload) {
       return no(400, MESSAGES.email, "email");
     }
   }
-
-  /* Normalised to 2547XXXXXXXX / 2541XXXXXXXX. One shape reaches the gateway
-     however the buyer typed it. */
-  const msisdn = cleanPhone.replace(/^\+/, "").replace(/^0/, "254");
 
   /* ---------- re-price from our own catalogue ---------- */
 

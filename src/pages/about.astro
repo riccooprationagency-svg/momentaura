@@ -1,0 +1,145 @@
+---
+// About.
+//
+// EXPERIENCE Part 3 makes this page the substitute for testimonials until real
+// reviews exist. A buyer who cannot find anyone vouching for a shop looks for a
+// person instead — a name, a face, a part of town. That is the job here, and all
+// three of those facts are still null.
+//
+// So the page omits them. No name line, no area line, no invented biography, and
+// above all no "founded on a passion for" — CLAUDE.md bans that phrasing by name
+// precisely because it is what gets written when there is nothing to say, and a
+// suspicious reader hears warmth with no facts in it as a shop with something to
+// hide.
+//
+// THE PORTRAIT GETS THE SAME TREATMENT A PRODUCT WITHOUT PHOTOGRAPHY GETS: the
+// light system and a kraft placeholder, not a stock face, not a silhouette, not
+// a sentence apologising for the absence. That rule already exists in this
+// codebase and it is the same rule for the same reason — an honest placeholder
+// beats a dishonest photograph. When a real photograph lands, systemFor() would
+// put this page in the dark system exactly as it does a product.
+//
+// NO DISPATCH LEDGER. Zero orders have been dispatched, and a component does not
+// render numbers that are not true.
+//
+// What is left is what can be checked: what the shop sells, where it sends from,
+// and how it behaves. Recorded in BUILD-ORDER section 10 as a thin page with the
+// three facts that thicken it.
+import Base from "../layouts/Base.astro";
+import Gap from "../components/Gap.astro";
+import { site, known } from "../lib/site";
+
+const { name, photo, area } = site.owner;
+const hasName = known(name);
+const hasArea = known(area);
+const hasPhoto = known(photo);
+---
+
+<Base
+  title="About — MomentAura"
+  description="Who packs and sends these orders, and how this shop behaves."
+  system="light"
+>
+  <section class="page">
+    <div class="wrap page__inner">
+      <h1 class="page__heading">About</h1>
+
+      <div class="about__object">
+        {
+          hasPhoto ? (
+            <img
+              src={photo}
+              alt={hasName ? `${name}, who packs and sends MomentAura orders` : "The person who packs and sends MomentAura orders"}
+              width="600"
+              height="800"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            /* The same honest placeholder a product without photography gets. */
+            <span class="photo-pending" aria-hidden="true">MomentAura</span>
+          )
+        }
+      </div>
+
+      <Gap field="owner.photo" />
+
+      {
+        hasName && (
+          <p class="page__body">
+            MomentAura is run by {name}
+            {hasArea ? `, from ${area}` : ""}. Orders are packed and sent by hand.
+          </p>
+        )
+      }
+
+      <Gap field="owner.name" />
+      <Gap field="owner.area" />
+
+      <h2 class="page__sub">What this shop sells</h2>
+      <p class="page__body">
+        Apparel and accessories — t-shirts, hoodies, sweatshirts, bags, necklaces. Prices
+        are in Kenyan shillings and are on the page, always. Payment is by M-Pesa.
+      </p>
+
+      <h2 class="page__sub">How it behaves</h2>
+      <p class="page__body">
+        Nothing is dispatched before the payment is confirmed. A product that cannot be
+        sent says so on its own page instead of quietly disappearing, and a sold-out item
+        stays visible rather than being hidden — what other people have already bought is
+        worth being able to see.
+      </p>
+      <p class="page__body">
+        There are no reviews on this site, because nobody has left one. There is no
+        countdown, no "only two left", and no stock figure that is not real. Where there
+        is nothing true to say, the page says nothing.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__inner {
+    max-width: var(--max-width);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .page__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-16);
+    margin-block-start: var(--s-40);
+  }
+
+  .page__body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  /* One crop, the same 3:4 every product uses. */
+  .about__object {
+    max-width: var(--reveal-object);
+    aspect-ratio: 3 / 4;
+    margin-block-end: var(--s-40);
+  }
+
+  .about__object img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-surface);
+  }
+</style>

@@ -360,6 +360,12 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   breakpoint cannot be a token. There are three — 640px, 900px and 1100px. Read them there,
   change them there and in the queries together. Media preludes are the one place a
   raw pixel value is expected
+- **V12 asserts that no internal link in `dist/` goes nowhere.** The nav and footer
+  carried links to `/delivery`, `/contact`, `/about`, `/privacy` and `/track` from step 2,
+  and all five 404'd until step 10 — eight steps, on a site whose premise is that a buyer
+  arrives suspicious. Nothing in the build was unhappy about it: Astro does not know which
+  hrefs a template invented, and every page rendered perfectly. A dead link is the cheapest
+  confirmation a buyer can get that a shop is abandoned
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, the accent
   confined to its sanctioned sites, the closed stamp contained to `Docket.astro`
   and counted at no more than one Seal fill per built page, the `PAIRINGS` table complete
@@ -376,16 +382,24 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
 - **V4 counts the scripts, and it is a budget rather than an absence.** It asserted zero
   JavaScript until step 7 shipped the cart — the one exception this file has always
   named — so it moved from absence to containment rather than being relaxed: exactly one
-  `.js` in `dist/`, named `cart.<hash>.js`, under 6.5KB, referenced by that same one URL
+  `.js` in `dist/`, named `cart.<hash>.js`, under 7KB, referenced by that same one URL
   from every page, and no inline `<script>` body anywhere in the output. Absence needs no
   judgement and a budget nobody counts becomes a comment, which is why the loosening had
   to buy a tighter rule somewhere else.
-  **The byte budget has moved exactly once — 5KB to 6.5KB at step 8** — to pay for the
-  checkout submit and the confirmation screen, most of it the error copy this file
-  requires. The raise is argued in `verify.mjs` beside the constant, and that is the only
-  place it may ever be argued. Shrink before raising: the two line painters were one loop
-  written twice until step 8 merged them. A budget that follows whatever the file happens
-  to weigh is not a budget, and that starts with one raise nobody wrote down
+  **The byte budget has moved twice — 5KB to 6.5KB at step 8, 6.5KB to 7KB at step 10.**
+  Step 8 paid for the checkout submit and the confirmation screen; step 10 paid for order
+  lookup, the sixth job this one script does. Both raises are argued in `verify.mjs`
+  beside the constant, and that is the only place either may ever be argued.
+  **Shrink first, and shrink more than you raise.** Step 10 removed roughly 930 bytes —
+  one `q()` for thirty-one `querySelector` calls, one constant for nine `"aria-disabled"`
+  literals, one `send()` for both forms' fetch-and-busy-button dance, one `clearErrors()`,
+  one `say()`, one `toOrder()` — and still missed by 62. What was rejected to close that
+  62 is the part worth remembering: folding the checkout submit and the tracking submit
+  into one generic form handler would have fitted, and would have buried the payment path
+  in an eight-parameter abstraction that this file requires to be read line by line. **A
+  budget is never worth making the money code harder to read.** A budget that follows
+  whatever the file happens to weigh is not a budget, and that starts with one raise
+  nobody wrote down
 - **The cart stores slug and quantity only. Never a name, a price or a stock figure.**
   This is a security property, not an implementation detail, and step 8 must not weaken
   it. localStorage is the buyer's own disk: anything the cart writes there, a buyer can

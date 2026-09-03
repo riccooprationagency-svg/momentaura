@@ -1,0 +1,18 @@
+{
+  "owner": {
+    "name": null,
+    "photo": null,
+    "area": null
+  },
+  "contact": {
+    "phone": null,
+    "whatsapp": null,
+    "hours": null
+  },
+  "delivery": {
+    "dispatchFrom": "Nairobi",
+    "zones": [],
+    "returnsWindowDays": null,
+    "returnsCondition": null
+  }
+}
