@@ -614,11 +614,67 @@ empty state instead — nothing may have invented a hostname.
 Dropping `/track` from the list, inventing `/shop`, removing one `noindex`, and making
 `origin()` return a host while `site.json` is null each fail it.
 
+### The domain is momentaura.store, and it is deliberately not connected
+
+`site.url` is `https://momentaura.store` — registered, owned, and the domain the original
+Shopify store ran on. `momentaura.co.ke` appeared in eight places across the three test
+fixtures and was registered nowhere; it was invented for tests. It is gone. `mpesa-test.mjs`
+now holds one `ORIGIN` constant used by both the env fixture and the CallBackURL
+assertion, which previously matched a literal nothing else in the file used.
+
+**The site ships to the Cloudflare Pages `.pages.dev` URL only.** momentaura.store stays
+unconnected and uncrawled until there is real stock and photography. Google forming a
+first impression of a shop with five out-of-stock products and kraft placeholders is a
+cost paid once and hard to undo, and a first impression is the entire subject of this
+build.
+
+So `public/_headers` carries `X-Robots-Tag: noindex, nofollow` on `/*`. Not `Disallow` in
+robots.txt: a disallowed page is not read, so its noindex is not read either, and a URL
+discovered from a link elsewhere can still be listed. noindex is read and obeyed.
+
+The canonical links and the sitemap name momentaura.store while the site is served from
+.pages.dev, and that is correct rather than contradictory — they describe where the site
+lives, the header describes whether to index what is being served. The noindex is what
+makes the mismatch harmless in the meantime, and it means the canonicals are already
+right on the day the domain connects rather than being a second change to remember.
+
+**Search Console waits.** Submitting a sitemap that names a host which is not serving
+achieves nothing and starts a record of failed fetches. DNS TXT verification is preferred
+over the meta tag when it does happen, so no markup is owed to it.
+
+### What changes at go-live, in order
+
+1. Connect momentaura.store to the Pages project
+2. **Delete the `X-Robots-Tag` block from `public/_headers`.** Leaving it makes the real
+   shop unfindable, silently, with every gate green. `verify.mjs` V13b prints a note on
+   every build for as long as the block exists, because no gate can detect a DNS change
+   that happens outside this repo — the header is correct today and wrong the moment the
+   domain is connected
+3. Set `MPESA_CALLBACK_ORIGIN` to `https://momentaura.store` and re-register the callback
+   URL with Daraja
+4. Then Search Console
+
+### `MPESA_CALLBACK_ORIGIN` changes twice, and neither is in this repo
+
+It is a Cloudflare environment variable, read only inside `functions/`, and it holds a
+different value at each of three points:
+
+| When | Value |
+|---|---|
+| Tests | `https://momentaura.store` — a fixture, asserting shape, not deployment |
+| Daraja go-live | the `.pages.dev` URL, because go-live needs a live HTTPS callback and momentaura.store will not be serving |
+| Custom domain connected | `https://momentaura.store` |
+
+The handler builds the callback URL from the env var and asserts nothing about the host,
+so nothing in the code needs to change at either step. What does need to change is the
+URL registered with Safaricom, which is done in their portal and not here. A callback
+URL pointing at a host that stopped serving is an order that settles only by status
+query — recoverable, and only because section 9 built that fallback.
+
 ### Still open at step 11
 
-- **The domain.** Everything above is built and waiting on `site.url`. Search Console
-  cannot start until it exists, and DNS TXT verification is preferred over the meta tag
-  so no markup is owed to it
+- **The `X-Robots-Tag` block in `public/_headers`**, which has to be deleted at go-live
+  and which nothing can detect the right moment for. It is first on the list above
 - **`og:image`.** There is none, deliberately. Every product still renders light with no
   photograph, and CLAUDE.md permits no stock, no supplier photo and nothing generated. A
   preview card is worth having and a dishonest one is not, so the card is title and

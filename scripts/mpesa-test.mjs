@@ -76,6 +76,24 @@ const daraja = await load("_daraja.js");
 const SAFARICOM_IP = "196.201.214.200";
 const TOKEN_PATH = "s3cr3t-callback-path";
 
+/* The origin every request in this file is made to, and the one the callback URL
+ * is asserted against. ONE CONSTANT, so the fixture and the assertion cannot
+ * disagree — the CallBackURL check would otherwise pass by matching a literal
+ * that nothing else in the file uses.
+ *
+ * It is momentaura.store because that is the domain that is actually owned. It
+ * was momentaura.co.ke, which was invented here and registered nowhere, and a
+ * test fixture naming a host that is not ours is a small untruth in the one
+ * file that exists to catch untruths about the money path.
+ *
+ * IT IS NOT WHAT MPESA_CALLBACK_ORIGIN HOLDS IN PRODUCTION. That is the
+ * .pages.dev URL until the custom domain is connected, because Daraja go-live
+ * needs a live HTTPS callback and momentaura.store will not be serving. The
+ * handler builds the URL from the env var and asserts nothing about the host,
+ * so this value is the shape of the thing rather than a claim about deployment.
+ * See BUILD-ORDER section 11. */
+const ORIGIN = "https://momentaura.store";
+
 let darajaMode = "ok";
 let tokenFetches = 0;
 let pushes = [];
@@ -163,7 +181,7 @@ const baseEnv = () => ({
   MPESA_CONSUMER_SECRET: "cs",
   MPESA_SHORTCODE: "174379",
   MPESA_PASSKEY: "pk",
-  MPESA_CALLBACK_ORIGIN: "https://momentaura.co.ke",
+  MPESA_CALLBACK_ORIGIN: ORIGIN,
   MPESA_CALLBACK_TOKEN: TOKEN_PATH,
 });
 
@@ -209,14 +227,14 @@ const lacks = (h, n, what) => {
 const ORDER = { items: [{ slug: "crew-tee", qty: 2 }], name: "Amina Wanjiru", phone: "0712345678" };
 
 const push = (body = ORDER, env = baseEnv()) =>
-  stk({ request: new Request("https://momentaura.co.ke/api/mpesa/stk", { method: "POST", body: JSON.stringify(body) }), env });
+  stk({ request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "POST", body: JSON.stringify(body) }), env });
 
 const askStatus = (body, env = baseEnv()) =>
-  status({ request: new Request("https://momentaura.co.ke/api/mpesa/status", { method: "POST", body: JSON.stringify(body) }), env });
+  status({ request: new Request(`${ORIGIN}/api/mpesa/status`, { method: "POST", body: JSON.stringify(body) }), env });
 
 const hit = (body, { token = TOKEN_PATH, ip = SAFARICOM_IP, env = baseEnv(), method = "POST" } = {}) =>
   callback({
-    request: new Request(`https://momentaura.co.ke/api/mpesa/callback/${token}`, {
+    request: new Request(`${ORIGIN}/api/mpesa/callback/${token}`, {
       method,
       headers: { "CF-Connecting-IP": ip },
       body: method === "POST" ? JSON.stringify(body) : undefined,
@@ -325,7 +343,7 @@ await check("the amount sent to Daraja is an integer, and the phone is normalise
 
 await check("the callback URL is the configured origin plus the secret path", async () => {
   await push();
-  eq(pushes[0].CallBackURL, `https://momentaura.co.ke/api/mpesa/callback/${TOKEN_PATH}`, "CallBackURL");
+  eq(pushes[0].CallBackURL, `${ORIGIN}/api/mpesa/callback/${TOKEN_PATH}`, "CallBackURL");
 });
 
 await check("a sold-out product is refused by name, and nothing is pushed", async () => {
@@ -657,7 +675,7 @@ await check("a callback for an unknown id creates nothing", async () => {
 
 await check("an unreadable body is acknowledged rather than retried forever", async () => {
   const res = await callback({
-    request: new Request(`https://momentaura.co.ke/api/mpesa/callback/${TOKEN_PATH}`, {
+    request: new Request(`${ORIGIN}/api/mpesa/callback/${TOKEN_PATH}`, {
       method: "POST",
       headers: { "CF-Connecting-IP": SAFARICOM_IP },
       body: "{{{not json",

@@ -14,6 +14,7 @@
  *   V10b the rendered elements in dist/ carry only their own attributes
  *   V12 no internal link in dist/ goes nowhere
  *   V13 the sitemap, the canonicals and robots.txt agree with dist/
+ *   V13b a note while the built site carries a site-wide noindex
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -1183,6 +1184,36 @@ if (existsSync(DIST)) {
           `${closed.length} closed, ${canonicals} canonical(s), ` +
           `${broke ? `${broke} disagreement(s)` : "all agree"}`
     );
+  }
+}
+
+/* ---------- V13b — the preview is not indexable, and that is temporary ----------
+ *
+ * A note rather than a check, because there is nothing here to be right or wrong
+ * about: a site-wide noindex is correct while the site is served from .pages.dev
+ * and wrong the moment momentaura.store is connected, and the difference between
+ * those two is a DNS change that happens outside this repo. No gate can see it.
+ *
+ * So it is reported on every build instead. The failure being guarded against is
+ * not a bad header, it is a correct header nobody remembers to remove — which
+ * would leave the real shop unfindable, silently, with every gate green. That is
+ * the same shape as the five dead nav links V12 exists for, and it is why this
+ * prints even though it never fails.
+ */
+
+if (existsSync(DIST)) {
+  const headersPath = join(DIST, "_headers");
+  if (existsSync(headersPath)) {
+    const headers = readFileSync(headersPath, "utf8");
+    if (/^\s*X-Robots-Tag:\s*[^\n]*noindex/im.test(headers)) {
+      notes.push(
+        "dist/_headers carries a site-wide X-Robots-Tag: noindex. NOTHING ON THIS SITE\n" +
+          "        CAN BE INDEXED while it is there, which is intended for the .pages.dev\n" +
+          "        preview and wrong the moment momentaura.store is connected. Delete the\n" +
+          "        block in public/_headers at go-live. Do not submit the sitemap to Search\n" +
+          "        Console before then: it names momentaura.store, which is not serving."
+      );
+    }
   }
 }
 
