@@ -319,9 +319,14 @@ await check("MISSES RUN OUT — the twenty-first is refused rather than answered
   await missTwenty("197.0.113.9");
   const res = await ask({ ...GOOD, reference: "MA-ZZZZ-ZZZZ" }, "POST", "197.0.113.9");
   eq(res.status, 429, "status");
-  eq(res.headers.get("Retry-After"), "600", "Retry-After");
+  const wait = Number(res.headers.get("Retry-After"));
+  /* The window is fixed, so what is left of it is what the caller waits — never
+     the whole ten minutes when the budget resets in twelve seconds. */
+  if (!(wait > 0 && wait <= 600)) throw new Error(`Retry-After out of range: ${wait}`);
+  const remaining = 600 - Math.floor((Date.now() / 1000) % 600);
+  if (Math.abs(wait - remaining) > 2) throw new Error(`Retry-After ${wait} is not the ${remaining}s left in the window`);
   const message = (await res.json()).message;
-  for (const part of ["Wait ten minutes", "contact page"]) {
+  for (const part of [`Try again in ${Math.ceil(wait / 60)} minute`, "contact page"]) {
     if (!message.includes(part)) throw new Error(`message lacks ${JSON.stringify(part)}: ${message}`);
   }
 });

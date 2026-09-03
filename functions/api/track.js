@@ -35,7 +35,7 @@
 import catalogue from "../../src/data/products.json";
 import { msisdnFrom } from "./_order.js";
 import { getPending } from "./_pending.js";
-import { addressOf, overBudget, recordMiss, RETRY_AFTER_SECONDS } from "./_throttle.js";
+import { addressOf, overBudget, recordMiss, secondsUntilReset } from "./_throttle.js";
 
 const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
 
@@ -139,15 +139,17 @@ export async function onRequest({ request, env }) {
      mistyped twenty times is the one who most needs one. */
   const address = addressOf(request);
   if (await overBudget(env, address)) {
+    const wait = secondsUntilReset();
+    const minutes = Math.ceil(wait / 60);
     return json(
       429,
       {
         message:
-          "Too many lookups from this connection have come back empty. Wait ten minutes " +
-          "and try again, or get in touch on the contact page and the order will be " +
-          "looked up by hand.",
+          `Too many lookups from this connection have come back empty. Try again in ` +
+          `${minutes} ${minutes === 1 ? "minute" : "minutes"}, or get in touch on the ` +
+          `contact page and the order will be looked up by hand.`,
       },
-      { "Retry-After": String(RETRY_AFTER_SECONDS) }
+      { "Retry-After": String(wait) }
     );
   }
 

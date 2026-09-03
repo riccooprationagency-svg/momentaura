@@ -36,7 +36,12 @@ const WINDOW_SECONDS = 600;
 /** Misses allowed per address per window. A mistyped reference costs one. */
 const LIMIT = 20;
 
-export const RETRY_AFTER_SECONDS = WINDOW_SECONDS;
+/* What is left of the current window. The window is fixed, so a caller who
+   spends the budget in its last few seconds waits those seconds and not ten
+   minutes — a Retry-After longer than the lock is a compliant client sitting
+   out a lookup it could have been served. */
+export const secondsUntilReset = (now = Date.now()) =>
+  WINDOW_SECONDS - Math.floor((now / 1000) % WINDOW_SECONDS);
 
 const keyFor = (address, now) => `try:${address}:${Math.floor(now / (WINDOW_SECONDS * 1000))}`;
 
