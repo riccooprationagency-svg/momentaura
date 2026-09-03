@@ -109,7 +109,7 @@ const explode = (code) => {
 
 const post = (body, { method = "POST" } = {}) =>
   onRequest({
-    request: new Request("https://momentaura.co.ke/api/checkout", {
+    request: new Request("https://momentaura.store/api/checkout", {
       method,
       headers: { "Content-Type": "application/json" },
       body: method === "POST" ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,

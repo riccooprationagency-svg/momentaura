@@ -1,0 +1,32 @@
+# Cloudflare Pages headers.
+#
+# ============================================================================
+# THIS FILE CURRENTLY KEEPS THE WHOLE SITE OUT OF EVERY SEARCH INDEX.
+#
+# DELETE THE X-Robots-Tag BLOCK WHEN momentaura.store IS CONNECTED.
+# Leaving it in place after go-live makes the real shop unfindable, silently,
+# on a site whose whole problem is being found and believed. Nothing here can
+# detect that: the header is correct today and wrong the moment the domain is
+# connected, and the only difference between the two is a DNS change that
+# happens outside this repo. verify.mjs prints a note on every build for as
+# long as this block exists, which is the only reminder there is.
+# ============================================================================
+#
+# The site deploys to the .pages.dev URL only. momentaura.store is registered
+# and owned, and stays unconnected until there is real stock and photography.
+# Google forming a first impression of a shop with five out-of-stock products
+# and kraft placeholders is a cost that is paid once and is hard to undo, and
+# a first impression is the entire subject of this build.
+#
+# canonical and the sitemap already name momentaura.store, which is correct and
+# not a contradiction: they describe where the site lives, this describes
+# whether to index what is being served. noindex is what makes the mismatch
+# harmless in the meantime — a crawler that reads a canonical pointing at a host
+# that is not serving would otherwise have nowhere to go.
+#
+# X-Robots-Tag is used rather than Disallow in robots.txt on purpose. Disallow
+# stops a crawler reading the page, which also stops it reading a noindex, so a
+# URL discovered from a link elsewhere can still be listed. noindex is read and
+# obeyed.
+/*
+  X-Robots-Tag: noindex, nofollow

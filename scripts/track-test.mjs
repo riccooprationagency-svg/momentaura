@@ -97,7 +97,7 @@ function resetKv() {
 
 const ask = (body, method = "POST", ip = "197.0.113.5") =>
   onRequest({
-    request: new Request("https://momentaura.co.ke/api/track", {
+    request: new Request("https://momentaura.store/api/track", {
       method,
       headers: { "Content-Type": "application/json", ...(ip ? { "CF-Connecting-IP": ip } : {}) },
       body: method === "POST" ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,

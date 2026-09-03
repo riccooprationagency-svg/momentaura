@@ -34,7 +34,7 @@
 
 import catalogue from "../../src/data/products.json";
 import { msisdnFrom } from "./_order.js";
-import { getPending } from "./_pending.js";
+import { getPending, refKey } from "./_pending.js";
 import { addressOf, overBudget, recordMiss, secondsUntilReset } from "./_throttle.js";
 
 const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
@@ -187,7 +187,7 @@ export async function onRequest({ request, env }) {
 
   let record;
   try {
-    record = await getPending(env, `ref:${reference}`);
+    record = await getPending(env, refKey(reference));
   } catch (error) {
     console.log(JSON.stringify({ at: "track", code: "kv_read_failed", detail: String(error) }));
     return json(503, {

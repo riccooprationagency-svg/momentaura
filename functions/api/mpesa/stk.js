@@ -18,7 +18,7 @@
 
 import { DarajaError, stkPush } from "../_daraja.js";
 import { MESSAGES, readOrder, reference } from "../_order.js";
-import { putPending } from "../_pending.js";
+import { putPending, refKey } from "../_pending.js";
 
 /* What happened to the money, as opposed to what was wrong with the request.
  *
@@ -108,7 +108,7 @@ export async function onRequest({ request, env }) {
   };
 
   try {
-    await putPending(env, `ref:${ref}`, record);
+    await putPending(env, refKey(ref), record);
   } catch (error) {
     /* KV unavailable or unbound. Refuse rather than push: a prompt whose result
        has nowhere to land is a charge we could not honour. */
@@ -140,7 +140,7 @@ export async function onRequest({ request, env }) {
        order that never existed on a reconciliation list forever. Best-effort —
        if this write fails too, the log above is still the record. */
     try {
-      await putPending(env, `ref:${ref}`, { ...record, status: "failed", failure: code, settledAt: Date.now() });
+      await putPending(env, refKey(ref), { ...record, status: "failed", failure: code, settledAt: Date.now() });
     } catch {
       /* Intentionally empty. See above. */
     }

@@ -76,6 +76,24 @@ const daraja = await load("_daraja.js");
 const SAFARICOM_IP = "196.201.214.200";
 const TOKEN_PATH = "s3cr3t-callback-path";
 
+/* The origin every request in this file is made to, and the one the callback URL
+ * is asserted against. ONE CONSTANT, so the fixture and the assertion cannot
+ * disagree — the CallBackURL check would otherwise pass by matching a literal
+ * that nothing else in the file uses.
+ *
+ * It is momentaura.store because that is the domain that is actually owned. It
+ * was momentaura.co.ke, which was invented here and registered nowhere, and a
+ * test fixture naming a host that is not ours is a small untruth in the one
+ * file that exists to catch untruths about the money path.
+ *
+ * IT IS NOT WHAT MPESA_CALLBACK_ORIGIN HOLDS IN PRODUCTION. That is the
+ * .pages.dev URL until the custom domain is connected, because Daraja go-live
+ * needs a live HTTPS callback and momentaura.store will not be serving. The
+ * handler builds the URL from the env var and asserts nothing about the host,
+ * so this value is the shape of the thing rather than a claim about deployment.
+ * See BUILD-ORDER section 11. */
+const ORIGIN = "https://momentaura.store";
+
 let darajaMode = "ok";
 let tokenFetches = 0;
 let pushes = [];
@@ -135,6 +153,11 @@ function makeKv() {
     store,
     failWrites: false,
     failReads: false,
+    /* A predicate on the key, so ONE of an order's two writes can be failed
+       while the other succeeds. Whole-store failure cannot express the case the
+       mirror ordering exists for: KV up, the record settling, and only the
+       buyer's copy not landing. */
+    failWritesTo: null,
     async get(key, type) {
       if (this.failReads) throw new Error("KV read failed");
       const raw = store.get(key);
@@ -143,6 +166,7 @@ function makeKv() {
     },
     async put(key, value) {
       if (this.failWrites) throw new Error("KV write failed");
+      if (this.failWritesTo && this.failWritesTo(key)) throw new Error("KV write failed");
       store.set(key, value);
     },
   };
@@ -157,7 +181,7 @@ const baseEnv = () => ({
   MPESA_CONSUMER_SECRET: "cs",
   MPESA_SHORTCODE: "174379",
   MPESA_PASSKEY: "pk",
-  MPESA_CALLBACK_ORIGIN: "https://momentaura.co.ke",
+  MPESA_CALLBACK_ORIGIN: ORIGIN,
   MPESA_CALLBACK_TOKEN: TOKEN_PATH,
 });
 
@@ -203,14 +227,14 @@ const lacks = (h, n, what) => {
 const ORDER = { items: [{ slug: "crew-tee", qty: 2 }], name: "Amina Wanjiru", phone: "0712345678" };
 
 const push = (body = ORDER, env = baseEnv()) =>
-  stk({ request: new Request("https://momentaura.co.ke/api/mpesa/stk", { method: "POST", body: JSON.stringify(body) }), env });
+  stk({ request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "POST", body: JSON.stringify(body) }), env });
 
 const askStatus = (body, env = baseEnv()) =>
-  status({ request: new Request("https://momentaura.co.ke/api/mpesa/status", { method: "POST", body: JSON.stringify(body) }), env });
+  status({ request: new Request(`${ORIGIN}/api/mpesa/status`, { method: "POST", body: JSON.stringify(body) }), env });
 
 const hit = (body, { token = TOKEN_PATH, ip = SAFARICOM_IP, env = baseEnv(), method = "POST" } = {}) =>
   callback({
-    request: new Request(`https://momentaura.co.ke/api/mpesa/callback/${token}`, {
+    request: new Request(`${ORIGIN}/api/mpesa/callback/${token}`, {
       method,
       headers: { "CF-Connecting-IP": ip },
       body: method === "POST" ? JSON.stringify(body) : undefined,
@@ -242,6 +266,19 @@ const callbackBody = ({ id = "ws_CO_TEST_1", code = 0, amount = 1300, receipt = 
 });
 
 const record = async (id = "ws_CO_TEST_1") => await kv.get(id, "json");
+
+/* A pushed order aged backwards, so the status query is past the 90-second grace
+   and will actually ask Daraja. Up here with the other helpers because the
+   callback tests reach for it too, not only the status-query section below. */
+const pushThenAge = async (ms) => {
+  const res = await push();
+  const body = await res.json();
+  const stored = await record();
+  stored.pushedAt = Date.now() - ms;
+  stored.createdAt = stored.pushedAt;
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  return body;
+};
 
 console.log("\n  M-Pesa — STK push, callback, status query\n");
 
@@ -306,7 +343,7 @@ await check("the amount sent to Daraja is an integer, and the phone is normalise
 
 await check("the callback URL is the configured origin plus the secret path", async () => {
   await push();
-  eq(pushes[0].CallBackURL, `https://momentaura.co.ke/api/mpesa/callback/${TOKEN_PATH}`, "CallBackURL");
+  eq(pushes[0].CallBackURL, `${ORIGIN}/api/mpesa/callback/${TOKEN_PATH}`, "CallBackURL");
 });
 
 await check("a sold-out product is refused by name, and nothing is pushed", async () => {
@@ -455,6 +492,130 @@ await check("a mismatch flags the ref: copy as well", async () => {
   eq(byReference.amount, 1300, "the stored amount is not overwritten");
 });
 
+/* ============ the ordering that makes the two copies safe ============
+ *
+ * WHAT FOLLOWS IS THE GATE BEHIND persist()'s ORDER OF WRITES, and until these
+ * checks existed that ordering was a comment.
+ *
+ * settle() writes ref:<reference> FIRST and the CheckoutRequestID copy second,
+ * and both failures propagate. The consequence is an invariant rather than a
+ * repair: THE CANONICAL RECORD CANNOT BE TERMINAL UNLESS THE BUYER'S COPY WAS
+ * WRITTEN TERMINAL FIRST. That is the whole reason the `already` path is allowed
+ * to change nothing — it is unreachable with a stale mirror, so there is no
+ * mirror to re-write there.
+ *
+ * Written the other way round the same failure would be permanent: the canonical
+ * copy would go terminal, the retry would find it, return `already`, and never
+ * come back for the reference copy. A buyer who had paid would read `pending`
+ * for the full seven-day TTL. Nothing would have thrown, nothing would be
+ * logged, and both records would be well-formed.
+ *
+ * So the failure injected here is not KV falling over — that case is covered
+ * above and is loud. It is the quiet one: KV up, the order settling correctly,
+ * and only the write the buyer reads not landing.
+ *
+ * A predicate that fails writes to `ref:` only would also break the push, which
+ * writes that key before Daraja is called. So every case below pushes first and
+ * arms the failure afterwards, which is also the real sequence: the record is
+ * already on disk when the result arrives.
+ */
+
+const dropMirror = () => {
+  kv.failWritesTo = (key) => key.startsWith("ref:");
+};
+const restoreMirror = () => {
+  kv.failWritesTo = null;
+};
+
+/* The invariant itself, asserted as one thing rather than inferred from two.
+   A terminal canonical record over a pending buyer's copy is the state this
+   ordering exists to make unreachable, and it is worth naming in the failure. */
+async function neitherAhead(reference, what) {
+  const canonical = await record();
+  const buyer = await kv.get(`ref:${reference}`, "json");
+  if (canonical.status !== "pending" && buyer.status === "pending") {
+    throw new Error(
+      `${what}: the canonical record is ${canonical.status} while the copy /api/track ` +
+        `reads is still pending — a buyer who has paid would be told nothing happened`
+    );
+  }
+  return { canonical, buyer };
+}
+
+await check("A DROPPED ref: WRITE LEAVES THE CANONICAL RECORD PENDING — it does not settle alone", async () => {
+  const { reference } = await (await push()).json();
+  dropMirror();
+  await hit(callbackBody());
+
+  const { canonical, buyer } = await neitherAhead(reference, "after a dropped mirror write");
+  eq(canonical.status, "pending", "the canonical record must not advance past the copy");
+  eq(buyer.status, "pending", "the buyer's copy genuinely did not land");
+});
+
+await check("THE CALLBACK ANSWERS 500 ON THAT PATH, so Safaricom retries it", async () => {
+  await push();
+  dropMirror();
+  const res = await hit(callbackBody());
+
+  eq(res.status, 500, "a settle that did not complete must not be acknowledged");
+  /* A 200 here is the dangerous answer, not merely the wrong one: Safaricom
+     stops retrying what it sees acknowledged, and the retry is the only thing
+     that finishes this order. */
+  lacks(await res.text(), "ResultCode", "an acknowledgement Daraja would read as done");
+});
+
+await check("THE RETRY CONVERGES BOTH COPIES — the canonical was still pending, so settling runs again", async () => {
+  const { reference } = await (await push()).json();
+  dropMirror();
+  await hit(callbackBody());
+  restoreMirror();
+
+  /* Safaricom resends what it did not see acknowledged. Because the canonical
+     copy never left `pending`, this is a full settlement rather than the
+     `already` path — which is exactly why `already` needs no repair of its own. */
+  const res = await hit(callbackBody());
+  eq(res.status, 200, "the retry is acknowledged");
+  eq((await res.json()).ResultCode, 0, "and acknowledged as handled");
+
+  const { canonical, buyer } = await neitherAhead(reference, "after the retry");
+  eq(canonical.status, "paid", "the canonical record settled");
+  eq(buyer.status, "paid", "THE RECORD /api/track READS settled with it");
+  eq(buyer.receipt, "RGX1A2B3C4", "carrying the same receipt");
+  eq(buyer.settledAt, canonical.settledAt, "as one write of one record, not two guesses at it");
+});
+
+/* The same failure down the other road. Only the callback path was covered
+   before, and the status query is the second caller of the same settle() — the
+   one that recovers an order whose callback never arrived at all. */
+
+await check("THE STATUS QUERY NEVER REPORTS paid WHEN THE BUYER'S COPY DID NOT LAND", async () => {
+  const body = await pushThenAge(120_000);
+  dropMirror();
+  const res = await askStatus(body);
+
+  eq(res.status, 200, "the buyer's own poll is answered, not errored");
+  /* Truthful rather than cautious: the canonical record IS still pending,
+     because settle() refused to advance it. Reporting `paid` here would be the
+     status query telling a buyer something its own record does not say. */
+  eq((await res.json()).status, "pending", "reported status");
+  const { canonical } = await neitherAhead(body.reference, "after a dropped mirror write via the query");
+  eq(canonical.status, "pending", "and the record agrees with what was reported");
+});
+
+await check("the next poll converges both copies, with no callback involved", async () => {
+  const body = await pushThenAge(120_000);
+  dropMirror();
+  await askStatus(body);
+  restoreMirror();
+
+  const res = await askStatus(body);
+  eq((await res.json()).status, "paid", "reported status");
+  const { canonical, buyer } = await neitherAhead(body.reference, "after the second poll");
+  eq(canonical.status, "paid", "the canonical record settled");
+  eq(buyer.status, "paid", "THE RECORD /api/track READS settled with it");
+  eq(buyer.via, "query", "settled by the query, the callback never arrived");
+});
+
 await check("A DUPLICATE CALLBACK CHANGES NOTHING — idempotent on CheckoutRequestID", async () => {
   await push();
   await hit(callbackBody());
@@ -514,7 +675,7 @@ await check("a callback for an unknown id creates nothing", async () => {
 
 await check("an unreadable body is acknowledged rather than retried forever", async () => {
   const res = await callback({
-    request: new Request(`https://momentaura.co.ke/api/mpesa/callback/${TOKEN_PATH}`, {
+    request: new Request(`${ORIGIN}/api/mpesa/callback/${TOKEN_PATH}`, {
       method: "POST",
       headers: { "CF-Connecting-IP": SAFARICOM_IP },
       body: "{{{not json",
@@ -538,16 +699,6 @@ await check("KV failing during settle returns 500 SO SAFARICOM RETRIES", async (
 });
 
 /* ================= the status query ================= */
-
-const pushThenAge = async (ms) => {
-  const res = await push();
-  const body = await res.json();
-  const stored = await record();
-  stored.pushedAt = Date.now() - ms;
-  stored.createdAt = stored.pushedAt;
-  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
-  return body;
-};
 
 await check("the status query needs the reference as well as the id", async () => {
   const body = await pushThenAge(0);
