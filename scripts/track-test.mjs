@@ -25,6 +25,12 @@ const scratch = join(tmpdir(), `momentaura-track-${Date.now()}`);
 mkdirSync(scratch, { recursive: true });
 cpSync(API, scratch, { recursive: true });
 
+/* The scratch copy sits outside the repo, so nothing above it declares ESM and
+   a .js file there loads as CommonJS — the shipped handlers are modules and
+   their first import throws. Node looks for this file; the repo's own
+   package.json is out of reach from tmp. */
+writeFileSync(join(scratch, "package.json"), '{"type":"module"}\n', "utf8");
+
 const orderPath = join(scratch, "_order.js");
 const orderSource = readFileSync(orderPath, "utf8");
 const orderPatched = orderSource.replace(
@@ -89,11 +95,11 @@ function resetKv() {
   };
 }
 
-const ask = (body, method = "POST") =>
+const ask = (body, method = "POST", ip = "197.0.113.5") =>
   onRequest({
     request: new Request("https://momentaura.co.ke/api/track", {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(ip ? { "CF-Connecting-IP": ip } : {}) },
       body: method === "POST" ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
     }),
     env: { ORDERS: kv },
@@ -211,6 +217,19 @@ await check("a settled order whose lines all have a lead time gets A DATE", asyn
   eq(body.dispatchDate, "Wednesday 9 September", "a long-form date, never a duration");
 });
 
+/* The date is formatted in Nairobi, so it has to be counted there. A settlement
+   at 01:00 Nairobi is the previous day in UTC, and counting from the previous
+   day either lands the promise short or lands it on a Saturday. */
+await check("A SETTLEMENT AFTER MIDNIGHT IN NAIROBI COUNTS FROM THE NAIROBI DAY", async () => {
+  /* 22:30 UTC on Sunday 6 September 2026 is 01:30 Monday 7 September in Nairobi. */
+  await store({ items: [{ slug: "quick-cap", qty: 1 }], status: "paid", settledAt: Date.UTC(2026, 8, 6, 22, 30) });
+  const body = await (await ask(GOOD)).json();
+  /* Monday 7 plus five working days is Monday 14. Counted from Sunday 6 in UTC
+     it would read Friday 11 — three days early, and from a Sunday that is not a
+     working day at all. */
+  eq(body.dispatchDate, "Monday 14 September", "counted from the Nairobi day");
+});
+
 await check("the date skips the weekend rather than counting calendar days", async () => {
   await store({ items: [{ slug: "quick-cap", qty: 1 }], status: "paid", settledAt: Date.UTC(2026, 8, 4) });
   const body = await (await ask(GOOD)).json();
@@ -288,6 +307,51 @@ await check("KV failing says so rather than reporting no such order", async () =
   const res = await ask(GOOD);
   eq(res.status, 503, "status");
   lacks(await res.text(), "No order matches", "never claims the order does not exist");
+});
+
+/* ---------- the guessing budget ---------- */
+
+const missTwenty = async (ip) => {
+  for (let i = 0; i < 20; i++) await ask({ ...GOOD, reference: "MA-ZZZZ-ZZZZ" }, "POST", ip);
+};
+
+await check("MISSES RUN OUT — the twenty-first is refused rather than answered", async () => {
+  await missTwenty("197.0.113.9");
+  const res = await ask({ ...GOOD, reference: "MA-ZZZZ-ZZZZ" }, "POST", "197.0.113.9");
+  eq(res.status, 429, "status");
+  eq(res.headers.get("Retry-After"), "600", "Retry-After");
+  const message = (await res.json()).message;
+  for (const part of ["Wait ten minutes", "contact page"]) {
+    if (!message.includes(part)) throw new Error(`message lacks ${JSON.stringify(part)}: ${message}`);
+  }
+});
+
+await check("the budget is spent by the address that spent it, not by everyone", async () => {
+  await missTwenty("197.0.113.9");
+  eq((await ask(GOOD, "POST", "197.0.113.10")).status, 200, "another address is unaffected");
+});
+
+await check("A BUYER CHECKING THEIR OWN ORDER NEVER RUNS OUT — only misses count", async () => {
+  for (let i = 0; i < 40; i++) {
+    const res = await ask(GOOD);
+    if (res.status !== 200) throw new Error(`lookup ${i + 1} was refused with ${res.status}`);
+  }
+});
+
+await check("a spent budget answers before the order is read, so it confirms nothing", async () => {
+  await missTwenty("197.0.113.9");
+  const res = await ask(GOOD, "POST", "197.0.113.9");
+  eq(res.status, 429, "a real reference is refused the same as a wrong one");
+  lacks(await res.text(), REFERENCE, "the reference");
+});
+
+await check("KV FAILING NEVER LOCKS A BUYER OUT — the budget fails open", async () => {
+  const reads = kv.get.bind(kv);
+  kv.get = async (key, type) => {
+    if (key.startsWith("try:")) throw new Error("KV read failed");
+    return reads(key, type);
+  };
+  eq((await ask(GOOD)).status, 200, "the order is still found");
 });
 
 console.log("");

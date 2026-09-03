@@ -19,6 +19,11 @@
  * confirming a reference exists is most of the way to confirming who bought
  * what.
  *
+ * MISSES ARE COUNTED PER ADDRESS AND RUN OUT. The reference is what keeps an
+ * order private; the budget in _throttle.js is what stops an unlimited number
+ * of attempts at it being free. A buyer checking their own order is never the
+ * traffic it describes, because only misses are counted.
+ *
  * WHAT IT CANNOT DO YET, and this is stated on the page rather than hidden: it
  * reports what the system actually knows, and the system only knows the outcome
  * of orders that went through the M-Pesa path, because that is the only path
@@ -30,6 +35,7 @@
 import catalogue from "../../src/data/products.json";
 import { msisdnFrom } from "./_order.js";
 import { getPending } from "./_pending.js";
+import { addressOf, overBudget, recordMiss, RETRY_AFTER_SECONDS } from "./_throttle.js";
 
 const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
 
@@ -48,7 +54,18 @@ const NOT_FOUND =
   "reference is on your confirmation screen, and the phone number is the one the " +
   "payment went through. If both are right, get in touch on the contact page.";
 
-/* Working days from a date. Saturday and Sunday are not dispatch days.
+/* Nairobi is UTC+3 all year — Kenya keeps no daylight saving — so the offset is
+ * a constant rather than a lookup. */
+const NAIROBI_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/* Working days from a date, COUNTED IN NAIROBI TIME. Saturday and Sunday are
+ * not dispatch days.
+ *
+ * The shift is the whole point. A payment settling at 01:00 Nairobi on a Monday
+ * is Sunday 22:00 UTC, so counting the weekend in UTC starts a day early and
+ * lands the promise a day short — or on a Saturday, on a page whose only claim
+ * is that the date is one you can hold us to. The date is formatted in Nairobi,
+ * so it is counted there too.
  *
  * Public holidays are not modelled, and that is a stated limit rather than an
  * oversight: it needs a real Kenyan calendar, and a date quietly wrong twice a
@@ -59,14 +76,14 @@ const NOT_FOUND =
  * server boundary; they follow the same rule, and this comment is the link
  * between them. */
 function workingDaysFrom(start, days) {
-  const date = new Date(start);
+  const date = new Date(start + NAIROBI_OFFSET_MS);
   let left = days;
   while (left > 0) {
     date.setUTCDate(date.getUTCDate() + 1);
     const day = date.getUTCDay();
     if (day !== 0 && day !== 6) left--;
   }
-  return date;
+  return new Date(date.getTime() - NAIROBI_OFFSET_MS);
 }
 
 const LONG_DATE = new Intl.DateTimeFormat("en-GB", {
@@ -101,19 +118,37 @@ function dispatchDate(record) {
   return LONG_DATE.format(workingDaysFrom(from, longest));
 }
 
-const json = (status, body) =>
+const json = (status, body, extra) =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
+      ...extra,
     },
   });
 
 export async function onRequest({ request, env }) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
+  }
+
+  /* Spent budget, before anything is read or looked up. It says what happened
+     and what to do, and it routes to a person, because a buyer who has
+     mistyped twenty times is the one who most needs one. */
+  const address = addressOf(request);
+  if (await overBudget(env, address)) {
+    return json(
+      429,
+      {
+        message:
+          "Too many lookups from this connection have come back empty. Wait ten minutes " +
+          "and try again, or get in touch on the contact page and the order will be " +
+          "looked up by hand.",
+      },
+      { "Retry-After": String(RETRY_AFTER_SECONDS) }
+    );
   }
 
   let payload;
@@ -156,6 +191,7 @@ export async function onRequest({ request, env }) {
      the wrong phone and a 404 for a reference that does not exist are the same
      response, so neither confirms anything about the other. */
   if (!record || record.msisdn !== msisdn) {
+    await recordMiss(env, address);
     return json(404, { message: NOT_FOUND });
   }
 
