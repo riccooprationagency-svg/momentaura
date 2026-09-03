@@ -1,8 +1,20 @@
 import { defineConfig } from "astro/config";
+import site from "./src/data/site.json" with { type: "json" };
 
 // Static output. No integrations, and none are expected — cart is the only
 // client-side JS in the whole project and it ships as a plain module.
-// `site` is set at step 11, once the domain exists, for sitemap and Open Graph.
+//
+// `site` comes from src/data/site.json, which is where every fact about the shop
+// itself lives and where each one stays null until a real one exists. It is null
+// today, so Astro.site is undefined, and the canonical link, Open Graph tags,
+// sitemap and robots.txt all omit themselves rather than emit a hostname nobody
+// has registered. Set src/data/site.json's `url` and the four appear together.
+//
+// A sitemap integration is not used, and not because of the dependency rule
+// alone: the sitemap is eleven lines of an endpoint that reads the same route
+// data the pages are generated from, and verify.mjs V13 asserts it against what
+// is actually in dist/. An integration would be a dependency plus a second thing
+// to trust, in place of a gate.
 
 // Astro names a hoisted script after the .astro file that carried the tag, so
 // the cart shipped as Base.astro_astro_type_script_index_0_lang.<hash>.js — a
@@ -48,6 +60,10 @@ const nameTheCart = {
 export default defineConfig({
   output: "static",
   integrations: [],
+
+  // Undefined rather than null: Astro validates this as a URL when it is set,
+  // and null is not one.
+  site: site.url ?? undefined,
 
   build: {
     // Inline the stylesheet rather than shipping it as a separate request.

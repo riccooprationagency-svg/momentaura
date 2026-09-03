@@ -13,6 +13,7 @@
  *   V10 tag-specific attributes derive from the condition that picks the tag
  *   V10b the rendered elements in dist/ carry only their own attributes
  *   V12 no internal link in dist/ goes nowhere
+ *   V13 the sitemap, the canonicals and robots.txt agree with dist/
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -1049,6 +1050,140 @@ if (existsSync(DIST)) {
     `  V12 internal links    ${checked} checked across ${pages.length} page(s)` +
       `${dead.length === 0 ? ", none dead" : `, ${new Set(dead).size} dead`}`
   );
+}
+
+/* ---------- V13 — the sitemap, the canonicals and robots.txt agree ----------
+ *
+ * Four artefacts describe which pages this site has and which are worth
+ * indexing: the sitemap, the canonical link on each page, robots.txt, and the
+ * noindex meta. THREE OF THEM ARE MAINTAINED BY HAND, and they are exactly the
+ * kind of list this repo has already been caught keeping badly — V12 exists
+ * because the nav carried five links to pages nobody had built, for eight steps,
+ * with every gate green.
+ *
+ * A sitemap has the same failure and a quieter one. A URL in it that was never
+ * built is a 404 handed to a crawler on purpose. A page missing from it is
+ * invisible in the one way nobody thinks to check, because the site looks
+ * perfect to anyone already on it. Neither shows up in a browser.
+ *
+ * So the four are asserted against each other and against what is actually in
+ * dist/, rather than any of them being trusted:
+ *
+ *   every built page is in the sitemap, unless robots.txt closes it
+ *   every sitemap URL was built — the V12 rule, on the crawler's copy
+ *   every canonical points at the page it is written on
+ *   a page robots.txt disallows carries noindex, and only those do
+ *
+ * ALL OF IT WAITS ON THE DOMAIN, and that is checked rather than assumed: with
+ * src/data/site.json's `url` null there is no honest absolute URL to write, so
+ * the correct output is an empty urlset, no canonical anywhere and no Sitemap
+ * line. Half of it appearing would mean something emitted a hostname it invented.
+ */
+
+if (existsSync(DIST)) {
+  const siteData = JSON.parse(readFileSync(join(SRC, "data", "site.json"), "utf8"));
+  const base = typeof siteData.url === "string" && siteData.url.trim() !== ""
+    ? siteData.url.trim().replace(/\/+$/, "")
+    : null;
+
+  const sitemapPath = join(DIST, "sitemap.xml");
+  const robotsPath = join(DIST, "robots.txt");
+
+  if (!existsSync(sitemapPath)) fail("V13", "dist/sitemap.xml was not built");
+  if (!existsSync(robotsPath)) fail("V13", "dist/robots.txt was not built");
+
+  if (existsSync(sitemapPath) && existsSync(robotsPath)) {
+    /* Counted so the summary line cannot report agreement while listing
+       disagreements underneath it. */
+    const before = failures.length;
+    const sitemap = readFileSync(sitemapPath, "utf8");
+    const robots = readFileSync(robotsPath, "utf8");
+
+    /* The pages actually built, as the paths a crawler would ask for. */
+    const built = walkAll(DIST)
+      .filter((f) => f.endsWith(".html"))
+      .map((f) => "/" + rel(f).replace(/^dist\//, "").replace(/index\.html$/, "").replace(/\/$/, ""))
+      .map((p) => (p === "" ? "/" : p));
+
+    /* robots.txt is the declaration of what is closed. It is read rather than
+       restated here, so this check cannot drift from it the way a second copy
+       of the list would — which is the whole failure being guarded against. */
+    const closed = [...robots.matchAll(/^Disallow:\s*(\S+)\s*$/gim)].map((m) => m[1]);
+    if (closed.length === 0) fail("V13", "robots.txt closes nothing — /order-received must not be crawlable");
+
+    const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+
+    if (base === null) {
+      /* Nothing may have invented a hostname. */
+      if (locs.length) fail("V13", `site.json url is null but the sitemap names ${locs.length} URL(s)`);
+      if (/^Sitemap:/im.test(robots)) fail("V13", "site.json url is null but robots.txt carries a Sitemap line");
+      for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+        if (/<link\s[^>]*rel=["']canonical["']/i.test(readFileSync(page, "utf8"))) {
+          fail("V13", `site.json url is null but ${rel(page)} carries a canonical`);
+        }
+      }
+    } else {
+      if (!robots.includes(`Sitemap: ${base}/sitemap.xml`)) {
+        fail("V13", "robots.txt does not point at the sitemap");
+      }
+
+      const listed = new Set();
+      for (const loc of locs) {
+        if (!loc.startsWith(`${base}/`) && loc !== `${base}/`) {
+          fail("V13", `sitemap URL is off-host, and Search Console rejects the file whole  ${loc}`);
+          continue;
+        }
+        const path = loc.slice(base.length) || "/";
+        listed.add(path === "" ? "/" : path);
+        /* The V12 rule, on the copy handed to a crawler. */
+        if (!built.includes(path)) fail("V13", `sitemap names a page that was never built  ${path}`);
+        if (closed.includes(path)) fail("V13", `sitemap invites a crawler to a path robots.txt disallows  ${path}`);
+      }
+
+      for (const path of built) {
+        if (!closed.includes(path) && !listed.has(path)) {
+          fail("V13", `built page is in no sitemap, so nothing will find it  ${path}`);
+        }
+      }
+    }
+
+    /* The canonical on each page, and the noindex that has to match robots.txt.
+       Both are per-page, so both are read from the page rather than assumed. */
+    let canonicals = 0;
+    for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+      const source = readFileSync(page, "utf8");
+      const path = ("/" + rel(page).replace(/^dist\//, "").replace(/index\.html$/, "").replace(/\/$/, "")) || "/";
+      const self = path === "" ? "/" : path;
+
+      const found = [...source.matchAll(/<link\s[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/gi)].map((m) => m[1]);
+      if (found.length > 1) fail("V13", `${rel(page)} carries ${found.length} canonical links`);
+      if (base !== null) {
+        if (found.length === 0) fail("V13", `${rel(page)} has no canonical`);
+        else if (found[0] !== `${base}${self === "/" ? "/" : self}`) {
+          fail("V13", `${rel(page)} canonical points elsewhere  ${found[0]} (page is ${self})`);
+        }
+        canonicals += found.length;
+      }
+
+      const noindex = /<meta\s[^>]*name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(source);
+      if (closed.includes(self) && !noindex) {
+        fail("V13", `robots.txt disallows ${self} but the page does not say noindex — a crawler that found the URL another way will index it`);
+      }
+      if (!closed.includes(self) && noindex) {
+        fail("V13", `${self} says noindex but robots.txt does not close it — one of the two is wrong`);
+      }
+    }
+
+    const broke = failures.length - before;
+    console.log(
+      base === null
+        ? `  V13 sitemap           domain unset — no sitemap URLs, canonicals or Sitemap line` +
+          `${broke ? `, and ${broke} that should not be there` : ", as intended"}`
+        : `  V13 sitemap           ${locs.length} URL(s), ${built.length} page(s) built, ` +
+          `${closed.length} closed, ${canonicals} canonical(s), ` +
+          `${broke ? `${broke} disagreement(s)` : "all agree"}`
+    );
+  }
 }
 
 /* ---------- report ---------- */

@@ -10,17 +10,33 @@
 
 import "../styles/global.css";
 import devGuards from "../styles/dev-guards.css?raw";
+import { absolute } from "../lib/site";
 
 interface Props {
   title: string;
   description?: string;
   /** Page chrome. Individual sections override per product. */
   system?: "dark" | "light";
+  /* Whether the page is worth indexing. TRUE BY DEFAULT, because most pages
+   * here are things a buyer should be able to find, and a content page that
+   * silently fell out of the index would be invisible in the one way nobody
+   * checks. The three that pass false are steps in a transaction, and
+   * /order-received is the one that matters: it is reached holding an order
+   * reference, and the reference is what opens an order on /track. robots.txt
+   * disallows the same three; this is the half that still holds for a crawler
+   * that reached the URL without asking. */
+  index?: boolean;
 }
 
-const { title, description, system = "dark" } = Astro.props;
+const { title, description, system = "dark", index = true } = Astro.props;
 
 const path = Astro.url.pathname;
+
+/* One spelling of a page's own address, shared with sitemap.xml through the
+   same origin helper, so the canonical a crawler reads and the URL the sitemap
+   offers cannot disagree. Root stays "/", everything else loses its trailing
+   slash. verify.mjs V13 asserts the two agree across every built page. */
+const canonical = absolute(path === "/" ? "/" : path.replace(/\/+$/, ""));
 const isCurrent = (href: string) =>
   href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
 
@@ -58,6 +74,34 @@ const year = new Date().getFullYear();
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
+
+    {canonical && <link rel="canonical" href={canonical} />}
+    {!index && <meta name="robots" content="noindex, follow" />}
+
+    {/* Open Graph, because most traffic arrives cold on one page from a
+        WhatsApp link and the preview card is the first thing anyone sees of
+        this shop. og:url is absolute by specification, so the whole block waits
+        on a real domain rather than naming a host nobody has registered.
+
+        NO og:image YET. Every product still renders light with no photograph,
+        and CLAUDE.md permits no stock, no supplier photo and nothing generated.
+        A card is worth having and a dishonest one is not, so until a real
+        photograph exists the preview is title and description — which is thin,
+        and true. summary rather than summary_large_image for the same reason:
+        the large card reserves space for an image and renders the gap. */}
+    {
+      canonical && (
+        <>
+          <meta property="og:type" content="website" />
+          <meta property="og:site_name" content="MomentAura" />
+          <meta property="og:locale" content="en_KE" />
+          <meta property="og:title" content={title} />
+          {description && <meta property="og:description" content={description} />}
+          <meta property="og:url" content={canonical} />
+          <meta name="twitter:card" content="summary" />
+        </>
+      )
+    }
 
     <!-- Archivo only. JetBrains Mono sits lower on the page; preloading both
          competes for bandwidth and delays first paint. -->
