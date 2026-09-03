@@ -136,10 +136,16 @@ export async function onRequest({ request, env }) {
 
   /* Spent budget, before anything is read or looked up. It says what happened
      and what to do, and it routes to a person, because a buyer who has
-     mistyped twenty times is the one who most needs one. */
+     mistyped twenty times is the one who most needs one.
+
+     ONE INSTANT FOR THE WHOLE REQUEST. The window the budget is read from, the
+     one Retry-After describes and the one a miss is counted against have to be
+     the same window, and a KV read spanning a boundary would otherwise split
+     them. */
+  const now = Date.now();
   const address = addressOf(request);
-  if (await overBudget(env, address)) {
-    const wait = secondsUntilReset();
+  if (await overBudget(env, address, now)) {
+    const wait = secondsUntilReset(now);
     const minutes = Math.ceil(wait / 60);
     return json(
       429,
@@ -193,7 +199,7 @@ export async function onRequest({ request, env }) {
      the wrong phone and a 404 for a reference that does not exist are the same
      response, so neither confirms anything about the other. */
   if (!record || record.msisdn !== msisdn) {
-    await recordMiss(env, address);
+    await recordMiss(env, address, now);
     return json(404, { message: NOT_FOUND });
   }
 
