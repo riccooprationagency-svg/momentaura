@@ -484,12 +484,58 @@ something that was built. **202 links across 17 pages, none dead.** The five pag
 step added had been linked from the nav and footer since section 2 and had 404'd for eight
 steps, and nothing in the build was unhappy about it.
 
+### Four defects found in review after section 10 merged
+
+Three of them were invisible to every gate in the repo, which is the property they had in
+common — each was a fact the tests asserted about a shape rather than about the path a
+buyer actually walks.
+
+- **A settled order stayed `pending` on the tracking page.** The record lives under two
+  KV keys — the CheckoutRequestID the callback arrives on, and `ref:<reference>`, which is
+  all `/api/track` has — and `settle()` wrote only the first. Every completed payment read
+  as unconfirmed on the one screen a buyer opens to check, for the whole seven-day TTL.
+  Settling now writes both, **reference copy first**: if that write fails it throws before
+  the id copy leaves `pending`, so the next callback retry settles both. The other order
+  would have made a failed reference write permanent, because the retry would find a
+  terminal status and correctly change nothing
+- **The dispatch date was counted in UTC and printed in Nairobi.** A payment settling
+  between midnight and 03:00 Nairobi is the previous day in UTC, so the count started a
+  day early — and a Monday 01:30 settlement counted from a Sunday, producing a promise
+  three days short landing on a Saturday. Counted in Nairobi now, which is a fixed UTC+3
+  because Kenya keeps no daylight saving
+- **A retry left the previous answer on screen.** Submitting the tracking form hid
+  `[data-track-result]`, but the not-found block sits outside it — deliberately, because
+  it is not a result. A connection failure on the second attempt showed the buyer "that
+  order cannot be found" about a request that never reached the server. Every
+  `[data-status]` block is hidden on submit now, not just the result
+- **Order lookup had no guessing budget**, which the section below had recorded as open
+
+### The guessing budget, in `_throttle.js`
+
+Twenty misses per address per ten minutes, in KV, then a 429 carrying `Retry-After` and a
+route to `/contact`.
+
+- **Only misses are counted.** A buyer refreshing their own order all morning is the use
+  the page exists for and must never be what locks them out, and the successful path is
+  still one KV read
+- **It fails open** — a KV wobble or a missing `CF-Connecting-IP` must not take order
+  lookup down. The cost of failing closed is a buyer who paid being told they cannot look;
+  the cost of failing open is that a guesser gets their free attempts back while it lasts.
+  The reference is still the secret either way, and this is the one place in the repo that
+  fails open on purpose
+- Fixed window, read-then-write, no compare-and-swap. It undercounts slightly under
+  concurrency, which is the same KV trade recorded for `settle()` in section 9
+
+### The three endpoint gates could not run on a clean clone
+
+`checkout-test.mjs`, `mpesa-test.mjs` and `track-test.mjs` copy `functions/api/` into a
+temp directory and import it. Nothing above a temp directory declares ESM, so every `.js`
+handler loaded as CommonJS and threw on its first `import` — the pre-commit hook died on
+the money gate before it ran a single case. Each scratch copy now gets a
+`{"type":"module"}` package.json beside it.
+
 ### Still open
 
-- **No rate limit on `/api/track`.** The reference is eight characters from a
-  thirty-character alphabet and the phone must match, so brute force over HTTP is
-  impractical — but impractical is not bounded. Worth a KV attempt counter when there is
-  traffic to justify the writes
 - **Working days, not holidays.** Both the server's dispatch date and the confirmation
   screen's skip weekends and do not model Kenyan public holidays. Modelling them needs a
   real calendar; a date quietly wrong twice a year is worse than one honest about counting

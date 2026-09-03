@@ -73,6 +73,11 @@ globalThis.__catalogue = [
 
 const scratch = join(tmpdir(), `momentaura-checkout-test-${Date.now()}`);
 mkdirSync(scratch, { recursive: true });
+
+/* The scratch copy sits outside the repo, so nothing above it declares ESM and
+   _order.js loads as CommonJS — its first import throws. Node looks for this
+   file; the repo's own package.json is out of reach from tmp. */
+writeFileSync(join(scratch, "package.json"), '{"type":"module"}\n', "utf8");
 writeFileSync(join(scratch, "_order.js"), orderPatched, "utf8");
 const modulePath = join(scratch, "checkout.mjs");
 writeFileSync(modulePath, patched, "utf8");

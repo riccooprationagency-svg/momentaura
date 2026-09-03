@@ -565,8 +565,13 @@ if (trackForm && trackButton && trackResult) {
     event.preventDefault();
     if (trackButton.getAttribute(OFF) === "true") return;
 
+    /* Every outcome goes, not just the result block. Not found sits outside it,
+     * so hiding only the result leaves the last answer on screen underneath a
+     * connection error — a buyer reading "that order cannot be found" about an
+     * attempt that never reached the server. */
     clearErrors(["reference", "trackphone"], trackError);
     trackResult.hidden = true;
+    for (const state of qa("[data-status]")) state.hidden = true;
 
     const data = new FormData(trackForm);
 

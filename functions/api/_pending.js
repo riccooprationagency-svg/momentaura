@@ -10,6 +10,13 @@
  * Keyed on CheckoutRequestID, which is what both the callback and the status
  * query carry back.
  *
+ * IT IS ALSO KEYED ON `ref:<reference>`, because /api/track has neither of
+ * those — a buyer holds the reference and the phone, and nothing else. The two
+ * keys are the same record under two names, so settling writes both. Writing
+ * only the CheckoutRequestID copy leaves the reference copy saying `pending`
+ * for the whole seven days, on the one screen a buyer opens to find out whether
+ * their money arrived.
+ *
  * WHAT IS STORED, AND WHY EACH FIELD IS HERE:
  *
  *   reference   ours, shown to the buyer, and the only field the browser sees
@@ -44,6 +51,22 @@ export async function putPending(env, checkoutRequestId, record) {
 
 export async function getPending(env, checkoutRequestId) {
   return await binding(env).get(checkoutRequestId, "json");
+}
+
+/**
+ * Writes a settled record under both names it is known by.
+ *
+ * THE REFERENCE COPY GOES FIRST, and the order is load-bearing. If it fails,
+ * this throws before the CheckoutRequestID copy leaves `pending`, so the next
+ * callback retry settles again and both copies converge. Written the other way
+ * round, a failed reference write would be permanent: the retry would find a
+ * terminal status, return `already`, and never come back to it.
+ */
+async function persist(env, checkoutRequestId, record) {
+  if (typeof record.reference === "string" && record.reference) {
+    await putPending(env, `ref:${record.reference}`, record);
+  }
+  await putPending(env, checkoutRequestId, record);
 }
 
 /**
@@ -95,7 +118,7 @@ export async function settle(env, checkoutRequestId, result) {
         claimedAmount: result.amount ?? null,
         via: result.via,
       };
-      await putPending(env, checkoutRequestId, flagged);
+      await persist(env, checkoutRequestId, flagged);
       return { outcome: "mismatch", record: flagged };
     }
 
@@ -106,7 +129,7 @@ export async function settle(env, checkoutRequestId, result) {
       receipt: typeof result.receipt === "string" ? result.receipt : null,
       via: result.via,
     };
-    await putPending(env, checkoutRequestId, paid);
+    await persist(env, checkoutRequestId, paid);
     return { outcome: "settled", record: paid };
   }
 
@@ -120,6 +143,6 @@ export async function settle(env, checkoutRequestId, result) {
     resultCode: result.code ?? null,
     via: result.via,
   };
-  await putPending(env, checkoutRequestId, failed);
+  await persist(env, checkoutRequestId, failed);
   return { outcome: "settled", record: failed };
 }

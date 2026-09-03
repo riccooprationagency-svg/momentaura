@@ -44,6 +44,12 @@ const scratch = join(tmpdir(), `momentaura-mpesa-${Date.now()}`);
 mkdirSync(scratch, { recursive: true });
 cpSync(API, scratch, { recursive: true });
 
+/* The scratch copy sits outside the repo, so nothing above it declares ESM and
+   a .js file there loads as CommonJS — the shipped handlers are modules and
+   their first import throws. Node looks for this file; the repo's own
+   package.json is out of reach from tmp. */
+writeFileSync(join(scratch, "package.json"), '{"type":"module"}\n', "utf8");
+
 const orderPath = join(scratch, "_order.js");
 const orderSource = readFileSync(orderPath, "utf8");
 const orderPatched = orderSource.replace(
@@ -421,6 +427,32 @@ await check("a successful callback settles the order paid, with the receipt", as
   eq(stored.status, "paid", "status");
   eq(stored.receipt, "RGX1A2B3C4", "receipt");
   eq(stored.via, "callback", "settled by the callback");
+});
+
+/* The record lives under two keys and /api/track only ever sees one of them.
+   Settling the CheckoutRequestID copy alone leaves a buyer who has paid reading
+   "payment not confirmed" on the tracking page until the record expires. */
+await check("SETTLING WRITES THE ref: COPY TOO — the one /api/track reads", async () => {
+  const { reference } = await (await push()).json();
+  await hit(callbackBody());
+  const byReference = await kv.get(`ref:${reference}`, "json");
+  eq(byReference.status, "paid", "the reference copy is settled");
+  eq(byReference.receipt, "RGX1A2B3C4", "and carries the same receipt");
+  eq(byReference.reference, reference, "under its own reference");
+});
+
+await check("a failed callback settles the ref: copy as well", async () => {
+  const { reference } = await (await push()).json();
+  await hit(callbackBody({ code: 1032 }));
+  eq((await kv.get(`ref:${reference}`, "json")).status, "failed", "the reference copy is failed");
+});
+
+await check("a mismatch flags the ref: copy as well", async () => {
+  const { reference } = await (await push()).json();
+  await hit(callbackBody({ amount: 1 }));
+  const byReference = await kv.get(`ref:${reference}`, "json");
+  eq(byReference.status, "mismatch", "the reference copy is flagged");
+  eq(byReference.amount, 1300, "the stored amount is not overwritten");
 });
 
 await check("A DUPLICATE CALLBACK CHANGES NOTHING — idempotent on CheckoutRequestID", async () => {
