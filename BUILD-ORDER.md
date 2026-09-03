@@ -405,90 +405,98 @@ docs say; and every production-credential behaviour, since none have been issued
 Delivery, About, Contact, Privacy, `/track`. `/track` takes order reference plus phone —
 no accounts, no passwords.
 
-### Built. `/track` first, and it works today
+### The content rule, and what each page omits
 
-All five pages exist; the nav and footer had linked to every one of them since section 2
-and all five 404'd until now.
+**A fact that does not exist is not rendered.** No brackets, no "coming soon", no
+paragraph explaining that a table would go here. A delivery page missing a zone table is
+honest; one carrying `[areas]` is a stub that shipped, and a stub tells a buyer the shop
+was assembled from a template and abandoned — which is the suspicion this whole site
+exists to reduce.
 
-`/track` was built first because it is the only trust page that needs no fact Ric holds.
-It closes the gap that opens the moment someone pays — money gone, then silence until a
-parcel arrives — and it needs nothing invented to do it. Reference plus the phone the
-order was placed with. No account, because an account is a password to forget and a
-credential store to protect in exchange for nothing this needs.
+The facts live in `src/data/site.json`, every value `null`, typed in `src/lib/site.ts`.
+`GAPS` is derived from which are still null, so it cannot claim something is missing after
+it has been supplied. `Gap.astro` renders one **in development only**, naming the key and
+what it blocks; a production build never emits it.
 
-**A wrong phone and a reference that does not exist return the identical response**,
-byte for byte. Distinguishing them would make the phone check an oracle for which
-references exist. `scripts/track-test.mjs` asserts it, in the pre-commit hook.
+**Each page is thinner than it will be, and here is what thickens it:**
 
-**What `/track` cannot find yet, and the page says so:** only the M-Pesa path records an
-outcome, because it is the only one with a callback that settles anything. Step 8's
-gateway has no webhook and writes nothing to KV. Until section 9 has credentials there is
-nothing to look up, and the page states that rather than shrugging at a real reference.
-Delete that paragraph when section 9 goes live.
+| Page | Renders today | Absent, and what it needs |
+|---|---|---|
+| `/track` | Everything. Form, four outcomes, not-found, line items, dispatch date | Nothing — this page is complete |
+| `/delivery` | Paying (in full), Dispatch | Areas and cost table → `delivery.zones`. Returns → `delivery.returnsWindowDays` **and** `returnsCondition`, both or neither |
+| `/about` | Kraft placeholder, what the shop sells, how it behaves | The named human → `owner.name`, `owner.photo`, `owner.area` |
+| `/contact` | Routes to `/track` and `/delivery` | **Every way of reaching a person** → `contact.phone`, `contact.whatsapp`, `contact.hours` |
+| `/privacy` | Everything | Nothing — it describes code, not facts |
 
-### The gaps are data, not prose
+**`/contact` is the thinnest and the most expensive.** It currently offers no way to reach
+a human at all, because there is no real number and one that does not ring is worse than
+none. Three error states already route here — the blocked message on `/order`, the failure
+messages in `/api/checkout`, and the M-Pesa messages in `/api/mpesa/stk` — and each is a
+route to a page that cannot finish the sentence.
 
-Everything only Ric can supply lives in `src/data/site.json`, every value `null`, typed
-and documented in `src/lib/site.ts`. The same rule as `products.json`: **a null renders as
-an omission or as a stated absence, never as a placeholder and never as a guess.**
+**When a real number lands it is ONE commit:** `site.json`, then those three error states
+wired through together. One edit, not four rediscoveries.
 
-| Key | What is needed |
-|---|---|
-| `owner.name` | The real name of the person who packs and sends orders |
-| `owner.photo` | A real photograph of that person. No AI, no stock, no avatar |
-| `owner.area` | The part of Nairobi they work from |
-| `contact.phone` | **A number that rings and is answered** |
-| `contact.whatsapp` | The WhatsApp number, if it differs |
-| `contact.hours` | When a person is actually there |
-| `delivery.zones` | Areas with real costs and real working-day counts |
-| `delivery.returnsWindowDays` | How many days to return something |
-| `delivery.returnsCondition` | What condition it has to be in |
+### `/track`, built first
 
-`GAPS` in `src/lib/site.ts` is derived from which of those are still null, so the list
-cannot claim something is missing after it has been supplied. `Gap.astro` renders one
-**in development only**, gated on `import.meta.env.DEV`, naming the key and what it
-blocks. Production never sees it: a page showing "[PHONE NUMBER]" says the shop was
-assembled from a template and left unfinished, which is the exact suspicion the site
-exists to reduce. Production says only true things or says nothing.
+It needs no fact Ric holds, and it closes the gap that opens the moment someone pays.
+Reference plus the phone the order was placed with. No account: an account is a password
+to forget and a credential store to protect, in exchange for nothing this needs.
 
-**`contact.phone` is the most expensive missing value in the repo.** Every error message
-on the payment path — `/api/checkout`, `/api/mpesa/stk`, the blocked order on `/order`,
-the confirmation screen, `/track` — ends by routing someone to `/contact`, because
-CLAUDE.md requires a phone number on an error and there has never been a real one. Each
-of those is currently a route to a page that cannot finish the sentence. **One value
-unblocks all of them at once**, which is why it was recorded as one dependency in section
-7 rather than rediscovered five times.
+- The reference must match the shape `_order.js` mints — `MA-XXXX-XXXX` — before it is
+  used as a KV key. Lower case and surrounding whitespace are tolerated
+- **It reads and never writes.** The fifth endpoint touching order data, and the only one
+  that cannot change any of it
+- **A wrong phone and a reference that does not exist return the identical response**,
+  byte for byte. Distinguishing them would make the phone check an oracle for which
+  references exist
+- Not found reads as a correction with a route to `/contact`, never as an error — a
+  mistyped character is far likelier than a missing order. It is one more outcome in the
+  same `[data-status]` set the page already carries, so it holds a real link rather than
+  being a string written into `textContent`
+- A settled order gets **a date, not a duration**, computed server-side from the longest
+  lead time in the order counted forward in working days. One line with a null lead time
+  and the field is absent entirely — the longest of the known ones would be a guess
+  wearing a date's clothes on the screen a buyer opens to find out where their money went.
+  `leadTimeDays` is null on every product, so nothing renders today
+- The response carries the reference, status, amount, items and the date. Never the name,
+  the email, the phone number or the `CheckoutRequestID`
 
-### Privacy is complete, because it describes code rather than facts
+### `/order-received` was brought into line
 
-It is the one trust page that could be written in full today: no analytics, no cookies,
-no third-party scripts, self-hosted fonts, no accounts, order held in the browser as
-product codes and quantities only, name and phone passed to the payment provider and
-nobody else, no card form anywhere, pending orders expiring after seven days. Every
-sentence is checkable against this repo, and the browser check asserts the page loads no
-third-party resource while promising none.
+It had been rendering a sentence saying the delivery date would come later. That is a
+stated absence, which this step's rule forbids, so the sentence is gone and the dated line
+is simply absent when there is no date.
 
-The marketing opt-out CLAUDE.md requires takes its honest form: there is no mailing list
-and nothing subscribes anyone to one, so the only use of an email address is the receipt
-the buyer asked for. **If a mailing list is ever added, this page changes first.**
+### The script budget moved a second time, 6.5KB to 7KB
 
-### `/track` cost no budget rise
+Roughly 930 bytes were shrunk first — one `q()` for thirty-one `querySelector` calls, one
+constant for nine `"aria-disabled"` literals, one `send()`, one `clearErrors()`, one
+`say()`, one `toOrder()` — and the tracking form still missed by 62. Folding the two form
+handlers into one generic function would have closed it and would have buried the payment
+path in an eight-parameter abstraction. The number moved instead. Argued in `verify.mjs`
+beside the constant.
 
-The cart script went 7,486 bytes against a 6,656 ceiling when the tracking form landed,
-and the budget did not move — CLAUDE.md's rule is shrink before raising, and there was
-slack to find. Thirty-one `document.querySelector` calls became a helper, nine
-`"aria-disabled"` literals became a constant, the two forms' shared fetch-and-busy-button
-dance became one `send()`, and their two identical error-clearing blocks became one
-`clearErrors(fields, slot)`. It ships at **6,616 of 6,656**.
+### No link on this site goes nowhere
+
+`verify.mjs` **V12** walks every internal `href` in `dist/` and asserts it resolves to
+something that was built. **202 links across 17 pages, none dead.** The five pages this
+step added had been linked from the nav and footer since section 2 and had 404'd for eight
+steps, and nothing in the build was unhappy about it.
 
 ### Still open
 
-- **No rate limit on `/api/track`.** The reference is 8 characters from a 30-character
-  alphabet and the phone must match, so brute force over HTTP is impractical, but
-  impractical is not the same as bounded. Worth a KV attempt counter when there is traffic
-  to justify the writes
-- `about` and `delivery` become substantially shorter pages the moment their data lands;
-  neither is padded to look finished in the meantime
+- **No rate limit on `/api/track`.** The reference is eight characters from a
+  thirty-character alphabet and the phone must match, so brute force over HTTP is
+  impractical — but impractical is not bounded. Worth a KV attempt counter when there is
+  traffic to justify the writes
+- **Working days, not holidays.** Both the server's dispatch date and the confirmation
+  screen's skip weekends and do not model Kenyan public holidays. Modelling them needs a
+  real calendar; a date quietly wrong twice a year is worse than one honest about counting
+  working days only
+- The same working-day rule is implemented twice, once server-side in `track.js` and once
+  client-side in `cart.ts`, because they sit on opposite sides of the wire and cannot share
+  code. Both are commented as such
 
 ## 11 — Ship
 Sitemap, Open Graph images, Search Console. Test on a real phone on Safaricom data.

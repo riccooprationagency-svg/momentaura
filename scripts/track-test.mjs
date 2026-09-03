@@ -33,7 +33,22 @@ const orderPatched = orderSource.replace(
 );
 if (orderPatched === orderSource) throw new Error("could not find the catalogue import — has _order.js moved it?");
 writeFileSync(orderPath, orderPatched, "utf8");
-globalThis.__catalogue = [{ slug: "crew-tee", name: "Crew tee", price: 650, stock: 6 }];
+
+/* track.js imports the catalogue directly too, for lead times. Same redirection,
+   same reason: the catalogue this repo ships is never edited to make a test pass. */
+const trackPath = join(scratch, "track.js");
+const trackSource = readFileSync(trackPath, "utf8");
+const trackPatched = trackSource.replace(
+  /^import catalogue from .*$/m,
+  "const catalogue = globalThis.__catalogue;"
+);
+if (trackPatched === trackSource) throw new Error("could not find the catalogue import — has track.js moved it?");
+writeFileSync(trackPath, trackPatched, "utf8");
+
+globalThis.__catalogue = [
+  { slug: "crew-tee", name: "Crew tee", price: 650, stock: 6, leadTimeDays: null },
+  { slug: "quick-cap", name: "Quick cap", price: 900, stock: 4, leadTimeDays: 5 },
+];
 
 const { onRequest } = await import(pathToFileURL(join(scratch, "track.js")).href);
 
@@ -66,7 +81,11 @@ function resetKv() {
       if (raw === undefined) return null;
       return type === "json" ? JSON.parse(raw) : raw;
     },
-    async put() {},
+    /* track.js never writes. This exists only so a case can rewrite the stored
+       order between resetKv() and the request. */
+    async put(key, value) {
+      store.set(key, value);
+    },
   };
 }
 
@@ -124,6 +143,8 @@ await check("the response carries nothing beyond what the buyer already knows", 
   const res = await ask(GOOD);
   const text = await res.text();
   eq(Object.keys(JSON.parse(text)).sort(), ["amount", "items", "placedAt", "reference", "status"], "keys");
+  /* dispatchDate is absent here because crew-tee has no lead time; the cases
+     below cover it being present. */
   lacks(text, "Amina", "the name");
   lacks(text, "amina@example.com", "the email");
   lacks(text, "254712345678", "the phone number");
@@ -158,11 +179,66 @@ await check("A WRONG PHONE AND AN UNKNOWN REFERENCE GIVE THE IDENTICAL ANSWER", 
   eq(await wrongPhone.text(), await noSuchOrder.text(), "body");
 });
 
+await check("not found reads as a correction with a route to contact, not an error", async () => {
+  const message = (await (await ask({ ...GOOD, reference: "MA-ZZZZ-ZZZZ" })).json()).message;
+  for (const part of ["cannot be found", "Check the reference", "contact page"]) {
+    if (!message.includes(part)) throw new Error(`message lacks ${JSON.stringify(part)}: ${message}`);
+  }
+  for (const wrong of ["Error", "error", "failed", "invalid", " we "]) {
+    if (message.includes(wrong)) throw new Error(`message reads as an error or says "we": ${wrong}`);
+  }
+});
+
 await check("a wrong phone does not confirm the reference exists", async () => {
   const res = await ask({ ...GOOD, phone: "0700000000" });
   const text = await res.text();
   lacks(text, REFERENCE, "the reference");
   lacks(text, "paid", "the status");
+});
+
+/* ---------- the dispatch date ---------- */
+
+/* Rewrites the stored order so a case can set its lines and status. */
+const store = async (patch) => {
+  const current = await kv.get(`ref:${REFERENCE}`, "json");
+  await kv.put(`ref:${REFERENCE}`, JSON.stringify({ ...current, ...patch }));
+};
+
+await check("a settled order whose lines all have a lead time gets A DATE", async () => {
+  await store({ items: [{ slug: "quick-cap", qty: 1 }], status: "paid", settledAt: Date.UTC(2026, 8, 2) });
+  const body = await (await ask(GOOD)).json();
+  /* Wednesday 2 September 2026 plus five working days. */
+  eq(body.dispatchDate, "Wednesday 9 September", "a long-form date, never a duration");
+});
+
+await check("the date skips the weekend rather than counting calendar days", async () => {
+  await store({ items: [{ slug: "quick-cap", qty: 1 }], status: "paid", settledAt: Date.UTC(2026, 8, 4) });
+  const body = await (await ask(GOOD)).json();
+  /* Friday 4 September plus five working days lands on Friday 11, not Wednesday 9. */
+  eq(body.dispatchDate, "Friday 11 September", "weekend skipped");
+});
+
+await check("ONE LINE WITH NO LEAD TIME AND THE FIELD IS ABSENT ENTIRELY", async () => {
+  await store({
+    items: [{ slug: "quick-cap", qty: 1 }, { slug: "crew-tee", qty: 1 }],
+    status: "paid",
+    settledAt: Date.UTC(2026, 8, 2),
+  });
+  const body = await (await ask(GOOD)).json();
+  if ("dispatchDate" in body) throw new Error(`a date was guessed from a null lead time: ${body.dispatchDate}`);
+});
+
+await check("the catalogue this repo ships yields no date, because every lead time is null", async () => {
+  await store({ items: [{ slug: "crew-tee", qty: 2 }], status: "paid", settledAt: Date.now() });
+  const body = await (await ask(GOOD)).json();
+  if ("dispatchDate" in body) throw new Error("a date rendered from a null lead time");
+});
+
+await check("an unsettled order carries no dispatch date, lead time or not", async () => {
+  await store({ items: [{ slug: "quick-cap", qty: 1 }], status: "pending", settledAt: Date.UTC(2026, 8, 2) });
+  const body = await (await ask(GOOD)).json();
+  eq(body.status, "pending", "status");
+  if ("dispatchDate" in body) throw new Error("a pending order was given a delivery date");
 });
 
 /* ---------- what the buyer typed ---------- */

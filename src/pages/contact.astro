@@ -1,31 +1,35 @@
 ---
 // Contact.
 //
-// THIS IS THE MOST EXPENSIVE GAP IN THE REPO, and the page says so to Ric in
-// development rather than hiding it behind a tidy layout.
+// THIS PAGE IS THE BLOCKER THREE ERROR STATES ARE WAITING ON. CLAUDE.md requires
+// a phone number on an error, and there has never been a real one — so the
+// blocked message on /order, the failure messages in /api/checkout, and the
+// M-Pesa messages in /api/mpesa/stk all end by routing someone here instead of
+// printing a number. Every one of those is currently a route to a page that
+// cannot finish the sentence.
 //
-// Every error message on the payment path — /api/checkout, /api/mpesa/stk, the
-// blocked order on /order, the confirmation screen, the tracking page — ends by
-// sending someone here, because CLAUDE.md requires a phone number on an error
-// and there has never been a real one to print. Each of those messages is
-// currently a route to a page that cannot finish the sentence.
+// It is still not invented, and it is not apologised for either. A number that
+// does not ring is worse than no number: it turns a buyer who was merely stuck
+// into one who has been lied to, at the moment they are already worried about
+// their money. And a paragraph explaining that there is no number yet is a stub
+// with better manners — the rule for this step is that a fact which does not
+// exist is not rendered.
 //
-// It is still not invented. A number that does not ring is worse than no number:
-// it converts a buyer who was merely stuck into one who has been lied to, at the
-// exact moment they were already worried about their money. The honest version
-// says there is no published number yet and does not pretend otherwise.
+// So the routes that DO exist are rendered, and the ones that do not are absent.
+// What remains is true and useful: an order can be checked without an account,
+// and the delivery terms are one link away.
 //
-// One value in site.json unblocks all of it at once.
+// WHEN A REAL NUMBER LANDS, IT IS ONE COMMIT: site.json, then the three error
+// states above, wired through together. Recorded in BUILD-ORDER section 10 so it
+// is one edit rather than four rediscoveries.
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
 import { site, known } from "../lib/site";
 
-const phone = site.contact.phone;
-const whatsapp = site.contact.whatsapp;
-const hours = site.contact.hours;
-
+const { phone, whatsapp, hours } = site.contact;
 const hasPhone = known(phone);
 const hasWhatsapp = known(whatsapp);
+const hasHours = known(hours);
 const reachable = hasPhone || hasWhatsapp;
 
 // Digits only, for the tel: and wa.me hrefs. Never rendered as the label.
@@ -34,7 +38,7 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
 
 <Base
   title="Contact — MomentAura"
-  description="How to reach a person about an order."
+  description="How to reach a person about an order, and how to check one yourself."
   system="light"
 >
   <section class="page">
@@ -42,16 +46,10 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
       <h1 class="page__heading">Contact</h1>
 
       {
-        reachable ? (
+        reachable && (
           <p class="page__body">
-            A person answers these. If it is about an order, have the order reference
-            ready — it is on your confirmation screen and looks like MA-4KLM-2XQP.
-          </p>
-        ) : (
-          <p class="page__body">
-            There is no published phone number for this shop yet. Rather than print one
-            that does not ring, this page says so: if you have paid for something and need
-            a person, that route is still being set up.
+            A person answers these. If it is about an order, have the reference ready — it
+            is on your confirmation screen and looks like MA-4KLM-2XQP.
           </p>
         )
       }
@@ -60,9 +58,7 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
         hasPhone && (
           <p class="reach">
             <span class="reach__label">Phone</span>
-            <a class="reach__value" href={`tel:${digits(phone)}`}>
-              {phone}
-            </a>
+            <a class="reach__value" href={`tel:${digits(phone)}`}>{phone}</a>
           </p>
         )
       }
@@ -79,21 +75,10 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
       }
 
       {
-        hasWhatsapp === false && hasPhone && (
-          <p class="page__body">WhatsApp is on the same number.</p>
-        )
-      }
-
-      {
-        known(hours) ? (
+        hasHours && (
           <p class="reach">
             <span class="reach__label">Hours</span>
             <span class="reach__value">{hours}</span>
-          </p>
-        ) : (
-          <p class="page__body">
-            Hours are not published yet, so no promise is made about how quickly a message
-            is answered.
           </p>
         )
       }
@@ -102,16 +87,19 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
       <Gap field="contact.whatsapp" />
       <Gap field="contact.hours" />
 
-      <hr class="page__hair" />
-
-      <h2 class="page__sub">About an order</h2>
+      <h2 class="page__sub">Checking an order yourself</h2>
       <p class="page__body">
-        An order can be checked with its reference and the phone number it was placed
-        with, without an account, on the <a href="/track">track an order</a> page.
+        An order can be looked up with its reference and the phone number it was placed
+        with, without an account and without a password, on the <a href="/track"
+          >track an order</a
+        > page.
       </p>
 
+      <h2 class="page__sub">Delivery and returns</h2>
       <p class="page__body">
-        Delivery and returns are on the <a href="/delivery">delivery terms</a> page.
+        How payment works, where orders are sent from, and the returns terms are on the <a
+          href="/delivery">delivery</a
+        > page.
       </p>
     </div>
   </section>
@@ -139,6 +127,7 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
     letter-spacing: var(--tr-label);
     color: var(--fg-muted);
     margin-block-end: var(--s-16);
+    margin-block-start: var(--s-40);
   }
 
   .page__body {
@@ -147,17 +136,10 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
     margin-block-end: var(--s-20);
   }
 
-  .page__hair {
-    border: 0;
-    border-block-start: 1px solid var(--border);
-    width: 100%;
-    margin-block: var(--s-40);
-  }
-
   /* A way to reach a person is a checkable fact, so it sits in the data
-     register — but the accent stays off it. --accent means "you can verify
-     this" and is confined to two sanctioned sites; a phone number is an
-     instruction to act, not a lead time to check. */
+     register. The accent stays off it: --accent means "you can verify this" and
+     is confined to two sanctioned sites, and a phone number is an instruction to
+     act rather than a lead time to check. */
   .reach {
     display: grid;
     gap: var(--s-8);

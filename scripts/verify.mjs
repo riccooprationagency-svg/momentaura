@@ -12,6 +12,7 @@
  *   V9  every reachable text-on-surface pairing has a contrast.mjs row
  *   V10 tag-specific attributes derive from the condition that picks the tag
  *   V10b the rendered elements in dist/ carry only their own attributes
+ *   V12 no internal link in dist/ goes nowhere
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -849,26 +850,46 @@ if (existsSync(DIST)) {
  * The old rule survives where it still applies: a page may not carry executable
  * markup of its own, only a reference to the one bundle.
  *
- * THE BUDGET MOVED ONCE, AT STEP 8, FROM 5KB TO 6.5KB. Recorded here because a
- * budget that quietly follows whatever the file currently weighs is not a
- * budget, and the way that starts is a raise nobody wrote down.
+ * THE BUDGET HAS MOVED TWICE. 5KB to 6.5KB at step 8; 6.5KB to 7KB at step 10.
+ * Both are recorded here, because a budget that quietly follows whatever the
+ * file currently weighs is not a budget, and the way that starts is a raise
+ * nobody wrote down.
  *
- * What it bought: the checkout submit and the confirmation screen. Both are the
- * flow the cart exists to complete, and neither can go anywhere else — CLAUDE.md
- * permits exactly one script, so "put it in a second file" is not on the table.
- * Most of the growth is error copy the same file requires: every message says
- * what happened and what to do, and those sentences are the point rather than
- * padding. The cart did three jobs at step 7 and does five now.
+ * STEP 8, 5KB -> 6.5KB, bought the checkout submit and the confirmation screen.
+ * Most of the growth was error copy CLAUDE.md requires: every message says what
+ * happened and what to do, and those sentences are the point rather than
+ * padding. The two line painters were one loop written twice and were merged
+ * before the number moved.
  *
- * What it did not buy: headroom worth spending. 6.5KB leaves a few hundred bytes
- * over the measured size — enough for the phone number to land in these messages
- * when section 10 supplies one, and not enough for another screen. The next
- * feature that needs a kilobyte fails this check, which is the whole job.
+ * STEP 10, 6.5KB -> 7KB, bought order lookup — the sixth job this one script
+ * does, and the client half of a fifth endpoint. It cannot go anywhere else:
+ * CLAUDE.md permits exactly one script, so "put it in a second file" has never
+ * been on the table, and that is the constraint that makes this number rise
+ * rather than the file count.
  *
- * Before raising it again, shrink instead: the two line painters were one loop
- * written twice until step 8 merged them, and duplication is what a growing
- * script accumulates first. If it must move, move it here, in a comment, with
- * the reason — never by rounding up to whatever made the build pass.
+ * SHRINKING CAME FIRST, AND IT WAS THE LARGER HALF. Step 10 removed roughly 930
+ * bytes before moving anything: thirty-one document.querySelector calls became
+ * one helper, nine "aria-disabled" literals a constant, the two forms' shared
+ * fetch-and-busy-button dance one send(), their identical error clearing one
+ * clearErrors(), the message-into-a-slot pattern one say(), the two
+ * items-to-order conversions one toOrder(), and setFieldError absorbed a focus
+ * call each caller was repeating. The tracking form still did not fit by 62
+ * bytes.
+ *
+ * WHAT WAS REJECTED TO GET THOSE 62 BYTES, and why the number moved instead:
+ * folding the checkout submit and the tracking submit into one generic form
+ * handler. It would have fitted. It would also have buried the payment path
+ * inside an abstraction with eight parameters, and CLAUDE.md requires that path
+ * to be read line by line before every merge. A budget is not worth making the
+ * money code harder to read.
+ *
+ * 7KB leaves roughly 450 bytes over the measured size — less headroom than the
+ * step 8 raise left, deliberately. The next feature that needs a kilobyte fails
+ * this check, which is the whole job.
+ *
+ * Before raising it a third time: shrink first, and if it must move, move it
+ * here, in this comment, with the reason. Never by rounding up to whatever made
+ * the build pass.
  */
 
 if (existsSync(DIST)) {
@@ -879,9 +900,10 @@ if (existsSync(DIST)) {
   const js = files.filter((f) => f.endsWith(".js"));
   const fonts = files.filter((f) => f.endsWith(".woff2"));
 
-  // 6.5KB. Raised from 5KB at step 8 — see the note above for what it bought
-  // and what has to happen before it moves again.
-  const SCRIPT_BUDGET = 6.5 * 1024;
+  // 7KB. Raised from 6.5KB at step 10, which was raised from 5KB at step 8 — see
+  // the note above for what each bought, what was shrunk first, and what has to
+  // happen before it moves again.
+  const SCRIPT_BUDGET = 7 * 1024;
   const CART = /^cart\.[A-Za-z0-9_-]+\.js$/;
 
   // The one bundle.
@@ -959,6 +981,74 @@ if (existsSync(DIST)) {
       `      ${rel(page).padEnd(24)} ${String(total).padStart(7)} bytes / ${budget}  ${ok ? "within budget" : "OVER"}`
     );
   }
+}
+
+/* ---------- V12 — no link on this site goes nowhere ----------
+ *
+ * Every internal href in the built output has to resolve to something that was
+ * actually built.
+ *
+ * This is not a tidiness check. The nav and the footer carried links to
+ * /delivery, /contact, /about, /privacy and /track from step 2 onward, and all
+ * five 404'd until step 10 — for eight steps, on a site whose entire premise is
+ * that a buyer arrives suspicious and every unverifiable thing is a liability.
+ * A dead link is the cheapest possible confirmation that a shop is abandoned,
+ * and nothing in the build was unhappy about it: Astro does not know which
+ * hrefs a template invented, and the pages rendered perfectly.
+ *
+ * So the check is against dist/, after the build, where a link either lands on a
+ * file or does not. Mailto, tel, WhatsApp and anything off-origin are somebody
+ * else's to keep alive; fragments resolve to the page they sit on.
+ */
+
+if (existsSync(DIST)) {
+  const pages = walkAll(DIST).filter((f) => f.endsWith(".html"));
+  const assets = new Set(
+    walkAll(DIST).map((f) => "/" + rel(f).replace(/^dist\//, ""))
+  );
+
+  /* A path is reachable if it was built as a file, or as a directory index. */
+  const reachable = (path) => {
+    const clean = path.replace(/[?#].*$/, "");
+    if (clean === "/") return assets.has("/index.html");
+    const trimmed = clean.replace(/\/$/, "");
+    return (
+      assets.has(clean) ||
+      assets.has(trimmed) ||
+      assets.has(`${trimmed}.html`) ||
+      assets.has(`${trimmed}/index.html`)
+    );
+  };
+
+  const HREF = /<a\s[^>]*href=["']([^"']+)["']/gi;
+  const dead = [];
+  let checked = 0;
+
+  for (const page of pages) {
+    const source = readFileSync(page, "utf8");
+    for (const [, href] of source.matchAll(HREF)) {
+      /* Off-origin, and the schemes a page hands to the device rather than to
+         the server. None of them is ours to keep alive. */
+      if (/^(https?:|mailto:|tel:|sms:|whatsapp:|\/\/)/i.test(href)) continue;
+      /* A fragment resolves to the page it is written on. */
+      if (href.startsWith("#")) continue;
+      if (!href.startsWith("/")) continue;
+
+      checked++;
+      if (!reachable(href)) dead.push(`${rel(page)} -> ${href}`);
+    }
+  }
+
+  for (const d of new Set(dead)) fail("V12", `dead link  ${d}`);
+  if (dead.length) {
+    fail("V12", "  A link that goes nowhere is the cheapest confirmation a buyer can");
+    fail("V12", "  get that a shop is abandoned. Build the page or drop the link.");
+  }
+
+  console.log(
+    `  V12 internal links    ${checked} checked across ${pages.length} page(s)` +
+      `${dead.length === 0 ? ", none dead" : `, ${new Set(dead).size} dead`}`
+  );
 }
 
 /* ---------- report ---------- */

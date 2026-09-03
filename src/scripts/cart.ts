@@ -53,11 +53,6 @@ const ceiling = (stock: string | undefined): number => {
   return stock && Number.isFinite(figure) ? Math.min(MAX_QTY, figure) : MAX_QTY;
 };
 
-/* Matches price() in src/lib/products.ts. Integer KSh in the data, formatted
- * only at the edge, and the same locale on both sides so a line total and the
- * unit price above it can never disagree about how a thousand is punctuated. */
-const money = (value: number): string => `KSh ${value.toLocaleString("en-KE")}`;
-
 const units = (order: Order): number =>
   Object.values(order).reduce((total, qty) => total + qty, 0);
 
@@ -210,6 +205,18 @@ const text = (root: HTMLElement, selector: string, value: string): void => {
   if (node) node.textContent = value;
 };
 
+/* A list of {slug, qty} into the map the painters take. Both callers get one
+ * off a wire or a disk they do not control — the confirmation screen from local
+ * storage, the tracking page from a response — so both validate, and validating
+ * in one place is what stops the looser of the two drifting. */
+const toOrder = (items: { slug: string; qty: number }[] | undefined): Order => {
+  const out: Order = {};
+  for (const item of items ?? []) {
+    if (typeof item.slug === "string" && Number.isInteger(item.qty)) out[item.slug] = item.qty;
+  }
+  return out;
+};
+
 /* Reveals the lines named in `quantities`, writes each one's quantity and
  * amount and the order total, and hands back the lines it revealed.
  *
@@ -220,6 +227,12 @@ const text = (root: HTMLElement, selector: string, value: string): void => {
  * come to disagree about what a line costs, and that is the disagreement on
  * this site that would cost the most. */
 function paintLines(quantities: Order): HTMLElement[] {
+  /* Matches price() in src/lib/products.ts. Integer KSh in the data, formatted
+   * only at the edge, and the same locale on both sides so a line total and the
+   * unit price above it can never disagree about how a thousand is punctuated.
+   * Only this function formats money, so it lives here. */
+  const money = (value: number): string => `KSh ${value.toLocaleString("en-KE")}`;
+
   const shown: HTMLElement[] = [];
   let total = 0;
 
@@ -268,13 +281,12 @@ function paintOrder(): void {
   if (emptyState) emptyState.hidden = !empty;
   if (liveState) liveState.hidden = empty;
 
-  if (blockedNote) {
-    blockedNote.hidden = blocked === null;
-    if (blocked !== null) {
-      blockedNote.textContent =
-        `${blocked} is sold out, so this order cannot be sent. ` +
-        "Remove it to continue with the rest.";
-    }
+  if (blockedNote) blockedNote.hidden = blocked === null;
+  if (blocked !== null) {
+    say(
+      blockedNote,
+      `${blocked} is sold out, so this order cannot be sent. Remove it to continue with the rest.`
+    );
   }
 
   if (checkout) {
@@ -389,6 +401,16 @@ const PLACED = "momentaura.placed.v1";
  * whole, the same way read() drops a quantity that is not an integer. */
 const REFERENCE = /^MA-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
+/* Put a message where the buyer will see it, and reveal it. Three sites wrote
+ * these two lines out: the dropped connection inside send(), and each form's
+ * own failure path. */
+const say = (slot: HTMLElement | null, message: string) => {
+  if (slot) {
+    slot.textContent = message;
+    slot.hidden = false;
+  }
+};
+
 /* Sets or clears the message under one field. When there is a message it also
  * moves focus there, because the two callers wanted exactly that and each was
  * looking the same input up a second time to do it — the correction and the
@@ -461,10 +483,7 @@ async function send(
      * failed" would be a claim about the buyer's money we are not in a position
      * to make. */
     restore();
-    if (slot) {
-      slot.textContent = dropped;
-      slot.hidden = false;
-    }
+    say(slot, dropped);
     return null;
   }
 }
@@ -491,7 +510,6 @@ if (form && submitButton) {
     );
     if (!sent) return;
 
-    const { restore } = sent;
     const body = sent.body as { url?: string; message?: string; field?: string; reference?: string };
 
     if (sent.status === 200 && body.url && body.reference) {
@@ -515,15 +533,12 @@ if (form && submitButton) {
       return;
     }
 
-    restore();
+    sent.restore();
 
     const message = body.message ?? "That did not go through. Nothing has been charged.";
     if (body.field && body.field !== "items") {
       setFieldError(body.field, message);
-    } else if (formError) {
-      formError.textContent = message;
-      formError.hidden = false;
-    }
+    } else say(formError, message);
   });
 }
 
@@ -570,42 +585,53 @@ if (trackForm && trackButton && trackResult) {
     const body = sent.body as {
       status?: string;
       reference?: string;
-      amount?: number;
+      dispatchDate?: string;
       items?: { slug: string; qty: number }[];
       message?: string;
       field?: string;
     };
 
-    if (sent.status !== 200 || !body.reference || !body.status) {
+    /* Not found is an OUTCOME, not an error. It is one more entry in the same
+     * [data-status] set the page already carries, so the loop below reveals it
+     * with no extra code — and because the prose lives on the page rather than
+     * in the response, it can hold a real link to the contact page, which a
+     * message written into textContent could never do. */
+    const outcome =
+      sent.status === 200 && body.reference && body.status
+        ? body.status
+        : sent.status === 404
+          ? "notfound"
+          : null;
+
+    if (outcome === null) {
+      /* A 400 the buyer can fix, or a 503 they cannot. Both belong above the
+       * button, except the two fields they typed themselves. */
       const message = body.message ?? "That order could not be looked up.";
-      /* The server names a field only for the two the buyer typed. Everything
-       * else — including the deliberately identical answer for a wrong
-       * reference and a wrong phone — belongs above the button. */
       if (body.field === "reference" || body.field === "phone") {
-        const field = body.field === "phone" ? "trackphone" : "reference";
-        setFieldError(field, message);
-      } else if (trackError) {
-        trackError.textContent = message;
-        trackError.hidden = false;
-      }
+        setFieldError(body.field === "phone" ? "trackphone" : "reference", message);
+      } else say(trackError, message);
       return;
     }
 
+    /* One of the set, and only one. Hiding them all first means an outcome this
+     * script does not recognise shows nothing rather than the last one. */
+    for (const state of qa("[data-status]")) state.hidden = state.dataset.status !== outcome;
+
+    if (outcome === "notfound") return;
+
     const ref = q("[data-track-ref]");
-    if (ref) ref.textContent = body.reference;
+    if (ref) ref.textContent = body.reference ?? "";
 
-    /* One of four, and only one. Hiding them all first means an unknown status
-     * from a future version of the endpoint shows no outcome rather than the
-     * previous buyer's. */
-    for (const state of qa("[data-status]")) {
-      state.hidden = state.dataset.status !== body.status;
+    /* Absent unless the server sent one, and it arrives already formatted —
+     * a date is a commitment and the server is what knows the lead times. */
+    const dateLine = q("[data-track-date]");
+    const dateValue = q("[data-track-date-value]");
+    if (dateLine && dateValue) {
+      dateLine.hidden = !body.dispatchDate;
+      if (body.dispatchDate) dateValue.textContent = body.dispatchDate;
     }
 
-    const placed: Order = {};
-    for (const item of body.items ?? []) {
-      if (typeof item.slug === "string" && Number.isInteger(item.qty)) placed[item.slug] = item.qty;
-    }
-    paintLines(placed);
+    paintLines(toOrder(body.items));
 
     trackResult.hidden = false;
   });
@@ -666,8 +692,7 @@ function paintReceived(): void {
     (wanted === null || wanted === snapshot.reference);
 
   if (usable && snapshot && snapshot.items) {
-    const placed: Order = {};
-    for (const item of snapshot.items) placed[item.slug] = item.qty;
+    const placed = toOrder(snapshot.items);
 
     const refSlot = q("[data-received-ref]");
     if (refSlot) refSlot.textContent = snapshot.reference ?? "";
@@ -686,11 +711,9 @@ function paintReceived(): void {
      * longest of the known ones would be a guess dressed as a commitment. */
     const dateLine = q("[data-received-date]");
     const dateValue = q("[data-received-date-value]");
-    const noDate = q("[data-received-nodate]");
-    if (everyLineHasLead && longest > 0 && dateLine && dateValue && noDate) {
+    if (everyLineHasLead && longest > 0 && dateLine && dateValue) {
       dateValue.textContent = LONG_DATE.format(workingDaysFrom(new Date(), longest));
       dateLine.hidden = false;
-      noDate.hidden = true;
     }
 
     received.hidden = false;

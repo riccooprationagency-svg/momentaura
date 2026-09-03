@@ -98,6 +98,16 @@ import { products, price } from "../lib/products";
             The payment is confirmed and the order is being packed. It is dispatched from
             Nairobi.
           </p>
+          <!--
+            A DATE, never a duration, and the element is absent unless the server
+            sent one. It sends one only for a settled order where every line has
+            a real lead time — one null and the arrival is unknown, and the
+            longest of the known ones would be a guess wearing a date's clothes
+            on the screen a buyer opens to find out where their money went.
+          -->
+          <p class="track__date" data-track-date hidden>
+            Arriving by <span data-track-date-value></span>.
+          </p>
         </div>
 
         <div class="track__state" data-status="failed" hidden>
@@ -152,18 +162,24 @@ import { products, price } from "../lib/products";
         </p>
       </div>
 
-      <hr class="track__hair" />
-
       <!--
-        Said on the page, not left for a buyer to discover by typing a real
-        reference into something that cannot answer. This paragraph is deleted
-        the day step 9 has credentials, and BUILD-ORDER section 10 says so.
+        Not found. It is another outcome in the same [data-status] set, so the
+        script reveals it with the loop it already has rather than carrying a
+        fifth paragraph of prose — and because it lives here rather than in a
+        message from the server, it can hold a real link to the contact page.
+
+        It does not read as an error, because for the buyer it usually is not
+        one: a mistyped character is far likelier than a missing order.
       -->
-      <p class="track__note">
-        Orders placed before M-Pesa payment is live cannot be looked up here yet — the
-        payment route that records an outcome is not switched on. Until then, an order is
-        found by its reference through the contact page.
-      </p>
+      <div class="track__state track__state--loose" data-status="notfound" hidden>
+        <h2 class="track__state-heading">That order cannot be found</h2>
+        <p class="track__state-body">
+          Check the reference and the phone number — the reference is on your confirmation
+          screen, and the phone number is the one the payment went through. If both are
+          right, get in touch on the <a href="/contact">contact</a> page and it will be
+          looked up by hand.
+        </p>
+      </div>
     </div>
   </section>
 </Base>
@@ -241,6 +257,20 @@ import { products, price } from "../lib/products";
 
   .track__state {
     margin-block-end: var(--s-40);
+  }
+
+  /* The not-found block sits outside the result panel, so it carries its own
+     rule above it rather than inheriting the panel's. */
+  .track__state--loose {
+    border-block-start: 1px solid var(--border);
+    padding-block-start: var(--s-40);
+  }
+
+  .track__date {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
   }
 
   .track__sub {

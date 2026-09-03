@@ -27,18 +27,79 @@
  * no settled orders to find. Recorded in BUILD-ORDER section 10.
  */
 
+import catalogue from "../../src/data/products.json";
 import { msisdnFrom } from "./_order.js";
 import { getPending } from "./_pending.js";
+
+const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
 
 /* The shape _order.js mints. Checked before it is used as a KV key so a
    malformed value is refused rather than becoming a lookup. */
 const REFERENCE = /^MA-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
-/* One answer for every miss. */
+/* One answer for every miss, and it does not read as an error, because for the
+ * buyer it usually is not one — a mistyped character is far likelier than a
+ * missing order. It says what to check and where to go if both are right.
+ *
+ * NOT "we". CLAUDE.md forbids "we" where one person is meant, and there is no
+ * evidence here of more than one, so the sentence is written without it. */
 const NOT_FOUND =
-  "No order matches that reference and phone number. Check both — the reference " +
-  "is on your confirmation screen, and the phone number is the one the payment " +
-  "prompt was sent to.";
+  "That order cannot be found. Check the reference and the phone number — the " +
+  "reference is on your confirmation screen, and the phone number is the one the " +
+  "payment went through. If both are right, get in touch on the contact page.";
+
+/* Working days from a date. Saturday and Sunday are not dispatch days.
+ *
+ * Public holidays are not modelled, and that is a stated limit rather than an
+ * oversight: it needs a real Kenyan calendar, and a date quietly wrong twice a
+ * year is worse than one honest about counting working days only.
+ *
+ * The confirmation screen computes the same thing in the browser, from lead
+ * times rendered into the page. The two cannot share code across the client and
+ * server boundary; they follow the same rule, and this comment is the link
+ * between them. */
+function workingDaysFrom(start, days) {
+  const date = new Date(start);
+  let left = days;
+  while (left > 0) {
+    date.setUTCDate(date.getUTCDate() + 1);
+    const day = date.getUTCDay();
+    if (day !== 0 && day !== 6) left--;
+  }
+  return date;
+}
+
+const LONG_DATE = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: "Africa/Nairobi",
+});
+
+/* A DATE, never a duration, and only for an order that is actually settled.
+ *
+ * Returns null — and the caller then omits the field entirely — unless every
+ * line in the order has a real lead time. One null and the order's arrival is
+ * unknown; the longest of the known ones would be a guess wearing a date's
+ * clothes, on the screen a buyer opens specifically to find out where their
+ * money went. leadTimeDays is null on every product today, so nothing renders. */
+function dispatchDate(record) {
+  if (record.status !== "paid") return null;
+
+  let longest = 0;
+  for (const item of record.items ?? []) {
+    const product = BY_SLUG.get(item.slug);
+    const lead = product ? product.leadTimeDays : null;
+    if (typeof lead !== "number" || !Number.isFinite(lead) || lead < 1) return null;
+    longest = Math.max(longest, lead);
+  }
+  if (longest < 1) return null;
+
+  const from = record.settledAt ?? record.createdAt;
+  if (typeof from !== "number") return null;
+
+  return LONG_DATE.format(workingDaysFrom(from, longest));
+}
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), {
@@ -101,11 +162,17 @@ export async function onRequest({ request, env }) {
   /* What the buyer already knows about their own order, and nothing more. No
      name, no email, no receipt number, no CheckoutRequestID — the id is the key
      the status endpoint accepts, and there is no reason to hand it back here. */
+  /* The field is absent rather than null when there is no date, so the page has
+     nothing to render and omits the element — the same rule the page follows for
+     every other fact that does not exist. */
+  const dispatch = dispatchDate(record);
+
   return json(200, {
     reference: record.reference,
     status: record.status,
     placedAt: record.createdAt ?? null,
     amount: record.amount,
     items: Array.isArray(record.items) ? record.items : [],
+    ...(dispatch ? { dispatchDate: dispatch } : {}),
   });
 }
