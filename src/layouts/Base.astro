@@ -10,7 +10,7 @@
 
 import "../styles/global.css";
 import devGuards from "../styles/dev-guards.css?raw";
-import { absolute } from "../lib/site";
+import { absolute, site } from "../lib/site";
 
 interface Props {
   title: string;
@@ -37,6 +37,10 @@ const path = Astro.url.pathname;
    offers cannot disagree. Root stays "/", everything else loses its trailing
    slash. verify.mjs V13 asserts the two agree across every built page. */
 const canonical = absolute(path === "/" ? "/" : path.replace(/\/+$/, ""));
+
+/* Absent until site.json carries a real photograph. See lib/site.ts — it is a
+   declared gap, not an oversight, and it appears the day the value lands. */
+const ogImage = site.ogImage ? absolute(site.ogImage) : null;
 const isCurrent = (href: string) =>
   href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
 
@@ -98,7 +102,10 @@ const year = new Date().getFullYear();
           <meta property="og:title" content={title} />
           {description && <meta property="og:description" content={description} />}
           <meta property="og:url" content={canonical} />
-          <meta name="twitter:card" content="summary" />
+          {ogImage && <meta property="og:image" content={ogImage} />}
+          {/* The large card reserves space for an image and renders the gap
+              when there is none, so the card size follows the image. */}
+          <meta name="twitter:card" content={ogImage ? "summary_large_image" : "summary"} />
         </>
       )
     }

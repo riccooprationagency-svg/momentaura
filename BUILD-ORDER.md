@@ -675,12 +675,20 @@ query — recoverable, and only because section 9 built that fallback.
 
 - **The `X-Robots-Tag` block in `public/_headers`**, which has to be deleted at go-live
   and which nothing can detect the right moment for. It is first on the list above
-- **`og:image`.** There is none, deliberately. Every product still renders light with no
-  photograph, and CLAUDE.md permits no stock, no supplier photo and nothing generated. A
-  preview card is worth having and a dishonest one is not, so the card is title and
-  description — thin, and true. `twitter:card` is `summary` rather than
-  `summary_large_image` for the same reason: the large card reserves space for an image
-  and renders the gap
+- **`og:image`, now a declared gap in `site.json` rather than a thing nobody wrote down.**
+  There is none, deliberately. Every product still renders light with no photograph, and
+  CLAUDE.md permits no stock, no supplier photo, no AI and no blank mockup presented as a
+  product. A preview card is worth having and a dishonest one is not, so the card is
+  title and description — thin, and true. `twitter:card` follows the image: `summary`
+  while there is none, because the large card reserves space for one and renders the gap.
+  `site.ogImage` lands with the photography and the tag appears with it, the same way
+  `site.url` brought up four artefacts at once.
+
+  The 45 files in `assets-source/images` are not candidates. Thirty are marketplace
+  listing shots and five are supplier catalogue sheets carrying a SKU overlay and a
+  third-party trademark on the tag — banned by the imagery rule and, for those five, by
+  the Legal section as well. The ten `2026-08-14` phone photographs are the only set that
+  could qualify, and their provenance is Ric's to confirm
 - **Every product is `photo: null`, `stock: 0` and `leadTimeDays: null`.** The catalogue
   ships entirely light and entirely sold out. Nothing is broken by that and no gate
   objects, but it is what a buyer would arrive to
