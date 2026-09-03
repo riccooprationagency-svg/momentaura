@@ -546,3 +546,87 @@ the money gate before it ran a single case. Each scratch copy now gets a
 
 ## 11 — Ship
 Sitemap, Open Graph images, Search Console. Test on a real phone on Safaricom data.
+
+### The mirror ordering became a gate before anything shipped
+
+Section 10's review fixed settling so it writes both keys, and `persist()` writes
+`ref:<reference>` first on purpose: if that write fails it throws before the
+CheckoutRequestID copy leaves `pending`, so the retry settles again and both copies
+converge. Written the other way round the failure is permanent — the retry finds a
+terminal status, returns `already`, and never comes back for the buyer's copy.
+
+That is why the `already` path repairs nothing: it cannot be reached with a stale copy,
+so code to repair one there would be dead weight implying a state that cannot happen. A
+self-healing mirror was drafted before this ordering existed and was dropped rather than
+merged, for that reason.
+
+It was a comment, and it decides whether someone who has paid is told nothing happened
+for seven days. Five checks in `mpesa-test.mjs` now drive both settling roads with the
+reference write failing and the rest of KV healthy — the quiet failure, not KV falling
+over, which was already covered and is loud. The callback path stays pending and answers
+500 so Safaricom retries; the retry converges both. The status query, which nothing
+covered for the mirror before, reports `pending` rather than `paid` and converges on the
+next poll. Reversing the two writes fails four of them; swallowing the mirror failure
+fails all five.
+
+`refKey` in `_pending.js` replaced the prefix written literally in four places across
+three files. Two sides of one key that can drift is the shape of the bug the ordering
+exists to prevent.
+
+### The domain is a fact in site.json, not a constant in the config
+
+`site.url` joins the file where every fact about the shop itself lives under the rule
+that file already keeps: null until a real one exists. It is the one value there that
+cannot fail toward an omission on the page alone. Canonical URLs, Open Graph and sitemap
+entries are absolute by specification, so a guessed hostname would not read as a
+placeholder — it would read as a claim about where this site lives, and a wrong canonical
+points every page at somebody else's while an off-host sitemap is rejected whole.
+
+So the four things that need it omit themselves instead: no canonical, no Open Graph
+block, an empty `<urlset>`, and no `Sitemap:` line. Setting one line brings all four up
+together.
+
+The sitemap is `src/pages/sitemap.xml.ts`, reading the same route data the pages are
+generated from. Not `@astrojs/sitemap`: that is a dependency and, more to the point, a
+second thing to trust — it would walk its own idea of the route table and nothing here
+would have anything to say about what it found.
+
+`/checkout`, `/order` and `/order-received` are absent from the sitemap and disallowed in
+`robots.txt`, and carry `noindex`. `/order-received` is the one that matters rather than
+the tidy one: it is reached holding an order reference, and the reference is the secret
+that opens an order on `/track`.
+
+### V13, because three of these four are hand-maintained lists
+
+This repo has already shipped a hand-maintained list wrong for eight steps with every
+gate green — that is what V12 exists for. A sitemap fails the same way and more quietly.
+A page missing from it is invisible in the one way nobody thinks to check, because the
+site looks perfect to anyone already on it; a URL in it that was never built is a 404
+handed to a crawler on purpose. Neither shows up in a browser.
+
+V13 asserts the four against each other and against `dist/`: every built page is in the
+sitemap unless `robots.txt` closes it, every sitemap URL was built, every canonical
+points at the page it is written on, and a disallowed page carries `noindex` while no
+other page does. `robots.txt` is read rather than restated, so the check cannot drift
+from it the way a second copy of the list would. With the domain null it asserts the
+empty state instead — nothing may have invented a hostname.
+
+Dropping `/track` from the list, inventing `/shop`, removing one `noindex`, and making
+`origin()` return a host while `site.json` is null each fail it.
+
+### Still open at step 11
+
+- **The domain.** Everything above is built and waiting on `site.url`. Search Console
+  cannot start until it exists, and DNS TXT verification is preferred over the meta tag
+  so no markup is owed to it
+- **`og:image`.** There is none, deliberately. Every product still renders light with no
+  photograph, and CLAUDE.md permits no stock, no supplier photo and nothing generated. A
+  preview card is worth having and a dishonest one is not, so the card is title and
+  description — thin, and true. `twitter:card` is `summary` rather than
+  `summary_large_image` for the same reason: the large card reserves space for an image
+  and renders the gap
+- **Every product is `photo: null`, `stock: 0` and `leadTimeDays: null`.** The catalogue
+  ships entirely light and entirely sold out. Nothing is broken by that and no gate
+  objects, but it is what a buyer would arrive to
+- **The real-phone test on Safaricom data.** Not runnable here, and it is the last thing
+  section 9 is still waiting on. Nothing in this repo has ever made a request to Daraja
