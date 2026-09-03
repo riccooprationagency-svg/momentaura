@@ -851,10 +851,12 @@ promise those exact bytes are final. A re-subset must ship under a new filename 
 matching `@font-face` update; overwriting either name in place strands every returning
 buyer on the old file for a year, with no error anywhere.
 
-`/_astro/*` was not in the brief. It is the cart bundle, content-hashed exactly like the
-images and loaded by every page, and leaving the one hashed asset on the site
-revalidating while fonts and images are immutable is an inconsistency with no argument
-behind it. Say so if it should come out.
+`/_astro/*` was not in the brief and was raised rather than added quietly. It stays, on
+Ric's ruling and on the same argument as the images: the cart bundle is content-hashed by
+Astro exactly as `images.mjs` hashes a rendition, so the hash is what makes `immutable`
+honest there too. Leaving the one hashed asset revalidating while fonts and images are
+immutable would have been an inconsistency with nothing behind it — and the fonts, which
+carry no hash, are the entry in this table that rests on a promise instead.
 
 ### V14, and what V4 was not counting
 
