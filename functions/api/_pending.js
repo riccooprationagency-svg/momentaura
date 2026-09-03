@@ -53,6 +53,17 @@ export async function getPending(env, checkoutRequestId) {
   return await binding(env).get(checkoutRequestId, "json");
 }
 
+/* The buyer's key for an order. ONE SPELLING, IN ONE PLACE.
+ *
+ * The prefix was written out literally in four places across three files — here,
+ * both writes in stk.js, and the read in track.js — which is two sides of one
+ * key with nothing holding them together. That is the exact shape of the bug
+ * this file's ordering now exists to prevent: a record written under a name the
+ * reader does not look under is indistinguishable from an order that never
+ * settled, and the buyer is the one who reads the difference. A helper cannot be
+ * misspelled on one side only. */
+export const refKey = (reference) => `ref:${reference}`;
+
 /**
  * Writes a settled record under both names it is known by.
  *
@@ -61,10 +72,17 @@ export async function getPending(env, checkoutRequestId) {
  * callback retry settles again and both copies converge. Written the other way
  * round, a failed reference write would be permanent: the retry would find a
  * terminal status, return `already`, and never come back to it.
+ *
+ * Which is why `already` above repairs nothing: it cannot be reached with a
+ * stale copy, so code to repair one there would be dead weight implying a state
+ * that cannot happen. That is a real guarantee resting on two lines of ordering,
+ * so it is asserted rather than described — mpesa-test.mjs drives both settling
+ * roads with the reference write failing and the rest of KV healthy, and fails
+ * if the canonical record is ever terminal over a pending copy.
  */
 async function persist(env, checkoutRequestId, record) {
   if (typeof record.reference === "string" && record.reference) {
-    await putPending(env, `ref:${record.reference}`, record);
+    await putPending(env, refKey(record.reference), record);
   }
   await putPending(env, checkoutRequestId, record);
 }
