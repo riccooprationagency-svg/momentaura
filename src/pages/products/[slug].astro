@@ -5,7 +5,9 @@
 // Not built, each because the data or the photography does not exist. Decisions,
 // not gaps — see BUILD-ORDER section 6:
 //
-//   Thumbnails       one crop exists per product at most, and none exist yet
+//   Thumbnails       step 12 built the gallery. It renders every photograph in
+//                    products.json as one 3:4 stack, and photos is [] on all
+//                    five, so what renders today is still the one kraft block
 //   Spec table       fabric weight, fit and print method are all null
 //   Size chart       no measurements, and sizes[] is empty on every product
 //   Box-opening      no image sequence, and it is the one elaborate moment on
@@ -30,6 +32,7 @@ import Base from "../../layouts/Base.astro";
 import Docket from "../../components/Docket.astro";
 import Button from "../../components/Button.astro";
 import ProductCard from "../../components/ProductCard.astro";
+import Gallery from "../../components/Gallery.astro";
 import {
   categories,
   products,
@@ -75,24 +78,13 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
 <Base title={`${product.name} — MomentAura`} description={description}>
   <section class="detail" data-system={system}>
     <div class="wrap detail__inner">
+      <!-- detail — the one surface that opts in, the same way it is the one
+           surface that passes `detail` to Docket below. It renders every
+           photograph, and the first eagerly at high fetch priority: it is above
+           the fold and the largest element on the page, so it is the LCP
+           candidate. CLAUDE.md's lazy rule is for what sits under it. -->
       <div class="detail__object">
-        {
-          system === "light" ? (
-            <span class="photo-pending" aria-hidden="true">{product.name}</span>
-          ) : (
-            /* Above the fold and the largest element on the page, so it is the
-               LCP candidate and it loads eagerly. The lazy rule in CLAUDE.md is
-               for images below the fold. */
-            <img
-              src={product.photo}
-              alt={product.name}
-              width="600"
-              height="800"
-              loading="eager"
-              decoding="async"
-            />
-          )
-        }
+        <Gallery product={product} detail />
       </div>
 
       <div class="detail__body">
@@ -211,14 +203,6 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     grid-template-columns: 1fr;
     gap: var(--s-40);
     align-items: start;
-  }
-
-  .detail__object img {
-    aspect-ratio: 3 / 4;
-    object-fit: cover;
-    border-radius: var(--radius-surface);
-    width: 100%;
-    height: auto;
   }
 
   .detail__body {

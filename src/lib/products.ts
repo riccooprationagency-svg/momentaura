@@ -1,5 +1,29 @@
 import data from "../data/products.json";
 
+/**
+ * One photograph, at one 3:4 crop, in the sizes scripts/images.mjs emits.
+ *
+ * `src` names the 800px WebP — the rendition an <img> falls back to when no
+ * <source> matches. Gallery.astro derives every other URL from it by pattern,
+ * so the data records one path rather than six and cannot record five that
+ * agree and one that does not.
+ *
+ * `width` and `height` are the real pixel dimensions of that 800px rendition,
+ * read back off the encoded file rather than assumed from the requested width.
+ * They are what stops the page reflowing when the image lands, which is why
+ * they live in the data and not in a component: a component can only guess.
+ *
+ * `alt` is written by a person. The script refuses to mint one, because the
+ * only alt text it could invent is the product name, which the heading beside
+ * the image already says.
+ */
+export interface Photo {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+}
+
 export interface Product {
   slug: string;
   name: string;
@@ -11,7 +35,7 @@ export interface Product {
   leadTimeDays: number | null;
   dispatch: string | null;
   stock: number;
-  photo: string | null;
+  photos: Photo[];
   sizes: string[];
   runSize?: number;
   runRemaining?: number;
@@ -27,13 +51,62 @@ export const products = data as Product[];
  * The two-system rule, derived and never stored. A stored flag drifts out of
  * sync with reality, which is the failure the rule exists to prevent.
  *
- * Deliberately not `photo !== null`. An empty string, an undefined key or a
- * whitespace path are all falsy-in-spirit but pass a null check, and each one
- * would render a product dark over a placeholder — the one combination
- * CLAUDE.md forbids outright. Anything that is not a real path renders light.
+ * A count, and nothing cleverer. It can be a count because the loop below has
+ * already thrown on anything that is not a real photograph: the old single-photo
+ * version had to write `typeof photo === "string" && photo.trim() !== ""` here,
+ * because an empty string or a whitespace path passed a null check and rendered
+ * a product dark over a placeholder — the one combination CLAUDE.md forbids
+ * outright. Validating once at module load is the same guarantee in a place
+ * where it can say what is wrong, instead of at every call site where it can
+ * only fail quietly toward light.
  */
 export const systemFor = (product: Product): "dark" | "light" =>
-  typeof product.photo === "string" && product.photo.trim() !== "" ? "dark" : "light";
+  product.photos.length > 0 ? "dark" : "light";
+
+/* ---------- the photos array is checked once, at module load ----------
+ *
+ * systemFor() reads photos.length. That is only safe if length is honest, so
+ * every entry is checked here rather than defended against everywhere it is
+ * read. An array holding one malformed entry has length 1, renders the product
+ * dark, and puts a broken image where a photograph should be — on a page whose
+ * entire job is to look like a shop that works.
+ *
+ * It throws rather than filtering. A silently dropped photograph is a product
+ * that quietly renders light with a kraft block while products.json says it has
+ * photography, and nobody finds out until a buyer does. The build stopping is
+ * the cheap version of that discovery.
+ *
+ * Same shape as the CATEGORY_COPY guard below: read the data once, fail loudly
+ * at build time, and let every caller downstream assume the invariant.
+ */
+for (const product of products) {
+  if (!Array.isArray(product.photos)) {
+    throw new Error(`products.json: "${product.slug}" has no photos array. Use [] for none.`);
+  }
+
+  product.photos.forEach((photo, i) => {
+    const where = `products.json: "${product.slug}" photos[${i}]`;
+
+    if (typeof photo?.src !== "string" || photo.src.trim() === "") {
+      throw new Error(`${where} has no src. Run scripts/images.mjs; never hand-edit this array.`);
+    }
+    if (!photo.src.startsWith("/img/")) {
+      throw new Error(`${where} src is "${photo.src}" — every photograph is served from /img/.`);
+    }
+    if (typeof photo.alt !== "string" || photo.alt.trim() === "") {
+      throw new Error(
+        `${where} has no alt text. It says what the photograph shows; the heading ` +
+          `beside it already says the product name.`
+      );
+    }
+    if (!Number.isInteger(photo.width) || !Number.isInteger(photo.height) || photo.width < 1 || photo.height < 1) {
+      throw new Error(
+        `${where} has no real dimensions (${photo.width}x${photo.height}). Explicit width ` +
+          `and height are what stop the page reflowing when the image lands.`
+      );
+    }
+  });
+}
 
 /** Integer KSh in the data, formatted only at the edge. */
 export const price = (value: number): string => `KSh ${value.toLocaleString("en-KE")}`;

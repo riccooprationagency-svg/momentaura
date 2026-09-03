@@ -6,6 +6,7 @@
 // light with an honest placeholder rather than as an empty dark rectangle.
 import Docket from "./Docket.astro";
 import Button from "./Button.astro";
+import Gallery from "./Gallery.astro";
 import { systemFor, price, type Product } from "../lib/products";
 
 interface Props {
@@ -20,21 +21,11 @@ const system = systemFor(product);
   <div class="wrap reveal__inner">
     <h2 class="reveal__heading">{product.name}</h2>
 
+    <!-- No `detail`. A reveal sits below a 70dvh hero and carries a button to
+         the page that is the detail view; showing every photograph here would
+         make the homepage the product page and cost the homepage budget for it. -->
     <div class="reveal__object">
-      {
-        system === "light" ? (
-          <span class="photo-pending" aria-hidden="true">{product.name}</span>
-        ) : (
-          <img
-            src={product.photo}
-            alt={product.name}
-            width="600"
-            height="800"
-            loading="lazy"
-            decoding="async"
-          />
-        )
-      }
+      <Gallery product={product} />
     </div>
 
     <!-- No description paragraph. There is no text yet, and a bracketed stub is
@@ -71,14 +62,6 @@ const system = systemFor(product);
     line-height: var(--lh-display);
     text-transform: uppercase;
     font-weight: var(--w-medium);
-  }
-
-  .reveal__object img {
-    aspect-ratio: 3 / 4;
-    object-fit: cover;
-    border-radius: var(--radius-surface);
-    width: 100%;
-    height: auto;
   }
 
   .reveal__detail {

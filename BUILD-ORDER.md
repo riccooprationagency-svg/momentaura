@@ -689,8 +689,225 @@ query — recoverable, and only because section 9 built that fallback.
   third-party trademark on the tag — banned by the imagery rule and, for those five, by
   the Legal section as well. The ten `2026-08-14` phone photographs are the only set that
   could qualify, and their provenance is Ric's to confirm
-- **Every product is `photo: null`, `stock: 0` and `leadTimeDays: null`.** The catalogue
+- **Every product is `photo: null`, `stock: 0` and `leadTimeDays: null`.** (`photo`
+  became `photos: []` at step 12; the rest is unchanged.) The catalogue
   ships entirely light and entirely sold out. Nothing is broken by that and no gate
   objects, but it is what a buyer would arrive to
 - **The real-phone test on Safaricom data.** Not runnable here, and it is the last thing
   section 9 is still waiting on. Nothing in this repo has ever made a request to Daraja
+
+---
+
+## 12 — Images
+
+The pipeline, not the photographs. Every product is still `photos: []`, so nothing on the
+site looks different today. What changed is that a photograph now has one way in, and
+three failures that were previously invisible now fail the build.
+
+### `photo` became `photos`
+
+`products.json` carried one nullable path per product. It now carries an array of
+`{ src, alt, width, height }`, empty on all five, and `systemFor()` reads
+`photos.length > 0`.
+
+The old `systemFor()` had to be defensive at the point of use — `typeof photo === "string"
+&& photo.trim() !== ""` — because an empty string or a whitespace path passed a null check
+and rendered a product dark over a placeholder, the one combination CLAUDE.md forbids
+outright. A count cannot be defensive that way, so the check moved to where it belongs: a
+loop in `src/lib/products.ts` reads the array once at module load and throws on any entry
+that is not a real photograph. Validating once, in a place that can say what is wrong,
+beats validating at every call site that can only fail quietly toward light.
+
+It throws rather than filtering. A silently dropped photograph is a product rendering a
+kraft block while `products.json` says it has photography, and nobody finds out until a
+buyer does.
+
+### `scripts/images.mjs`, and the dependency it cost
+
+    node scripts/images.mjs <slug> <source> <alt> [<source> <alt> ...]
+
+Sources stay outside version control. `.gitignore` has said so since step 1 and the reason
+has not changed: several images that have passed through `assets-source/` are other
+companies' product photography, banned by the imagery rule and, for the five carrying a
+third-party trademark, by the Legal section as well. What enters the repo is a finished
+rendition, at our crop, of a photograph we took.
+
+The script emits AVIF and WebP at 400/800/1200 from one centred 3:4 crop, reads the real
+dimensions back off the encoded 800px file, prunes renditions the product no longer uses,
+and writes the array into `products.json`. It refuses three things: to upscale, because a
+1200px rendition of an 800px frame claims detail it does not have; to invent alt text,
+because the only line it could generate is the product name the heading already carries;
+and to write a file over 200KB.
+
+**Centre crop, never sharp's `attention` heuristic.** A smart crop picks a different window
+per photograph, and "one crop across every product" is a rule a heuristic cannot keep.
+
+**Filenames carry a hash of the source bytes plus the encoding recipe.** That is what makes
+the one-year `immutable` header honest: change a photograph, a width or a quality setting
+and every URL changes, so a returning buyer gets the new file because it is a different
+file rather than because a cache expired.
+
+### V1 stopped being an absence, and what that bought
+
+It asserted "astro, and no devDependencies at all". An absence needs no judgement to check.
+It now holds a named list containing `sharp` at an exact version, which is a budget — the
+same move V4 made at step 7 when the cart arrived, and it carries the same obligation. The
+script budget was made to say what each raise bought, what was shrunk first, and what was
+rejected to avoid raising it further. This gets the same treatment.
+
+**Three options were on the table. Ric chose the second.**
+
+| | What it does | What it costs |
+|---|---|---|
+| 1. Borrow Astro's | `import "sharp"` with no change to `package.json` | V1 keeps printing "astro and nothing else" while the build depends on a package nothing here declares |
+| 2. **Declare it, pinned** | one name in `devDependencies`, V1 becomes a one-name allow-list | V1 stops being an absence and becomes a list someone has to keep honest |
+| 3. No sharp at all | process images by hand outside the repo | "one crop, one light, one angle, across every product" stops being enforced and becomes something someone recalls |
+
+**Why option 1 was rejected, and it is the important half.** sharp was genuinely already
+reachable — Astro carries it in its own `optionalDependencies` — so the import would have
+worked today and cost nothing visible. What it would actually have produced is a gate
+reporting a state it cannot see: V1 printing "astro and nothing else" while the image
+pipeline ran on a package Astro chose the version of, could drop in a minor release, and
+marks *optional*, meaning a tree where the install skipped it is a valid tree. Nothing
+would have said so until an encode silently produced different bytes.
+
+That is the one failure this repo keeps finding. **V3** counted accent references until it
+was pointed out that a count of two accepts any two. **V9** stopped maintaining `PAIRINGS`
+from memory after four tokens shipped unmeasured behind a comment claiming they had been
+corrected. **V11** exists because CLAUDE.md printed two hex values the source contradicted.
+Three corrections, one shape: a report confident about something it had no way to check. A
+borrowed sharp would have been the fourth, and introducing it deliberately after fixing it
+three times is not a trade worth the name it saves.
+
+**Why pinned rather than ranged.** `^0.35.4` lets a future install change the encoder, and
+the same source frame through a different libvips is different bytes at a different size —
+a silent change to the thing this repo is most careful about. V1 asserts the exact pin, so
+"pinned" is a fact rather than a sentence in a comment. Moving it is a commit that says so.
+
+**What it bought.** AVIF and WebP at three widths from one centred 3:4 crop, produced by a
+script that refuses to upscale, refuses to invent alt text and refuses to write a file over
+200KB — rather than by a person remembering six files per photograph. That is option 3's
+cost avoided.
+
+**What it cost.** "Astro and nothing else" stopped being true as written. It is now two
+rules — astro at runtime, one named tool at build time — and every future reader holds both.
+
+**What it did not cost, and this is why the price is as low as it is: nothing that ships.**
+`npm run build` never imports sharp, the renditions are committed to `public/img/`, and a
+deploy from a tree installed with `--omit=dev` produces byte-identical output. If sharp
+breaks, it breaks at a keyboard with someone reading the error.
+
+**The runtime half did not move and is not negotiable: Astro, and nothing else.** It is the
+half that matters — it is what keeps the shipped output at zero JavaScript beyond the cart.
+V4 holds that one script to a byte budget, but V4 only ever gets to count one file because
+this list has one name on it.
+
+**Adding a second name.** It argues its case in V1's comment, with what it buys and what it
+costs, in the commit that adds it. The check is a list and not `dev.length <= 1` for exactly
+that reason: a count accepts any one package and would let a swap happen silently, where a
+name has to be typed on purpose. An allow-list of one is still a gate. One that grows
+without an argument each time is a comment.
+
+### `Gallery.astro`, and one placeholder
+
+Three files carried the same photo-or-placeholder ternary — a card, a reveal and the
+product page. They now compose one component, which is what makes "exactly one
+`.photo-pending`" a property of the code rather than of three people remembering.
+
+`detail` defaults to **off**, on the same reasoning as Docket's: on it renders every
+photograph with the first eager at `fetchpriority="high"`, off it renders the first only,
+lazily. The product page is the one surface that opts in — the same surface that is the
+only one passing `detail` to `Docket`. A card in a grid of nine that forgot to opt out
+would pull nine eager full-width images over a metered connection with nothing on the page
+looking wrong while it happened.
+
+`sizes` is what makes `srcset` do anything at all. Without it a browser has no width to
+work from before layout exists, assumes 100vw, and fetches the 1200px file onto every
+phone — the opposite of what three widths are for. It is a media-condition list, so
+`var()` does not resolve in it, so **V2b's media-prelude exemption was generalised from
+the prelude to the condition**: a quoted string containing a min-width or max-width
+condition is exempt wherever it is written, and everything else on the line is still
+matched.
+
+### Cache headers
+
+`public/_headers` carried only the `X-Robots-Tag` block. It now also decides caching, on
+one distinction: whether the filename changes when the bytes do.
+
+| Path | Header | Why |
+|---|---|---|
+| `/img/*`, `/_astro/*` | `max-age=31536000, immutable` | content-addressed, so the promise is keepable |
+| `/fonts/*` | `max-age=31536000, immutable` | 75KB on every page — but the names carry no hash |
+| everything else | `no-cache` | keep the copy, revalidate it |
+
+HTML is `no-cache` rather than `no-store`: no-store makes every visit a full download, and
+on a metered Kenyan bundle that is the buyer paying again for the same 21KB. It is not a
+`max-age` either — what is on these pages is stock, price and dispatch, and serving a
+four-minute-stale sold-out product is exactly the vendor behaviour the buyer arrived
+expecting.
+
+**The fonts are the one to be careful with.** `immutable` on a name with no hash is a
+promise those exact bytes are final. A re-subset must ship under a new filename and a
+matching `@font-face` update; overwriting either name in place strands every returning
+buyer on the old file for a year, with no error anywhere.
+
+`/_astro/*` was not in the brief and was raised rather than added quietly. It stays, on
+Ric's ruling and on the same argument as the images: the cart bundle is content-hashed by
+Astro exactly as `images.mjs` hashes a rendition, so the hash is what makes `immutable`
+honest there too. Leaving the one hashed asset revalidating while fonts and images are
+immutable would have been an inconsistency with nothing behind it — and the fonts, which
+carry no hash, are the entry in this table that rests on a promise instead.
+
+### V14, and what V4 was not counting
+
+Three checks that share one property: none is visible from a desk. The build is happy, the
+gates are green, the page renders, and the cost lands on a buyer who never says anything.
+
+- **`width`, `height` and `alt` on every `<img>` in `dist/`.** Without dimensions the
+  browser reserves no space, and everything under the image jumps when it arrives — on a
+  product page that is the price, the docket and the add-to-order button moving under a
+  thumb mid-tap
+- **Every image URL a page emits resolves to a built file.** `Gallery.astro` derives five
+  of each photograph's six URLs from the sixth, and its `RENDITIONS` list is a copy of
+  `WIDTHS` in the script. Rather than thread a constant between an `.astro` and a
+  hand-run `.mjs`, the check resolves what the page actually emits against what is
+  actually in `dist/` — which catches the drift, a typo, and a pruned rendition something
+  still points at. V12's argument applied to images, at higher stakes: a dead link is
+  found by clicking, a dead `<img>` is a broken picture on the page whose job is to prove
+  a real product exists
+- **200KB per file, on `public/img/`.** On `public/` and not `dist/` because that is where
+  the file enters the repo; catching it after it is in git history is catching it late
+
+**V4 counted no image bytes at all, and would have kept passing the day photography
+landed.** Five reveals at 70KB each is 350KB of a 500KB homepage arriving with nothing on
+the report moving. It now charges each page for one file per `<img>` — the largest WebP
+candidate, because a `<picture>` offers six renditions and the browser fetches one, so
+counting six is a figure nobody pays. WebP at the top width is both the fallback format
+and what a 3x phone at 400px CSS width actually requests; counting the 400w file would
+flatter the number on the exact device the budget exists to protect.
+
+### Measured, before and after
+
+The pipeline was exercised on synthetic 2400x3200 and 2600x3400 sources, then reverted.
+
+| | before | after, no photos | after, one photo on the page |
+|---|---|---|---|
+| `dist/index.html` | 103,598 | 104,219 | 208,923 |
+| a product page | 104,183 | 105,000 | 209,686 |
+| shared (2 fonts + cart) | 82,094 | 82,094 | 82,094 |
+| `<img>` in `dist/` | 0 | 0 | 10 |
+| heaviest rendition | — | — | 103,976 (1200w WebP) |
+
+The 621-byte and 817-byte increases with no photography are the `.gallery` wrapper and its
+rules, inlined into every page. The third column is one photograph on the homepage and one
+on a product page, at the 1200px WebP the budget charges for: 208,923 of a 500,000
+homepage budget, so roughly three more photographs fit on the homepage before it fails.
+
+### Still open at step 12
+
+- **There are no photographs.** All five products are `photos: []` and every page renders
+  light with one kraft block. This step built the way in, not the thing
+- **`og:image` is still absent**, and lands with the first photograph, as step 11 said
+- **Nobody has looked at a real photograph in this layout.** No gate can tell you a crop
+  is wrong, a stack reads badly, or a 3:4 window cut the product in half. The script
+  prints what it trimmed for that reason, and the first shoot needs eyes on the page
