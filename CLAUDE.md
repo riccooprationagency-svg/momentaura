@@ -14,6 +14,12 @@ Astro (static output) · Cloudflare Pages · Cloudflare KV for order state · Cl
 Functions for anything touching money. No React, no Tailwind, no UI library. Plain CSS
 with custom properties. Ask before adding any dependency; the answer is almost always no.
 
+**Runtime dependencies: Astro, and nothing else. That half has never moved.** Step 12
+added the first and only devDependency — `sharp`, used by `scripts/images.mjs` and by
+nothing the site loads. V1 in `verify.mjs` now holds a named list rather than asserting
+an absence, which is a budget rather than a fact, and the argument for the one name in
+it lives beside the check. A second name is a decision made there, in writing.
+
 ## What this sells
 
 Apparel and accessories — t-shirts, hoodies, sweatshirts, bags, watches, necklaces.
@@ -279,11 +285,37 @@ Everything respects `prefers-reduced-motion`.
 Real photographs only. **No AI-generated product imagery. No AI-generated people. No
 supplier photos in production. No stock lifestyle. No blank mockups presented as products.**
 
-One surface, one light, one angle, one 3:4 crop, across every product. WebP, lazy-loaded
-below the fold, explicit width and height on every image.
+One surface, one light, one angle, one 3:4 crop, across every product. AVIF with a WebP
+fallback, three widths, lazy below the fold, **explicit width and height on every image**.
+
+**A photograph enters the repo through `scripts/images.mjs` and no other way.** Sources
+stay outside version control — several that have passed through `assets-source/` are
+other companies' product photography, which this file bans outright. The script takes a
+slug, a source path and the alt text a person wrote, emits AVIF and WebP at 400/800/1200
+from one centred 3:4 crop, and writes the `photos` array into `products.json` with the
+dimensions read back off the encoded file. It refuses to upscale, refuses to invent alt
+text, and refuses to write a file over 200KB.
+
+**Never hand-edit the `photos` array.** `src/lib/products.ts` throws at build time on an
+entry the script would not have produced, because `systemFor()` is now `photos.length > 0`
+and a count is only safe when every entry is real. Filenames carry a hash of the source
+bytes and the encoding recipe, which is what makes the one-year `immutable` cache header
+in `public/_headers` an honest promise instead of a hope.
+
+**Every image renders through `Gallery.astro`, including the absence of one.** It takes
+`detail`, which defaults to **off**, on the same reasoning as `Docket`'s: on, it renders
+every photograph with the first eager at high fetch priority; off, the first photograph
+only, lazily. The product page is the one surface that opts in. A card that forgot to opt
+out would pull nine eager full-width images over a metered connection with nothing on the
+page looking wrong.
 
 Where no real photograph exists: light system, kraft placeholder block, product name in
 mono. An honest placeholder beats a dishonest photograph.
+
+**One placeholder, never one per photograph the product might have had.** `photos.length
+=== 0` renders exactly one `.photo-pending`. Four kraft blocks stacked down a page
+announce the same absence four times and read as broken rather than honest, which inverts
+the only reason the placeholder exists. The absence is one fact; it is stated once.
 
 ## Performance — pass/fail, not aspirational
 
@@ -303,6 +335,15 @@ Kenyan mobile traffic on metered bundles.
   file at all; Astro inlines a small hoisted script by default, which is how one
   script silently becomes one copy per page
 - Touch targets 44px minimum
+- **No single image file over 200KB.** V14 enforces it on `public/img/`, where the file
+  enters the repo, rather than on `dist/`, where catching it is already too late
+- **Caching is decided by whether the filename changes when the bytes do.** Content-
+  addressed paths — `/img/*`, `/_astro/*` — are `immutable` for a year. HTML is
+  `no-cache`, which keeps the copy and revalidates it: not `no-store`, which makes every
+  visit a full download on a metered bundle, and not a `max-age`, which would serve a
+  stale stock figure or price for its duration. `/fonts/*` is the exception to watch —
+  those two names carry no hash, so `immutable` there means a re-subset must ship under
+  a new filename
 
 Test on a real phone on mobile data before every deploy. Not on wifi.
 
@@ -366,6 +407,30 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   arrives suspicious. Nothing in the build was unhappy about it: Astro does not know which
   hrefs a template invented, and every page rendered perfectly. A dead link is the cheapest
   confirmation a buyer can get that a shop is abandoned
+- **V14 covers the three image failures nothing else can see.** Every `<img>` in `dist/`
+  carries `width`, `height` and `alt`; every image URL a page emits resolves to a file
+  that was actually built; no file in `public/img/` exceeds 200KB. None of these is
+  visible from a desk: the build is happy, the gates are green, the page renders, and
+  the cost lands on a buyer in Nairobi on a metered bundle who never says anything.
+  The URL half is V12's argument applied to images, and the stakes are higher — a dead
+  link is found by clicking, a dead `<img>` is a broken picture sitting on the page whose
+  whole job is to prove there is a real product behind it
+- **V4's page budget counts photography now, and it did not before.** It weighed markup,
+  fonts and the cart, which was complete only while no page had an image. It would have
+  kept passing the day the shoot landed — five reveals at 70KB each is 350KB of a 500KB
+  homepage arriving without a number on the report moving. It charges each page for one
+  file per `<img>`, the largest WebP candidate: a `<picture>` offers six renditions and
+  the browser fetches one, so counting all six would be a figure nobody pays, and WebP at
+  the top width is both the fallback format and what a 3x phone at 400px actually asks
+  for. Counting the 400w file would flatter the number on the exact device the budget
+  exists to protect
+- **V2b exempts a media-condition list wherever it is written, not just a media prelude.**
+  `var()` does not resolve in one, which is a language limit rather than a discipline
+  failure, and `sizes` on an `<img>` is the second place the language has one. Without it
+  `srcset` does nothing: a browser with no width to work from assumes 100vw and pulls the
+  1200px file onto every phone. The carve-out is the condition, so a raw dimension beside
+  one on the same line is still caught, and the breakpoints inside are the same three
+  declared at the top of `tokens.css`
 - `node scripts/verify.mjs` checks the rest: no raw hex outside `tokens.css`, the accent
   confined to its sanctioned sites, the closed stamp contained to `Docket.astro`
   and counted at no more than one Seal fill per built page, the `PAIRINGS` table complete

@@ -1,0 +1,151 @@
+---
+// Every photograph on this site goes through here, and so does every absence of
+// one. That is the point of the component: the two-system rule and the honest
+// placeholder are one decision, made in one file, rather than the same ternary
+// copied into a card, a reveal and a product page — which is what it was, three
+// times, until the array landed.
+//
+// ---------- one placeholder, never four ----------
+//
+// photos.length === 0 renders exactly one .photo-pending. Not one per photo the
+// product might one day have, and not one per rendition. Four kraft blocks stacked
+// down a product page announce the same absence four times and read as a broken
+// page rather than an honest one, which inverts the only reason the placeholder
+// exists. The absence is one fact. It is stated once.
+//
+// ---------- detail, and why it defaults to off ----------
+//
+// Same prop, same default and same reasoning as Docket's `detail`: off unless a
+// surface asks. On it renders every photograph, the first eager at high fetch
+// priority because it is the LCP element of a product page. Off it renders the
+// first photograph only, lazily.
+//
+// The default is the load-bearing part. A card in a grid of nine that forgot to
+// opt out would otherwise pull nine galleries of eager full-width images over a
+// metered connection, and nothing on the page would look wrong while it happened.
+// A surface that forgets to opt in shows one lazy image, which costs nothing.
+import { systemFor, type Product } from "../lib/products";
+
+interface Props {
+  product: Product;
+  detail?: boolean;
+}
+
+const { product, detail = false } = Astro.props;
+
+const system = systemFor(product);
+const shown = detail ? product.photos : product.photos.slice(0, 1);
+
+/* ---------- deriving the other five URLs ----------
+ *
+ * products.json records one path per photograph, the 800px WebP. The other five
+ * renditions are the same name with a different width and a different extension,
+ * so they are derived here rather than stored — five stored paths are five
+ * chances for one of them to be wrong in a way nothing reads until a buyer
+ * loads the page.
+ *
+ * These widths must match WIDTHS in scripts/images.mjs. They are duplicated on
+ * purpose rather than shared through a module: the two files are a .astro and a
+ * hand-run .mjs, and threading a constant between them buys less than the check
+ * that already covers the failure. verify.mjs V14 resolves every URL this
+ * component emits against what is actually in dist/, so a width here that the
+ * script never wrote fails the build rather than 404ing at a buyer.
+ */
+const RENDITIONS = [400, 800, 1200];
+const NAMED = /^(\/img\/.+)-(\d+)\.([0-9a-f]{8})\.webp$/;
+
+const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
+  const parsed = NAMED.exec(src);
+  if (!parsed) {
+    throw new Error(
+      `products.json photo src "${src}" is not a name scripts/images.mjs would have ` +
+        `written. Expected /img/<slug>-<n>-800.<hash>.webp. Never hand-edit the photos array.`
+    );
+  }
+  const [, stem, , hash] = parsed;
+  return RENDITIONS.map((w) => `${stem}-${w}.${hash}.${ext} ${w}w`).join(", ");
+};
+
+/* ---------- sizes ----------
+ *
+ * How wide the image will actually be rendered, so the browser can pick a
+ * rendition before it has any layout. It is the only way srcset does anything at
+ * all: without it the browser assumes 100vw and fetches the largest file every
+ * time, on the metered mobile connections this site is built for.
+ *
+ * These are the two layouts this component lands in, read off the grids in
+ * [slug].astro, ProductReveal.astro and [category].astro. They round up. An
+ * over-estimate costs bytes on one image; an under-estimate puts a soft
+ * photograph on the page where a buyer is deciding whether the shop is real, and
+ * of the two only one of them is recoverable by looking harder.
+ *
+ * V2b exempts these for the same reason it exempts a media prelude: a
+ * media-condition list is the one grammar var() does not resolve in, and this
+ * is the only other place on the site that has one. The breakpoints below are
+ * the three declared at the top of tokens.css — read and change them there.
+ */
+const SIZES = detail
+  ? "(min-width: 1340px) 496px, (min-width: 900px) 38vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
+  : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
+---
+
+<div class="gallery">
+  {
+    system === "light" ? (
+      /* One block. See the note at the top of this file. */
+      <div class="photo-pending" aria-hidden="true">
+        {product.name}
+      </div>
+    ) : (
+      shown.map((photo, i) => {
+        /* Eager and high priority for the first image of a detail view only —
+           it is above the fold and the largest thing on the page, so it is the
+           LCP candidate. Everything else is below the fold, which is where
+           CLAUDE.md's lazy rule applies, and that includes the first image of a
+           card or a homepage reveal: both sit under a 70dvh hero. */
+        const lead = detail && i === 0;
+
+        return (
+          <picture>
+            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
+            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
+            <img
+              class="gallery__img"
+              src={photo.src}
+              alt={photo.alt}
+              width={photo.width}
+              height={photo.height}
+              loading={lead ? "eager" : "lazy"}
+              fetchpriority={lead ? "high" : undefined}
+              decoding="async"
+            />
+          </picture>
+        );
+      })
+    )
+  }
+</div>
+
+<style>
+  /* A stack, never a carousel. A carousel needs a script, and the cart is the
+     only script this site ships; it also hides photographs behind an
+     interaction on the page where a buyer is trying to see all of them. */
+  .gallery {
+    display: grid;
+    gap: var(--s-12);
+  }
+
+  /* One 3:4 crop, everywhere. The ratio is stated in CSS as well as in the
+     width and height attributes so the box is reserved even if a rendition
+     fails to load — a 404 image with no ratio collapses the column and moves
+     everything under it, which is the layout shift the attributes exist to
+     prevent, arriving by the other door. */
+  .gallery__img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: var(--radius-surface);
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+</style>

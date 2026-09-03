@@ -30,3 +30,54 @@
 # obeyed.
 /*
   X-Robots-Tag: noindex, nofollow
+  Cache-Control: public, no-cache
+
+# ============================================================================
+# CACHING
+#
+# Two rules, and the difference between them is whether the filename changes
+# when the bytes do.
+#
+# HTML is `no-cache`, which is not `no-store`. no-store forbids keeping a copy
+# and makes every visit a full download, which on a metered Kenyan mobile
+# bundle is the buyer paying for the same 21KB again to read the same page.
+# no-cache keeps the copy and revalidates it, so an unchanged page costs a 304
+# and a few hundred bytes.
+#
+# It is not a max-age either. A short max-age serves a stale page for its
+# duration, and what is on these pages is stock, price and dispatch — the
+# checkable facts this whole site is built on. Selling something the catalogue
+# marked sold out four minutes ago is exactly the vendor behaviour the buyer
+# arrived expecting. Revalidate every time; the page is small and the answer is
+# usually 304.
+#
+# Everything below is content-addressed and therefore immutable for a year.
+# `immutable` is a promise that these exact bytes never change at this exact
+# URL, and it is only keepable because the hash is in the filename:
+#
+#   /img/crew-tee-1-800.7321b82b.webp
+#   /_astro/cart.CXCEDcWV.js
+#
+# scripts/images.mjs hashes the source bytes together with its encoding recipe,
+# so re-shooting a product or changing a quality setting produces a new name and
+# a new URL. Astro hashes the cart the same way. A returning buyer gets the new
+# file because it is a different file, never because a cache expired.
+#
+# THE FONTS ARE THE EXCEPTION, AND THEY ARE THE ONE TO BE CAREFUL WITH.
+# /fonts/archivo.woff2 and /fonts/jetbrains-mono.woff2 are fixed names with no
+# hash. Marking them immutable is a promise these two files are final. It is the
+# right trade — they are 75KB together, every page loads both, and nothing about
+# a subset font changes on its own — but it means a re-subset MUST ship under a
+# new filename and a matching @font-face update. Overwriting either name in
+# place leaves every returning buyer on the old file for up to a year, with no
+# error anywhere. See FONT-SETUP.md.
+# ============================================================================
+
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/img/*
+  Cache-Control: public, max-age=31536000, immutable
