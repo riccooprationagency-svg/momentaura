@@ -33,49 +33,70 @@ const revealed = products.slice(0, 2);
   description="Apparel and accessories made and dispatched from Nairobi. Prices in KSh, payment by M-Pesa."
 >
   <!--
-    The hero image slot is empty, and that is a decision rather than an
-    oversight.
+    The wordmark at --t-hero is the image. There is still no photograph of stock
+    we hold, and the three alternatives are each banned by name in CLAUDE.md —
+    supplier photographs, stock lifestyle, AI-generated product imagery — so
+    nothing legitimate could fill this frame. Type can, and the type is ours
+    outright.
 
-    No real photograph of stock we hold exists yet. The three alternatives are
-    each banned by name in CLAUDE.md — supplier photographs, stock lifestyle,
-    and AI-generated product imagery — so there is nothing legitimate to put
-    here. It is not a placeholder either: a kraft block would make the hero
-    announce an absence, and the dark system does not take a placeholder.
+    That is why the hero is a full viewport again. The 70dvh it sat at was a
+    hedge against emptiness, and at this size the letterforms occupy the frame
+    edge to edge within the gutter, so there is no emptiness left to hedge
+    against.
 
-    So the hero is typography on Packing Dark, held to 70dvh so the dispatch
-    rule and the first tiles sit above the fold. A full empty viewport reads as
-    broken; a short one reads as composed.
-
-    It fills when the shoot happens. Nothing else here needs to change: add the
-    image and lift the height back to a full viewport.
+    When the shoot happens the photograph sits BEHIND these letterforms rather
+    than replacing them: the mark stays at --t-hero, the image goes underneath,
+    and the section keeps its height. It does not become a photograph with a
+    caption over it. Nothing in this block changes but the addition of the
+    image and its ground.
   -->
-  <section class="hero">
+  <section class="hero" data-system="dark">
     <div class="wrap hero__inner">
       <p class="hero__line">Nairobi — apparel and accessories</p>
       <h1 class="hero__mark">MomentAura</h1>
     </div>
   </section>
 
-  <div class="wrap band">
-    <DispatchRule label="Nairobi" />
+  <div class="band" data-system="dark">
+    <div class="wrap">
+      <DispatchRule label="Nairobi" />
+    </div>
   </div>
 
-  <section class="wrap band">
-    <h2 class="section-heading">What is made here</h2>
-    <div class="tiles">
-      {categories.map((c) => <CategoryTile slug={c.slug} name={c.name} />)}
+  <section class="band" data-system="light">
+    <div class="wrap">
+      <h2 class="section-heading">What is made here</h2>
+      <div class="tiles">
+        {categories.map((c) => (
+          <CategoryTile slug={c.slug} name={c.name} line={c.line} />
+        ))}
+      </div>
     </div>
   </section>
 
-  {revealed.map((product) => <ProductReveal product={product} />)}
+  {
+    /* Reveal 1 takes the product's own system. Reveal 2 runs a dark band under
+       a light card, so the page alternates rather than presenting two identical
+       light screens in sequence. The band is page rhythm; the card is still the
+       product's own system and says nothing different about the product. */
+    revealed.map((product, i) => (
+      <ProductReveal product={product} band={i === 1 ? "dark" : undefined} />
+    ))
+  }
 </Base>
 
 <style>
+  /* Ground and ink together, always. An element that sets data-system remaps
+     --fg for its whole subtree, so painting the text without painting the
+     ground leaves one system's ink on the other's canvas. V7 fails the build
+     on the omission. */
   .hero {
     min-height: max(var(--hero-min), var(--hero-height));
     display: flex;
     align-items: flex-end;
     padding-block: var(--s-80);
+    background-color: var(--bg);
+    color: var(--fg);
   }
 
   .hero__inner {
@@ -91,15 +112,29 @@ const revealed = products.slice(0, 2);
     color: var(--fg-muted);
   }
 
+  /* Type as the image. Weight 500, not the 600 the nav wordmark carries: at
+     this size 600 closes the counters and the mark stops reading as letterforms
+     and starts reading as a mass. CLAUDE.md caps the logo at 600 — it does not
+     require it to be 600. Line-height 0.9 is what makes the stack read as solid
+     form, and it matters more here than anywhere else on the site. */
   .hero__mark {
-    font-size: var(--t-display);
+    font-size: var(--t-hero);
     line-height: var(--lh-display);
     text-transform: uppercase;
-    font-weight: var(--w-semi);
+    font-weight: var(--w-medium);
   }
 
+  /* The bands alternate systems and the alternation is the page's rhythm.
+     No rules, no dividers, no separators between sections — a change of ground
+     is the only separator this page uses.
+
+     Full-bleed, with .wrap nested inside holding the content to --max-width.
+     Painting --bg on .wrap instead would stop each ground at 1240px and leave
+     the alternation floating in a column down the middle of the page. */
   .band {
     padding-block: var(--s-80);
+    background-color: var(--bg);
+    color: var(--fg);
   }
 
   .section-heading {
