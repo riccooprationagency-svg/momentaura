@@ -27,6 +27,12 @@ assets-source/images/
 # Cloudflare / Wrangler
 .wrangler/
 
+# Local-only Pages dev config. Cloudflare configuration lives in the dashboard;
+# a wrangler.toml here exists only to hand `wrangler pages dev` a KV binding for
+# local testing. A committed one would be a second, divergent statement of what
+# the deployed site is bound to, and the dashboard would still be the true one.
+wrangler.toml
+
 # OS
 .DS_Store
 Thumbs.db
