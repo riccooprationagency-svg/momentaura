@@ -911,3 +911,97 @@ homepage budget, so roughly three more photographs fit on the homepage before it
 - **Nobody has looked at a real photograph in this layout.** No gate can tell you a crop
   is wrong, a stack reads badly, or a 3:4 window cut the product in half. The script
   prints what it trimmed for that reason, and the first shoot needs eyes on the page
+
+---
+
+## 13 — Gallery
+
+Section 1 of the analytics spec asked for four gallery behaviours. Three shipped, one was
+declined, and the declined one is the entry worth reading.
+
+### The row swipes, in CSS
+
+`scroll-snap-type: x mandatory` on the row, `scroll-snap-align: start` and
+`scroll-snap-stop: always` on each frame. Zero JavaScript: touch swipes it natively, a
+trackpad and a scrollbar reach it on desktop, and it works before the one script has
+loaded and if it never does.
+
+**This reverses a decision, and the reversal is narrower than it looks.** The CSS in
+`Gallery.astro` said "a stack, never a carousel" on two grounds. The first — a carousel
+needs a script — is simply no longer true. The second — it hides photographs behind an
+interaction on the page where a buyer is trying to see all of them — still stands, and is
+what the thumbnail strip answers: every photograph is on the page at once, at 56px, and
+the strip states the count rather than leaving a buyer to discover it by dragging. The
+carousel that comment refused was the kind that hides its own length. This one does not.
+
+`scroll-behavior` is not set, and V6 is right to refuse the animated value: an animated
+jump is the site moving the viewport on the buyer's behalf, which is the scroll-jacking
+CLAUDE.md bans, and it drops frames worst on exactly the phone this site is built for. A
+tap cuts straight to its photograph. That also leaves no motion for
+`prefers-reduced-motion` to reduce, which is the cheapest possible way to respect it.
+
+### The strip costs 312 bytes
+
+Seven jobs in one script now. `galleryStrip()` sets `scrollLeft` on click and marks
+`aria-current` on scroll — one listener each way, because marking only on click leaves the
+strip lying after a swipe, and the swipe is the interaction the row exists for.
+
+Thumbnails are offered the **400px rendition and nothing else**, deliberately not a
+srcset. V4 charges a page for the largest WebP candidate an element offers, so a thumbnail
+carrying all three widths would bill the page three more times for a 1200px file no device
+would fetch for a 56px box — and the point of that rule is that the budget reads what a
+phone actually pays. The image inside each button is `alt=""`; the button carries the
+name, and four copies of a written alt read back to back says the same sentence four times
+to the one person who cannot see the strip it describes.
+
+### Zoom is not built. This is a decision, not a gap
+
+**Zoom needs a source around 2400px wide. That number breaks two rules at once.**
+
+The 1200px rendition is the largest this site produces, and at the encoder settings in
+`scripts/images.mjs` a 2400px AVIF lands well past the **200KB per-file ceiling** V14
+enforces on `public/img/`. Raising the ceiling to fit it would mean a buyer in Nairobi on
+a metered bundle pays for a file whose only purpose is a hover state — on a phone, where
+there is no hover, and where the pinch gesture the platform already provides does the same
+job on the image that is on screen.
+
+**The fabric-detail photograph does what zoom was asked for, at no cost.** It is already
+one of the four slots the shoot fills, it is a real photograph of the real weave rather
+than an interpolated crop of one, and it is reachable by the same swipe as everything
+else. A buyer asking "what does this fabric actually look like" gets a better answer from
+a photograph taken to answer it than from a magnifier over a 1200px file.
+
+So: not deferred, not backlogged. **Declined, with the fabric-detail slot as the answer.**
+Reopen it only if the per-file ceiling and the mobile-data argument are reopened first,
+because those are the two things it costs.
+
+### Measured
+
+| | bytes | budget |
+|---|---|---|
+| `cart.<hash>.js` before | 6,762 | 7,168 |
+| `cart.<hash>.js` after | 7,074 | 7,168 |
+| the strip | +312 | — |
+
+94 bytes clear of the 7KB ceiling. It was 317 bytes before the click handler stopped
+marking the strip itself and left it to the scroll listener that has to exist anyway.
+
+### Verified, at every count
+
+`Gallery.astro` was exercised at one, two, three and four photographs, driven through
+`scripts/images.mjs` on synthetic 1800x2400 sources and reverted afterwards — the same
+method section 12 used, and for the same reason: every product is still `photos: []`, so
+none of this is reachable from the catalogue that ships. At each count: the first image
+eager at `fetchpriority="high"` and exactly one of each on the page, every other image
+lazy and carrying no `fetchpriority`, `width`/`height`/`alt` on all of them, one thumbnail
+per photograph and none at a count of one, the snap row and its `data-gallery` hook
+present only where there is a second photograph to reach, and a card — which never opts
+into `detail` — still one lazy image with no strip and no row.
+
+### Still open at step 13
+
+- **There are still no photographs.** Everything above is verified against synthetic
+  sources and reverted. The strip, the swipe and the 312 bytes ship to a site where every
+  product renders light and none of it is reachable yet
+- **Nobody has swiped this on a real phone.** The gates cannot tell you a snap feels
+  wrong, a 56px thumbnail is too small to hit, or four frames read as three
