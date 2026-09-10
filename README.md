@@ -24,10 +24,13 @@ given the Data Protection Act reasoning in `FONT-SETUP.md`.
 cp scripts/pre-commit .git/hooks/pre-commit   # once per clone — see below
 node scripts/contrast.mjs                     # WCAG, reads tokens.css directly
 node scripts/verify.mjs                       # hex, accent, banned list, budget
-node scripts/checkout-test.mjs                # the endpoint that touches money
+node scripts/mpesa-test.mjs                   # the endpoints that touch money
+node scripts/track-test.mjs                   # order lookup, by reference and phone
 ```
 
-All three run on every commit. Zero dependencies, plain Node.
+All four run on every commit, and again in CI on every push (`.github/workflows/gates.yml`)
+so a machine that never installed the local hook can't ship a broken money endpoint
+unnoticed. Zero dependencies, plain Node.
 
 `scripts/contrast.mjs` asserts every specified colour pairing against the real token
 values. `scripts/verify.mjs` asserts no raw hex outside `tokens.css`, the accent only at
@@ -35,19 +38,23 @@ its two sanctioned sites — the docket's fact row and the input focus underline
 pinned to its own selector rather than to a count — no banned constructs, one named
 script under budget, and page weight against the 500KB homepage budget.
 
-`scripts/checkout-test.mjs` exercises `functions/api/checkout.js`, which the other two
-never load: `functions/` is outside the Astro build, so a broken money endpoint passes
-every other gate. It runs the shipped handler on Node's own fetch primitives and proves
-the rules that matter there — a client price is ignored, an unknown slug is rejected, a
-sold-out product is named rather than dropped, and no gateway detail ever reaches the
-browser. It cannot prove anything about a live gateway and does not claim to.
+`scripts/mpesa-test.mjs` and `scripts/track-test.mjs` exercise `functions/api/mpesa/*`
+and `functions/api/track.js`, which the other two never load: `functions/` is outside the
+Astro build, so a broken money or order-lookup endpoint passes every other gate. Both run
+the shipped handlers on Node's own fetch primitives and prove the rules that matter —
+a client price is ignored, a forged callback amount is caught, a duplicate callback
+changes nothing, and a wrong phone number gives the same answer as a reference that does
+not exist. Neither can prove anything about a live Daraja shortcode, and neither claims to
+— see BUILD-ORDER section 9.
 
-Any of the three failing refuses the commit.
+Any of the four failing refuses the commit.
 
-**`.git/hooks/` is not version controlled, so a fresh clone has no gates until you run
+**`.git/hooks/` is not version controlled, so a fresh clone has no local gate until you run
 that copy.** Do it first, before writing anything. The accent rule is the constraint
 CLAUDE.md ranks as most important and it erodes silently — nothing fails, the build
-passes, the page looks right, and the signal quietly stops meaning anything.
+passes, the page looks right, and the signal quietly stops meaning anything. CI is the
+backstop for the clone that skips this step, not a replacement for it — CI catches a bad
+commit after it has already landed on `main`.
 
 `SKIP_BUILD=1 git commit` skips the rebuild; `git commit --no-verify` skips the gates
 entirely. Reach for the second one roughly never.
@@ -64,8 +71,11 @@ corporate gifting to apparel and are wrong about the product. Where `docs/` and
 
 ## Where the build is
 
-Step 1 of `BUILD-ORDER.md` complete — tokens, fonts, global stylesheet, layout
-primitives. Step 2 is the layout shell.
+Past step 14 of `BUILD-ORDER.md` (images, gallery). Checkout runs on M-Pesa STK Push directly —
+IntaSend was retired — and the constraint gates run in CI as well as the local pre-commit
+hook. Every product still sits at zero stock with no photography, so there is nothing
+sellable yet regardless of payment status. See `BUILD-ORDER.md` for the step-by-step
+detail and `src/lib/site.ts`'s `GAPS` list for what's still missing.
 
 ## Two rules worth knowing before you touch anything
 

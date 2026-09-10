@@ -425,6 +425,135 @@ await check("the order is written under its reference before the push goes out",
   eq(early.amount, 1300, "the reference record carries the computed amount");
 });
 
+/* ================= the request itself — _order.js =================
+ *
+ * readOrder() is the shared money-path validation: it decides what an order is
+ * before either gateway sees a shilling of it. These cases were exercised
+ * through /api/checkout by scripts/checkout-test.mjs. That endpoint and that
+ * suite are retired, and stk.js is now the only caller — so this is the only
+ * suite left that can see any of it. They moved rather than went.
+ *
+ * Every refusal below also asserts that NOTHING WAS PUSHED. The old suite could
+ * not check that: a validation bug that let a bad order through to Daraja rings
+ * a real phone, and the request never leaving is the property that matters here.
+ */
+
+const rawPush = (body, env = baseEnv()) =>
+  stk({ request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "POST", body }), env });
+
+/* [label, body, the message fragment it must carry]. The fragment is given
+   wherever _order.js has specific wording to say — a 4xx alone would pass on a
+   message that named the wrong field, and the field is what the buyer fixes. */
+const bad = [
+  ["not JSON at all", "{{{", null],
+  ["a JSON array rather than an object", [], null],
+  ["null", null, null],
+  ["no items", { name: "Amina Wanjiru", phone: "0712345678" }, "There is nothing in your order yet."],
+  ["an empty basket", { ...ORDER, items: [] }, "There is nothing in your order yet."],
+  ["more lines than a basket holds", { ...ORDER, items: Array.from({ length: 11 }, (_, i) => ({ slug: `x${i}`, qty: 1 })) }, null],
+  ["a fractional quantity", { ...ORDER, items: [{ slug: "crew-tee", qty: 1.5 }] }, null],
+  ["a negative quantity", { ...ORDER, items: [{ slug: "crew-tee", qty: -3 }] }, null],
+  ["a zero quantity", { ...ORDER, items: [{ slug: "crew-tee", qty: 0 }] }, null],
+  ["a quantity past the cap", { ...ORDER, items: [{ slug: "crew-tee", qty: 100 }] }, null],
+  ["a quantity as a string", { ...ORDER, items: [{ slug: "crew-tee", qty: "2" }] }, null],
+  ["a slug that is not a string", { ...ORDER, items: [{ slug: 12, qty: 1 }] }, null],
+  ["an item that is not an object", { ...ORDER, items: ["crew-tee"] }, null],
+  ["no name", { items: ORDER.items, phone: "0712345678" }, "Enter the name the order is for."],
+  ["a one-character name", { ...ORDER, name: "A" }, "Enter the name the order is for."],
+  ["no phone", { items: ORDER.items, name: "Amina Wanjiru" }, "Enter a Kenyan phone number"],
+  ["a phone that is not Kenyan", { ...ORDER, phone: "+447700900000" }, "Enter a Kenyan phone number"],
+  ["a phone with too few digits", { ...ORDER, phone: "071234567" }, "Enter a Kenyan phone number"],
+  ["a malformed email", { ...ORDER, email: "not-an-address" }, "That email address does not look right."],
+];
+
+for (const [label, body, fragment] of bad) {
+  await check(`refused before any prompt is sent: ${label}`, async () => {
+    const res = typeof body === "string" ? await rawPush(body) : await push(body);
+    if (res.status < 400 || res.status > 499) throw new Error(`expected a 4xx, got ${res.status}`);
+    const text = await res.text();
+    has(text, "message", "carries a message");
+    lacks(text, "something went wrong", "never a generic apology");
+    if (fragment) has(text, fragment, "says which field is wrong");
+    eq(pushes.length, 0, "nothing was pushed");
+    eq(kv.store.size, 0, "no order record was written");
+  });
+}
+
+await check("a slug not in the catalogue is refused, never silently skipped", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }, { slug: "not-a-product", qty: 1 }] });
+  eq(res.status, 422, "status");
+  has((await res.json()).message, "no longer available", "message");
+  eq(pushes.length, 0, "nothing was pushed for a partly unknown order");
+});
+
+/* The 01 range is the half of Kenyan mobile numbering that 07 testing misses
+   entirely: it normalises to 2541, not 2547, and a regex that only ever saw an
+   07 number would pass while refusing every Airtel and Telkom line on the site. */
+await check("every phone shape a buyer types normalises to the right msisdn", async () => {
+  for (const [typed, expected] of [
+    ["0712345678", "254712345678"],
+    ["0112345678", "254112345678"],
+    ["+254712345678", "254712345678"],
+    ["254112345678", "254112345678"],
+    ["0712 345 678", "254712345678"],
+    ["0712-345-678", "254712345678"],
+  ]) {
+    const res = await push({ ...ORDER, phone: typed });
+    if (res.status !== 200) throw new Error(`${typed} was refused with ${res.status}`);
+    eq(pushes[pushes.length - 1].PhoneNumber, expected, `${typed} normalised`);
+  }
+});
+
+await check("a blank email is accepted, and a real one is stored with the order", async () => {
+  eq((await push({ ...ORDER, email: "   " })).status, 200, "blank accepted");
+  eq((await record()).email, null, "blank stored as absent, not as whitespace");
+  await push({ ...ORDER, email: "a@b.co" });
+  eq((await record()).email, "a@b.co", "email stored");
+});
+
+await check("a quantity exactly at stock is accepted", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 6 }] });
+  eq(res.status, 200, "status");
+  eq((await res.json()).total, 3900, "total");
+});
+
+/* Both quantities sit inside stock, so the stock rule cannot fire and the
+   duplicate rule is the only thing that can refuse this. Two lines of 6 would
+   have been caught by the stock check instead, proving nothing about duplicates. */
+await check("the same slug twice is refused rather than summed past the cap", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 2 }, { slug: "crew-tee", qty: 2 }] });
+  eq(res.status, 400, "status");
+  eq(pushes.length, 0, "nothing was pushed");
+});
+
+await check("a repeated slug cannot be used to exceed stock in total", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 4 }, { slug: "crew-tee", qty: 4 }] });
+  if (res.status === 200) throw new Error("8 of a 6-stock product were accepted across two lines");
+  eq(res.status, 400, "status");
+});
+
+await check("two references in a row differ", async () => {
+  const a = (await (await push()).json()).reference;
+  const b = (await (await push()).json()).reference;
+  if (a === b) throw new Error(`reference repeated: ${a}`);
+  if (!/^MA-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(a)) throw new Error(`reference shape: ${a}`);
+});
+
+await check("a GET on the push endpoint is refused", async () => {
+  const res = await stk({
+    request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "GET" }),
+    env: baseEnv(),
+  });
+  eq(res.status, 405, "status");
+  eq(res.headers.get("Allow"), "POST", "Allow header");
+});
+
+await check("push responses are never cached", async () => {
+  const res = await push();
+  eq(res.headers.get("Cache-Control"), "no-store", "Cache-Control");
+  eq(res.headers.get("X-Content-Type-Options"), "nosniff", "nosniff");
+});
+
 /* ================= the callback ================= */
 
 await check("a wrong path token is a 404 that admits nothing", async () => {
@@ -781,7 +910,7 @@ await check("the status response carries no amount, phone number or receipt", as
 /* ================= no secret in the source ================= */
 
 await check("no key, passkey or shortcode is written into the source", async () => {
-  for (const file of ["_daraja.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
+  for (const file of ["_daraja.js", "_order.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
     const src = readFileSync(join(API, file), "utf8");
     for (const pattern of [/passkey\s*=\s*["'][A-Za-z0-9]{8,}/i, /["'][A-Za-z0-9]{40,}["']/]) {
       const hitMatch = src.match(pattern);

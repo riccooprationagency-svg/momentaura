@@ -135,7 +135,7 @@ const CANDIDATES: (Gap & { value: unknown })[] = [
     what: "a number that rings and is answered",
     blocks:
       "the Contact page, and the phone number CLAUDE.md requires on every error " +
-      "message in /api/checkout and /api/mpesa/stk",
+      "message in /api/mpesa/stk and /api/mpesa/status",
   },
   {
     key: "contact.whatsapp",

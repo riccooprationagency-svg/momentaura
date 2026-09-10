@@ -357,10 +357,9 @@ hardcoded: a paybill change must not need a code release.
 - **The IP allowlist default must be confirmed against current Daraja documentation before
   production.** It is Safaricom's list to change. It fails closed, so a stale list rejects
   real callbacks — which the status query then recovers
-- **The buyer-facing flow is not wired.** `/checkout` still posts to the IntaSend endpoint.
-  STK Push has no page to redirect to: it needs a "check your phone" screen that polls
-  `/api/mpesa/status`. That is a client change against a 6.5KB script budget with roughly
-  600 bytes spare, and it is not worth spending before a real shortcode proves the flow
+- ~~The buyer-facing flow is not wired.~~ **Closed at step 13.** `/checkout` now posts to
+  `/api/mpesa/stk`, and `/order-received` polls `/api/mpesa/status` until it has an answer.
+  See step 13 for what that cost against the script budget and what it still cannot prove
 
 ### Step 8's "one file swap" assumption was wrong, and is withdrawn
 
@@ -912,9 +911,85 @@ homepage budget, so roughly three more photographs fit on the homepage before it
   is wrong, a stack reads badly, or a 3:4 window cut the product in half. The script
   prints what it trimmed for that reason, and the first shoot needs eyes on the page
 
+## 13 — Retire IntaSend, wire the STK flow, add CI
+
+Three changes, one PR, because the second was not safely separable from the third: closing
+"the buyer-facing flow is not wired" (section 9) meant the site's only working checkout
+was about to change shape, and that is exactly the kind of change the gates exist to catch
+if a machine's local hook was never installed — which an audit the same week found true of
+at least one clone. Fixing the hook gap without also proving it against a real flow change
+would have been a check nobody had exercised.
+
+### IntaSend retired, not parked beside Daraja
+
+Section 8 shipped IntaSend as the interim gateway with the explicit plan that step 9 would
+replace `_gateway.js`'s body for Daraja and touch nothing else. Section 9 withdrew that
+plan: Daraja does not hand back a URL to redirect to, so its endpoints were built beside
+`checkout.js` rather than inside it, and both gateways have shipped side by side ever
+since — one wired to `/checkout`, one fully built and completely unreachable from any page.
+
+That is a decision, not an oversight, and it was made here rather than assumed: carrying
+two audited money paths indefinitely costs a second review every time either one changes,
+for a shop that has never taken a real payment through either. `functions/api/checkout.js`
+and `functions/api/_gateway.js` are deleted. `scripts/checkout-test.mjs`, which existed
+only to guard `checkout.js`, is deleted with them. If IntaSend is wanted again later it is
+a `git revert` of one commit, not a rebuild — it is still in history, just not in `main`.
+
+### The client change section 9 deferred
+
+`/checkout` now posts to `/api/mpesa/stk` instead of `/api/checkout`. On success there is
+no `url` to redirect to — Daraja hands back nothing to redirect to — so the buyer goes
+straight to `/order-received`, which now polls `/api/mpesa/status` every four seconds
+until the answer is `paid`, `failed`/`mismatch`, or eight minutes pass with neither, at
+which point it points the buyer at `/track` and `/contact` instead of polling forever.
+`showStatus()` — new, but factored out of the reveal-one-of-N-blocks loop `/track` already
+had, not written twice — decides which of the page's status blocks is visible; both pages
+now share it.
+
+The PLACED snapshot (`momentaura.placed.v1`) carries the `checkoutRequestId` Daraja
+returned, alongside the reference and items it already held, because `/api/mpesa/status`
+needs it and there is nowhere else on the buyer's own machine for it to live. Same rule as
+every other field in that key: validated before it is trusted, never rendered as markup.
+
+**Script budget moved a third time, 7KB to 7.5KB, and only after shrinking.** The full
+reasoning — what was cut before the number moved, and what was deliberately kept despite
+the cost — is in `scripts/verify.mjs` beside `SCRIPT_BUDGET`, per the rule the comment
+there has stated since step 10: raise it here, with the reason, never by rounding up to
+whatever made the build pass.
+
+**Still exactly as untested against a real Daraja shortcode as the rest of section 9.**
+`mpesa-test.mjs` proves the server side against a stub, as it always has. Nothing new
+proves that a real phone receives the prompt this client code now waits on, that Daraja's
+real timing matches the 4-second/8-minute numbers chosen here, or that `/order-received`
+renders correctly on a real device on a real Kenyan mobile connection. That needs the same
+thing section 9 has always needed: a real shortcode, still not applied for as of this step.
+
+### CI, alongside the local hook rather than instead of it
+
+`.github/workflows/gates.yml` runs the same four scripts `scripts/pre-commit` does, in the
+same order, against a fresh clone on every push and pull request to `main`. It exists
+because the local hook only protects a commit made from a machine that ran `cp
+scripts/pre-commit .git/hooks/pre-commit` first, `.git/hooks/` is not version controlled,
+and an audit found at least one working clone that never had. The hook is not redundant
+with CI and is not replaced by it: the hook catches a mistake before it is committed: CI
+catches the commit that shipped anyway, on `main`, where the cost of catching it late is
+highest. Keep installing the hook.
+
+### Documentation brought back in line
+
+`README.md`'s Gates section listed three of the four scripts the hook actually runs, and
+its "where the build is" line had said step 1 since step 1. Both were wrong in the specific
+way this repo's own rules exist to catch elsewhere — a stale claim nothing was failing on.
+`CLAUDE.md`'s Security section and its `checkout-test.mjs` paragraph referenced the file
+just deleted; both are rewritten against what actually guards the money path now. Every
+in-repo comment naming `checkout.js`, `_gateway.js` or IntaSend as the live path is updated
+to name `stk.js`, `_daraja.js` and M-Pesa STK Push instead — `docs/` is exempted, per its
+own stated rule of being history rather than instruction.
+  prints what it trimmed for that reason, and the first shoot needs eyes on the page
+
 ---
 
-## 13 — Gallery
+## 14 — Gallery
 
 Section 1 of the analytics spec asked for four gallery behaviours. Three shipped, one was
 declined, and the declined one is the entry worth reading.
@@ -979,12 +1054,13 @@ because those are the two things it costs.
 
 | | bytes | budget |
 |---|---|---|
-| `cart.<hash>.js` before | 6,762 | 7,168 |
-| `cart.<hash>.js` after | 7,074 | 7,168 |
+| `cart.<hash>.js` before | 7,357 | 7,680 |
+| `cart.<hash>.js` after | 7,669 | 7,680 |
 | the strip | +312 | — |
 
-94 bytes clear of the 7KB ceiling. It was 317 bytes before the click handler stopped
-marking the strip itself and left it to the scroll listener that has to exist anyway.
+11 bytes clear of the 7.5KB ceiling step 13 raised it to. It was 317 bytes before the
+click handler stopped marking the strip itself and left it to the scroll listener that
+has to exist anyway.
 
 ### Verified, at every count
 
@@ -1024,7 +1100,7 @@ and CLAUDE.md still carries that scar in its contrast section. The pattern is th
 every time — the prose drifts, the code does not, and the gates are green throughout.
 Reading is the only instrument that has ever found one.
 
-### Still open at step 13
+### Still open at step 14
 
 - **There are still no photographs.** Everything above is verified against synthetic
   sources and reverted. The strip, the swipe and the 312 bytes ship to a site where every

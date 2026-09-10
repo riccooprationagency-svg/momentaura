@@ -1,34 +1,28 @@
 ---
-// Checkout. Name and phone, an order summary, and one button that leaves for
-// the gateway's hosted page.
+// Checkout. Name and phone, an order summary, and one button that sends an
+// M-Pesa payment prompt to the phone number just entered.
 //
-// NO CARD FIELD EXISTS HERE, and none may ever be added. The card details are
-// entered on the gateway's own domain, which is what keeps PCI scope at the
-// lightest tier. This page collects a name, a phone number and optionally an
-// email, and nothing else.
+// NO CARD FIELD EXISTS HERE, and none may ever be added. M-Pesa is the only
+// payment method this shop takes, and the prompt is completed on the buyer's
+// own phone with their own PIN — nothing resembling a card or PIN field is
+// ever rendered on this domain.
 //
-// The redirect is stated before it happens, in prose, above the button. An
-// unannounced jump to another domain at the moment money moves is the single
-// most suspicion-inducing event in the whole flow — the buyer arrived expecting
-// to be taken somewhere and abandoned, and a silent hop to a domain they have
-// never heard of is exactly what that would look like.
-//
-// The gateway's name comes from functions/api/_gateway.js, which is the file
-// step 9 replaces with Daraja. The import points from src/ into functions/ on
-// purpose: it is the difference between the swap being one file and being one
-// file plus whichever pages happened to name the gateway in prose.
+// Submitting this form does not leave the site. That is stated in prose above
+// the button, because a buyer who has been trained by every other checkout to
+// expect a redirect should not be left wondering whether the click did
+// anything — /order-received is where the prompt's outcome actually shows up.
 import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
 import Field from "../components/Field.astro";
 import { products, price } from "../lib/products";
-import { GATEWAY_NAME } from "../../functions/api/_gateway.js";
+import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 
 // Light, following the products it lists, exactly as /order does.
 ---
 
 <Base
   title="Checkout — MomentAura"
-  description={`Name, phone number, and payment on ${GATEWAY_NAME}'s secure page. Dispatched from Nairobi.`}
+  description={`Name, phone number, and a ${GATEWAY_NAME} payment prompt sent to your phone. Dispatched from Nairobi.`}
   system="light"
   index={false}
 >
@@ -74,13 +68,13 @@ import { GATEWAY_NAME } from "../../functions/api/_gateway.js";
           />
 
           <!--
-            STATE THE REDIRECT BEFORE IT HAPPENS. Prose, above the button,
-            naming the domain. Not a tooltip, not fine print under the fold,
-            and not after the click.
+            STATE WHAT HAPPENS BEFORE IT HAPPENS. Prose, above the button. Not
+            a tooltip, not fine print under the fold, and not after the click.
           -->
           <p class="checkout__redirect">
-            Payment is completed on {GATEWAY_NAME}'s secure page. You will come back here
-            when it is done. No card details are ever entered on this site.
+            Submitting sends a {GATEWAY_NAME} payment prompt to the phone number above.
+            Enter your PIN there to pay. You do not leave this site, and no card details
+            are ever entered anywhere on it.
           </p>
 
           <!-- Filled and revealed by the cart when the server rejects the
@@ -91,7 +85,7 @@ import { GATEWAY_NAME } from "../../functions/api/_gateway.js";
 
           <div class="checkout__actions">
             <Button variant="filled" type="submit" data-checkout-submit>
-              Continue to {GATEWAY_NAME}
+              Pay with {GATEWAY_NAME}
             </Button>
             <a class="checkout__back" href="/order">Back to your order</a>
           </div>

@@ -9,7 +9,7 @@
 #
 # A fresh clone has no hooks until someone runs that. See README.md.
 #
-# Runs the constraint gates, then the money-path test. V2 and V3 inside
+# Runs the constraint gates, then the money-path and order-lookup tests. V2 and V3 inside
 # verify.mjs guard the accent rule — the constraint CLAUDE.md calls the single
 # most important in the file, and the one that erodes without anything failing.
 # It has to run without anyone remembering to run it.
@@ -36,15 +36,11 @@ fi
 node scripts/contrast.mjs
 node scripts/verify.mjs
 
-# The money endpoint. functions/ sits outside the Astro build, so nothing above
-# ever loads it: contrast.mjs reads tokens.css, verify.mjs walks src/ and dist/,
-# and a checkout.js broken in half would pass every gate in this hook. It is
-# also the one file CLAUDE.md calls the highest-risk in the repo. A test that
-# guards the money path and is never run is a comment, so it runs here too.
-node scripts/checkout-test.mjs
-
-# The M-Pesa endpoints, for the same reason and one more: the callback is public
-# and unauthenticated, and the three things that keep it safe — the secret path,
+# The M-Pesa endpoints — the highest-risk files in the repo. functions/ sits
+# outside the Astro build, so nothing above ever loads them: contrast.mjs reads
+# tokens.css, verify.mjs walks src/ and dist/, and a broken stk.js or callback
+# handler would pass every other gate in this hook. The callback is public and
+# unauthenticated, and the three things that keep it safe — the secret path,
 # the IP allowlist failing closed, and the amount re-verified against KV — are
 # all invisible when they work. A gate is the only thing that notices one of
 # them being removed.

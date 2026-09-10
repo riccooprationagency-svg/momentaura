@@ -11,9 +11,10 @@
  * payment. Only a callback or a successful status query marks an order paid."
  * The record this writes is `pending` and only _pending.js settle() may move it.
  *
- * Validation and re-pricing come from _order.js, shared with /api/checkout, so
- * the price and stock rules cannot drift between the two gateways. Price is not
- * in the accepted request shape at all.
+ * Validation and re-pricing come from _order.js — the same module IntaSend's
+ * checkout.js used to share it with, before it was retired. Kept as its own
+ * module rather than folded back in here so a future second gateway can share
+ * it again without price and stock rules drifting between the two.
  */
 
 import { DarajaError, stkPush } from "../_daraja.js";

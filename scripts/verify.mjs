@@ -1022,9 +1022,43 @@ if (existsSync(DIST)) {
  * step 8 raise left, deliberately. The next feature that needs a kilobyte fails
  * this check, which is the whole job.
  *
- * Before raising it a third time: shrink first, and if it must move, move it
- * here, in this comment, with the reason. Never by rounding up to whatever made
- * the build pass.
+ * STEP 13, 7KB -> 7.5KB, bought /order-received polling /api/mpesa/status until
+ * the STK push it just sent has an actual answer, replacing the redirect to
+ * IntaSend's hosted page that used to close this loop. That is the client half
+ * of the "buyer-facing flow is not wired" gap BUILD-ORDER section 9 named and
+ * deferred — it could not be built before now because nothing existed to poll.
+ *
+ * SHRUNK FIRST, AS REQUIRED. /track's reveal-one-of-N-status-blocks loop was
+ * already duplicating exactly the shape the new poller needed, so both now
+ * share one showStatus() instead of carrying two copies of "hide them all,
+ * show one" — a net addition smaller than writing the poller against a second
+ * copy of that loop would have been. The poller itself went through two
+ * passes: the first attempt was 373 bytes over budget; folding its two
+ * setTimeout-and-retry branches (one per outcome) into one retry() closure
+ * and inlining the two timing constants at their single call sites each
+ * (naming them cost two identifiers for numbers read exactly once) closed
+ * most of that before the budget moved at all.
+ *
+ * WHAT WAS NOT CUT TO AVOID THIS RAISE: the eight-minute give-up state
+ * ("stalled", pointing the buyer at /track and /contact). A page that polls
+ * forever with no way out for a buyer who left the tab open is the same
+ * "something went wrong" silence CLAUDE.md's copy rules ban everywhere else on
+ * this site, and cutting it to save roughly 150 bytes would have paid for the
+ * budget with the flow's honesty instead of with a number.
+ *
+ * 7.5KB IS FINAL. THERE IS NO NEXT RAISE TO ARGUE FOR. Every raise above was
+ * argued honestly: each bought a named feature, each shrank more than it spent,
+ * and each wrote down what it refused to cut. That is precisely what would make
+ * a fourth one feel earned, and it is why the number stops here instead. Three
+ * defensible raises are how a budget becomes a record of what the file happened
+ * to weigh, one good argument at a time.
+ *
+ * So the next feature that does not fit is not a raise. It is a cut, or it is
+ * paid for by deleting something already in this file, and if neither is
+ * acceptable then the feature does not ship — which is the sentence this whole
+ * budget existed to be able to say. Nothing above is a template for writing a
+ * fourth paragraph. This one is the argument against it, written now, while
+ * nobody needs it and it is therefore still easy to mean.
  */
 
 if (existsSync(DIST)) {
@@ -1035,10 +1069,11 @@ if (existsSync(DIST)) {
   const js = files.filter((f) => f.endsWith(".js"));
   const fonts = files.filter((f) => f.endsWith(".woff2"));
 
-  // 7KB. Raised from 6.5KB at step 10, which was raised from 5KB at step 8 — see
-  // the note above for what each bought, what was shrunk first, and what has to
-  // happen before it moves again.
-  const SCRIPT_BUDGET = 7 * 1024;
+  // 7.5KB, AND FINAL. Raised from 7KB at step 13, from 6.5KB at step 10, from
+  // 5KB at step 8 — see the note above for what each bought and what was shrunk
+  // first. There is no fourth raise to argue for: a feature that does not fit
+  // is cut, or paid for by deleting something already here.
+  const SCRIPT_BUDGET = 7.5 * 1024;
   const CART = /^cart\.[A-Za-z0-9_-]+\.js$/;
 
   // The one bundle.
