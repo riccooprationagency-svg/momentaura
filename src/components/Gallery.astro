@@ -97,6 +97,13 @@ const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
  * point of that rule is that the budget reads what a phone actually pays. The
  * smallest rendition is already seven times wider than the box, which covers a
  * 3x screen with room to spare.
+ *
+ * The declared height is the recipe's own rounding at 400px, not the recorded
+ * dimensions scaled down. The encoder rounds each rendition independently, so
+ * a photograph recorded at 800×1067 in products.json is served here at 400×533,
+ * and scaling 1067 by a half would declare 534 — a pixel taller than the file
+ * the browser is about to read, and a pixel of layout the CSS would otherwise
+ * have to hide.
  */
 const thumbFor = (src: string): string => {
   const [, stem, , hash] = parse(src);
@@ -216,7 +223,7 @@ const SIZES = detail
                 src={thumbFor(photo.src)}
                 alt=""
                 width={400}
-                height={Math.round((photo.height / photo.width) * 400)}
+                height={Math.round(400 * 4 / 3)}
                 loading="lazy"
                 decoding="async"
               />
