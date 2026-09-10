@@ -998,6 +998,32 @@ per photograph and none at a count of one, the snap row and its `data-gallery` h
 present only where there is a second photograph to reach, and a card — which never opts
 into `detail` — still one lazy image with no strip and no row.
 
+### A known blind spot: V2b cannot read the numbers it exempts
+
+`Gallery.astro`'s `sizes` comment claimed all three of its numbers were "the three declared
+at the top of tokens.css". Two are — 641px and 900px are the 640px and 900px breakpoints.
+**1340px is not, and never was.** It is layout arithmetic: `--max-width` 1240px plus two
+`--gutter`s at 2rem is 1304px, the viewport at which the container stops growing, rounded
+up to 1340. The value is right. The sentence explaining where it came from was invented.
+
+**Nothing in the build could have caught it, and nothing ever will.** V2b exempts a
+media-condition list from the raw-value rule because `var()` does not resolve in one — the
+exemption is a language limit, not a relaxation. But a check that is required to skip these
+numbers cannot read them, and it certainly cannot read a claim *about* them. Every
+media-condition list on this site sits in that hole: the two `sizes` strings here, and
+every `@media` prelude. Roughly forty raw pixel values, all correct today, none of them
+verifiable by anything except a person reading the line.
+
+The fix was the sentence. Changing 1340 to 1100 would have made the comment true by making
+the layout wrong, and that trade is always available and always worth refusing: **a comment
+is never repaired by moving the value it describes.**
+
+This is the third time a comment in this repo has been wrong in a way no gate could see.
+`--sisal` shipped at 3.56:1 on Kraft Board behind a comment saying it had been corrected,
+and CLAUDE.md still carries that scar in its contrast section. The pattern is the same
+every time — the prose drifts, the code does not, and the gates are green throughout.
+Reading is the only instrument that has ever found one.
+
 ### Still open at step 13
 
 - **There are still no photographs.** Everything above is verified against synthetic
