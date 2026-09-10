@@ -1,0 +1,51 @@
+# The same constraint gates scripts/pre-commit runs locally, run again here on
+# every push and pull request against main.
+#
+# WHY THIS EXISTS: the local hook only protects a commit made from a machine
+# that ran `cp scripts/pre-commit .git/hooks/pre-commit` first, and
+# `.git/hooks/` is not version controlled — a fresh clone has none until
+# someone remembers to install it. CI is the backstop for the clone that
+# skipped that step, or the commit made with `--no-verify`. It does not
+# replace the local hook: the hook catches a mistake before it is committed,
+# CI catches it after, on `main`, where the cost of catching it late is highest.
+#
+# Mirrors scripts/pre-commit exactly — same build, same four scripts, same
+# order — so "it failed in CI" and "it failed locally" are never two different
+# claims about the same commit.
+name: Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Astro's telemetry prompt would otherwise write to a runner that is
+      # thrown away after the job — silence it rather than let it print noise
+      # nobody reads. See README.md and FONT-SETUP.md for why it defaults off.
+      - run: npx astro telemetry disable
+
+      - run: npm run build
+
+      - run: node scripts/contrast.mjs
+      - run: node scripts/verify.mjs
+
+      # The M-Pesa endpoints — the highest-risk files in the repo — and order
+      # lookup. functions/ sits outside the Astro build, so nothing above ever
+      # loads them; a broken stk.js, callback handler or track.js would pass
+      # every other gate in this job.
+      - run: node scripts/mpesa-test.mjs
+      - run: node scripts/track-test.mjs

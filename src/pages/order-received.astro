@@ -1,5 +1,7 @@
 ---
-// Where the gateway sends the buyer back to.
+// Where checkout sends the buyer after the STK prompt is pushed — there is no
+// external gateway to redirect back from any more. The buyer never leaves this
+// site; a prompt goes to their phone and this page watches for the answer.
 //
 // THIS SCREEN GETS SCREENSHOTTED AND SHOWN TO OTHER PEOPLE. It is read out of
 // context, by someone who did not place the order, on a phone, in a WhatsApp
@@ -7,13 +9,13 @@
 // for how much, and says where it goes from here — without any of it depending
 // on the sentence before it.
 //
-// WHAT THIS PAGE MUST NOT CLAIM, and does not: that the money arrived.
+// WHAT THIS PAGE MUST NOT CLAIM UNTIL IT IS TRUE: that the money arrived.
 // CLAUDE.md is explicit — "An STK prompt is not a payment. Only a callback or a
-// successful status query marks an order paid." A redirect back from the gateway
-// is neither. It is a URL, and anyone can type it. So the wording is that the
-// order is placed and the payment is being confirmed, which is true whichever
-// way the payment actually went, and step 9's callback is what turns it into a
-// paid order.
+// successful status query marks an order paid." Landing on this page means the
+// push was accepted for delivery, nothing more, so cart.ts's pollPaymentStatus()
+// starts every visit on "pending" and only moves to "paid" once /api/mpesa/status
+// says so — the same settle() path the callback itself uses, so the two cannot
+// disagree about what counts as paid.
 //
 // The step 8 brief asked for "items and amount paid". That is the one line of
 // the brief this page does not follow, because at this point in the flow the
@@ -58,9 +60,28 @@ import { products, price } from "../lib/products";
         <p class="received__ref-label">Your order reference</p>
         <p class="received__ref" data-received-ref></p>
 
-        <p class="received__lead">
-          The payment is being confirmed. Nothing else is needed from you now — if the
-          payment did not complete, the order is not sent and nothing is charged.
+        <!-- Exactly one of these is visible at a time — cart.ts's showStatus()
+             hides the rest. Starts on "pending" because that is the true state
+             the instant this page renders: the STK prompt has been sent and
+             nothing has answered it yet. -->
+        <p class="received__lead" data-status="pending">
+          A payment prompt has been sent to your phone. Enter your M-Pesa PIN there to
+          pay — this page updates on its own once it hears back. If the payment does not
+          complete, the order is not sent and nothing is charged.
+        </p>
+        <p class="received__lead" data-status="paid" hidden>
+          Payment received. The order is confirmed and will be dispatched from Nairobi.
+        </p>
+        <p class="received__lead" data-status="failed" hidden>
+          The payment did not go through. Nothing has been charged and the order has not
+          been sent. Message us on the <a href="/contact">contact</a> page with the
+          reference above if you would like to try again.
+        </p>
+        <p class="received__lead" data-status="stalled" hidden>
+          This is taking longer than expected. Check the status of your order on the <a
+            href="/track">track</a
+          > page, or message us on the <a href="/contact">contact</a> page with the
+          reference above.
         </p>
 
         <hr class="received__hair" />

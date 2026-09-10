@@ -1,11 +1,10 @@
 /* Reading an order request, and re-pricing it from our own catalogue.
  *
- * THIS IS THE MONEY-PATH VALIDATION, AND IT EXISTS ONCE ON PURPOSE. Step 8's
- * /api/checkout and step 9's /api/mpesa/stk both take the same request shape and
- * both have to apply the same rules to it. Two copies of "never trust a client
- * price" is how one of them gets a stock rule fixed and the other does not, and
- * the one that does not is still an endpoint that moves money. So the rules live
- * here and the endpoints differ only in what they hand the order to.
+ * THIS IS THE MONEY-PATH VALIDATION, AND IT EXISTS ONCE ON PURPOSE. It was
+ * written to be shared by step 8's IntaSend checkout and step 9's Daraja STK
+ * push, and stayed its own module after IntaSend was retired: a second gateway
+ * arriving later gets the same rules for free, rather than a chance to drift
+ * from /api/mpesa/stk's copy of "never trust a client price."
  *
  * The contract: readOrder() is handed whatever came off the wire and returns
  * either a priced order or a refusal. It never throws, never partially accepts,
