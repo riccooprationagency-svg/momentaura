@@ -517,6 +517,23 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   otherwise
 - All three scripts run on every commit via `.git/hooks/pre-commit`
 
+## Concurrency
+
+**One agent per working tree.** Never run two sessions against this directory
+simultaneously — concurrent writes produce silent overwrites and committed half-states.
+
+**Before starting work, run `git status`.** If the tree contains changes this session did
+not make, stop and report rather than building on top of them.
+
+**Never run a command that discards uncommitted work by area** — no `git checkout .`, no
+`git checkout -- <path>`, no `git stash`, no `git clean`. Another session may be working
+in this tree, and a restore that reaches past your own edit takes their work with it and
+reports nothing.
+
+This is not hypothetical. Two sessions running against this directory deleted four config
+files and a tarball mid-step, and a later stash pop left conflict markers across three
+files including `_pending.js`.
+
 ## Prompting note
 
 Ask for **structure**, never mood.
