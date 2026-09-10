@@ -7,10 +7,13 @@
 interface Props {
   slug: string;
   name: string;
+  /** What the category holds, from CATEGORY_COPY. Declared there, never
+   *  invented at render time. */
+  line: string;
   photo?: string | null;
 }
 
-const { slug, name, photo = null } = Astro.props;
+const { slug, name, line, photo = null } = Astro.props;
 const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "light";
 ---
 
@@ -25,6 +28,7 @@ const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "ligh
     )
   }
   <span class="tile__name">{name}</span>
+  <span class="tile__line">{line}</span>
 </a>
 
 <style>
@@ -60,5 +64,14 @@ const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "ligh
     font-size: var(--t-docket);
     letter-spacing: var(--tr-docket);
     text-transform: uppercase;
+  }
+
+  /* Sentence case, Archivo, --fg-muted. Not the accent and not mono: these
+     lines name a kind of thing rather than stating a figure a buyer can check,
+     and CATEGORY_COPY says so in as many words. Setting them in the data
+     register would claim otherwise. */
+  .tile__line {
+    font-size: var(--t-caption);
+    color: var(--fg-muted);
   }
 </style>

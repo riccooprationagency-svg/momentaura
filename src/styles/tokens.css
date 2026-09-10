@@ -73,6 +73,34 @@
   --t-heading: clamp(1.75rem, 6vw, 2.375rem);
   --t-display: clamp(1.875rem, 8vw, 3rem);
 
+  /* The homepage wordmark and nothing else. A distinct register from
+     --t-display rather than a larger setting of it: --t-display is a heading
+     that shares its frame with other content, and this is type used as the
+     image.
+
+     The three numbers are derived, not chosen. MOMENTAURA is ten characters and
+     measures 7.24x its font size set in Archivo Medium — measured off the real
+     render at 240px, where it came to 1737px. The mark has to fit the content
+     column, which is .wrap minus two gutters: 1176px once --max-width caps at
+     1240, and 335px at a 375 viewport.
+
+       1176 / 7.24 = 162px   the widest it can ever be, so the ceiling is 10rem
+        335 / 7.24 =  46px   at 375, so 12vw (45px there) clears it by 9px
+
+     12vw rather than a larger coefficient because the gutter is a fixed width
+     and therefore a larger share of a narrow viewport: the tightest fit is at
+     the small end, not the large one, and a coefficient that fits at 1440
+     overflows at 375. The ceiling binds from 1333px up, where the content
+     column has stopped growing but the viewport has not.
+
+     An earlier revision specified clamp(5rem, 18vw, 15rem). 18vw renders the
+     mark at 1.30x the viewport width at every width — it overflows everywhere,
+     and 240px would need a 1801px viewport to fit inside the gutter. It shipped
+     388px of horizontal scroll at 1536. If this mark is ever to be set larger
+     than 162px it has to break onto two lines, which is also the only way
+     --lh-display earns its name: 0.9 stacks lines, and one line never stacks. */
+  --t-hero: clamp(2.25rem, 12vw, 10rem);
+
   --lh-display: 0.9; /* the signature — do not loosen */
   --lh-body: 1.3;
   --lh-ui: 1.5;
@@ -130,11 +158,14 @@
 
   --underline-offset: 0.2em;
 
-  /* Hero. Deliberately short of a full viewport: it carries no photograph, and
-     a full empty viewport reads as broken where a short one reads as composed.
-     The floor keeps it from collapsing on a landscape phone. Used as
-     max(--hero-min, --hero-height) so both hold. */
-  --hero-height: 70dvh;
+  /* Hero. A full viewport, now that the wordmark is set at --t-hero and fills
+     the frame edge to edge within the gutter. The 70dvh that stood here was a
+     hedge against emptiness — a full empty viewport reads as broken where a
+     short one reads as composed — and that argument ends once the type is the
+     image rather than a caption waiting for one. The floor keeps it from
+     collapsing on a landscape phone. Used as max(--hero-min, --hero-height)
+     so both hold. */
+  --hero-height: 100dvh;
   --hero-min: 480px;
 
   /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome
