@@ -24,6 +24,17 @@
 // opt out would otherwise pull nine galleries of eager full-width images over a
 // metered connection, and nothing on the page would look wrong while it happened.
 // A surface that forgets to opt in shows one lazy image, which costs nothing.
+//
+// ---------- the row swipes, and this reverses a decision ----------
+//
+// Until step 14 the CSS below said "a stack, never a carousel", on two grounds:
+// a carousel needs a script, and it hides photographs behind an interaction on
+// the page where a buyer is trying to see all of them. The first ground no
+// longer holds — scroll-snap does the whole job in CSS, and the swipe costs zero
+// bytes of JavaScript. The second is answered by the thumbnail strip: every
+// photograph is still on the page at once, at 56px, and the strip is what tells
+// a buyer there are four rather than leaving them to find out by dragging. The
+// carousel this file refused was the kind that hides its own length.
 import { systemFor, type Product } from "../lib/products";
 
 interface Props {
@@ -35,6 +46,13 @@ const { product, detail = false } = Astro.props;
 
 const system = systemFor(product);
 const shown = detail ? product.photos : product.photos.slice(0, 1);
+
+/* The row scrolls and the strip appears only where there is a second photograph
+   to reach. A strip of one is a control that does nothing, and a snap container
+   with a single child is a scroller with nowhere to go. Cards are never
+   swipeable for the same reason they are never eager: they show one image by
+   design, and `shown` is already sliced to it. */
+const swipeable = shown.length > 1;
 
 /* ---------- deriving the other five URLs ----------
  *
@@ -54,7 +72,7 @@ const shown = detail ? product.photos : product.photos.slice(0, 1);
 const RENDITIONS = [400, 800, 1200];
 const NAMED = /^(\/img\/.+)-(\d+)\.([0-9a-f]{8})\.webp$/;
 
-const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
+const parse = (src: string): RegExpExecArray => {
   const parsed = NAMED.exec(src);
   if (!parsed) {
     throw new Error(
@@ -62,8 +80,34 @@ const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
         `written. Expected /img/<slug>-<n>-800.<hash>.webp. Never hand-edit the photos array.`
     );
   }
-  const [, stem, , hash] = parsed;
+  return parsed;
+};
+
+const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
+  const [, stem, , hash] = parse(src);
   return RENDITIONS.map((w) => `${stem}-${w}.${hash}.${ext} ${w}w`).join(", ");
+};
+
+/* ---------- the thumbnail's one rendition ----------
+ *
+ * A 56px thumbnail is offered the 400px file and nothing else. Deliberately not
+ * a srcset: V4 charges a page for the largest WebP candidate an element offers,
+ * so a thumbnail carrying all three widths would bill this page three more times
+ * for a 1200px file no device would ever fetch for a 56px box — and the whole
+ * point of that rule is that the budget reads what a phone actually pays. The
+ * smallest rendition is already seven times wider than the box, which covers a
+ * 3x screen with room to spare.
+ *
+ * The declared height is the recipe's own rounding at 400px, not the recorded
+ * dimensions scaled down. The encoder rounds each rendition independently, so
+ * a photograph recorded at 800×1067 in products.json is served here at 400×533,
+ * and scaling 1067 by a half would declare 534 — a pixel taller than the file
+ * the browser is about to read, and a pixel of layout the CSS would otherwise
+ * have to hide.
+ */
+const thumbFor = (src: string): string => {
+  const [, stem, , hash] = parse(src);
+  return `${stem}-400.${hash}.webp`;
 };
 
 /* ---------- sizes ----------
@@ -81,8 +125,26 @@ const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
  *
  * V2b exempts these for the same reason it exempts a media prelude: a
  * media-condition list is the one grammar var() does not resolve in, and this
- * is the only other place on the site that has one. The breakpoints below are
- * the three declared at the top of tokens.css — read and change them there.
+ * is the only other place on the site that has one. Every number below is
+ * written literally because the grammar leaves no alternative, not because a
+ * token would have been inconvenient.
+ *
+ * TWO OF THE THREE ARE BREAKPOINTS. 1340px IS NOT. 641px and 900px are the
+ * 640px and 900px declared at the top of tokens.css, and they are read and
+ * changed there with the @media queries. 1340px is not in that list and is not
+ * a breakpoint: it is layout arithmetic. --max-width is 1240px and --gutter is
+ * 2rem, so the container stops growing at 1304px, and above that the column is
+ * a fixed 496px instead of a share of the viewport. 1340 is that 1304 rounded
+ * up. Between the two the 38vw branch returns 501px against an actual 496px,
+ * which over-estimates by five pixels — the direction this comment has already
+ * called the recoverable one.
+ *
+ * This paragraph read "the breakpoints below are the three declared at the top
+ * of tokens.css" until step 14. That was false about 1340px and had been since
+ * the line was written, and no gate saw it: V2b exempts this whole list from
+ * the raw-value rule, so the one check that would have read these numbers is
+ * the check required to skip them. Changing 1340 to 1100 would have made the
+ * sentence true by making the layout wrong. The sentence was the defect.
  */
 const SIZES = detail
   ? "(min-width: 1340px) 496px, (min-width: 900px) 38vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
@@ -97,42 +159,121 @@ const SIZES = detail
         {product.name}
       </div>
     ) : (
-      shown.map((photo, i) => {
-        /* Eager and high priority for the first image of a detail view only —
-           it is above the fold and the largest thing on the page, so it is the
-           LCP candidate. Everything else is below the fold, which is where
-           CLAUDE.md's lazy rule applies, and that includes the first image of a
-           card or a homepage reveal: both sit under a 70dvh hero. */
-        const lead = detail && i === 0;
+      <div
+        class="gallery__row"
+        data-gallery={swipeable ? "" : undefined}
+        role={swipeable ? "group" : undefined}
+        aria-label={swipeable ? `${product.name}, ${shown.length} photographs` : undefined}
+      >
+        {shown.map((photo, i) => {
+          /* Eager and high priority for the first image of a detail view only —
+             it is above the fold and the largest thing on the page, so it is the
+             LCP candidate. Everything else is below the fold, which is where
+             CLAUDE.md's lazy rule applies, and that includes the first image of a
+             card or a homepage reveal: both sit under a 70dvh hero.
 
-        return (
-          <picture>
-            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
-            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
-            <img
-              class="gallery__img"
-              src={photo.src}
-              alt={photo.alt}
-              width={photo.width}
-              height={photo.height}
-              loading={lead ? "eager" : "lazy"}
-              fetchpriority={lead ? "high" : undefined}
-              decoding="async"
-            />
-          </picture>
-        );
-      })
+             In a swipe row "below the fold" means beside it rather than under it,
+             and lazy is if anything more clearly right: photographs two to four
+             are off-screen until a swipe or a thumbnail reaches them. */
+          const lead = detail && i === 0;
+
+          return (
+            <picture class="gallery__frame">
+              <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
+              <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
+              <img
+                class="gallery__img"
+                src={photo.src}
+                alt={photo.alt}
+                width={photo.width}
+                height={photo.height}
+                loading={lead ? "eager" : "lazy"}
+                fetchpriority={lead ? "high" : undefined}
+                decoding="async"
+              />
+            </picture>
+          );
+        })}
+      </div>
+    )
+  }
+
+  {
+    /* The strip states the count. Its buttons are an enhancement on top of a row
+       that already swipes and already scrolls without them, so with the script
+       absent — or still waiting on requestIdleCallback — every photograph is
+       still reachable and nothing here is load-bearing.
+
+       The image inside each button is alt="", because the button already carries
+       the name. Four copies of a written alt read back to back says the same
+       sentence four times to the one person who cannot see the strip it is
+       describing. */
+    swipeable && (
+      <ul class="gallery__thumbs">
+        {shown.map((photo, i) => (
+          <li>
+            <button
+              type="button"
+              class="gallery__thumb"
+              data-gallery-thumb
+              aria-current={i === 0 ? "true" : "false"}
+              aria-label={`Photograph ${i + 1} of ${shown.length}`}
+            >
+              <img
+                src={thumbFor(photo.src)}
+                alt=""
+                width={400}
+                height={Math.round(400 * 4 / 3)}
+                loading="lazy"
+                decoding="async"
+              />
+            </button>
+          </li>
+        ))}
+      </ul>
     )
   }
 </div>
 
 <style>
-  /* A stack, never a carousel. A carousel needs a script, and the cart is the
-     only script this site ships; it also hides photographs behind an
-     interaction on the page where a buyer is trying to see all of them. */
   .gallery {
     display: grid;
     gap: var(--s-12);
+  }
+
+  /* ---------- swipe, with no script ----------
+     scroll-snap does on the compositor what a carousel library does in
+     JavaScript, and it keeps working while the one script this site ships is
+     still waiting on requestIdleCallback. Touch swipes it natively; a trackpad
+     and a scrollbar reach it on desktop, which is why overflow is auto rather
+     than hidden.
+
+     No gap between frames, deliberately. The snap offset of photograph i is then
+     exactly i scroller-widths, which is the arithmetic cart.ts does to scroll
+     the row — a gap would put every jump progressively further out of true, and
+     correcting for it costs bytes in a file with a hard ceiling. Mandatory
+     snapping means two frames are only ever adjacent mid-drag anyway.
+
+     The row names no scroll behaviour at all, and V6 is right to refuse the
+     animated one — the check reads this comment too, so the property is not
+     spelled out here. An animated jump is the site moving the viewport on the
+     buyer's behalf, which is the scroll-jacking CLAUDE.md bans, and it lands
+     worst exactly where this is used: a mid-range phone, where the tween drops
+     frames. A thumbnail tap cuts straight to its photograph. That also leaves no
+     motion here for prefers-reduced-motion to reduce, which is the cheapest way
+     to respect it — cart.ts sets scrollLeft and never names a behaviour. */
+  .gallery__row {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .gallery__frame {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    /* One photograph per swipe. Without this a fast drag skims past two or three,
+       which on a four-photograph product is most of the shoot. */
+    scroll-snap-stop: always;
   }
 
   /* One 3:4 crop, everywhere. The ratio is stated in CSS as well as in the
@@ -144,6 +285,43 @@ const SIZES = detail
     aspect-ratio: 3 / 4;
     object-fit: cover;
     border-radius: var(--radius-surface);
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* ---------- the strip ---------- */
+
+  .gallery__thumbs {
+    display: flex;
+    gap: var(--s-8);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* --s-56 is 56px, over the 44px touch minimum on the narrow axis; the 3:4 crop
+     makes the target 56 by 75. A border, never a shadow, and never the accent —
+     the accent means "you can check this", and which photograph is on screen is
+     not a fact about the product. */
+  .gallery__thumb {
+    display: block;
+    width: var(--s-56);
+    padding: 0;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    cursor: pointer;
+    transition: border-color var(--dur) var(--ease);
+  }
+
+  .gallery__thumb[aria-current="true"] {
+    border-color: var(--fg);
+  }
+
+  .gallery__thumb img {
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
     width: 100%;
     height: auto;
     display: block;

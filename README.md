@@ -71,7 +71,7 @@ corporate gifting to apparel and are wrong about the product. Where `docs/` and
 
 ## Where the build is
 
-Past step 12 of `BUILD-ORDER.md` (images). Checkout runs on M-Pesa STK Push directly —
+Past step 14 of `BUILD-ORDER.md` (images, gallery). Checkout runs on M-Pesa STK Push directly —
 IntaSend was retired — and the constraint gates run in CI as well as the local pre-commit
 hook. Every product still sits at zero stock with no photography, so there is nothing
 sellable yet regardless of payment status. See `BUILD-ORDER.md` for the step-by-step

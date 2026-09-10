@@ -794,6 +794,44 @@ function paintReceived(): void {
   }
 }
 
+/* ---------- the gallery strip ----------
+ *
+ * The seventh job this file does, and the smallest. The row already swipes and
+ * already scrolls without a line of this: scroll-snap is CSS, so the photographs
+ * are reachable before the script loads and reachable if it never does. All this
+ * adds is the thumbnail strip as a way in, and the strip's job is as much to say
+ * "there are four" as to move between them.
+ *
+ * No behaviour is named on the scroll, and the row names none either: V6 refuses
+ * the animated scroll behaviour as scroll-jacking — not spelled out here, since
+ * the check reads comments — so a tap cuts straight to its photograph. There is
+ * therefore no motion here for prefers-reduced-motion to reduce, which is the
+ * cheapest way to respect it.
+ *
+ * The listener runs both ways on purpose. Marking the strip only on click leaves
+ * it lying after a swipe, which is the interaction the row exists for: the
+ * scroll handler is what keeps the strip describing what is actually on screen,
+ * however the buyer got there. */
+function galleryStrip(): void {
+  const row = q("[data-gallery]");
+  if (!row) return;
+  const thumbs = qa("[data-gallery-thumb]");
+
+  /* A click only scrolls. It does not also mark the strip, because the scroll it
+     causes fires the listener below, which marks it — and that listener has to
+     exist anyway for the swipe. Marking in both places is the same line twice. */
+  thumbs.forEach((thumb, i) =>
+    thumb.addEventListener("click", () => {
+      row.scrollLeft = row.clientWidth * i;
+    })
+  );
+
+  row.addEventListener("scroll", () => {
+    const at = Math.round(row.scrollLeft / row.clientWidth);
+    thumbs.forEach((thumb, i) => thumb.setAttribute("aria-current", String(i === at)));
+  });
+}
+
 /* ---------- start ---------- */
 
 const start = () => {
@@ -801,6 +839,7 @@ const start = () => {
   paintAdded();
   paintOrder();
   paintReceived();
+  galleryStrip();
 };
 
 if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(start);
