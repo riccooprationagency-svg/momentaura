@@ -360,9 +360,11 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
 
 ## Security
 
-- **Never build a card form.** Payment always redirects to the gateway's hosted page
-- **Never commit secrets.** Gateway and Daraja credentials live in Cloudflare environment
-  variables, read only inside `functions/`
+- **Never build a card form.** M-Pesa is the only payment method. STK Push sends a prompt
+  to the buyer's own phone and they enter their PIN there — no card or PIN field is ever
+  rendered on this domain, and the buyer never leaves it either
+- **Never commit secrets.** Daraja credentials live in Cloudflare environment variables,
+  read only inside `functions/`
 - Re-price server-side from our own catalogue. Never trust a client price
 - The M-Pesa callback is unauthenticated — Safaricom does not sign it. Unguessable path,
   IP allowlist, idempotent by `CheckoutRequestID`, never trust the amount in the body
@@ -498,24 +500,27 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   itself has been cleared. Still no name, no price, no stock: the amounts on that screen
   are looked up from the catalogue rendered into the page, exactly as `/order` does.
   The reference is the one value that crosses from storage into the DOM, so it is checked
-  against the shape `checkout.js` mints before it is written, and a snapshot that fails
+  against the shape `stk.js` mints before it is written, and a snapshot that fails
   discards whole. It goes in through `textContent`, which cannot inject markup — the test
   is not about injection but about proving that what appears under "your order reference"
   is a reference. **A reference is never trusted as an assertion that an order was paid.**
-  Nothing on the confirmation screen claims the money arrived, because a redirect is a URL
-  and anyone can type one; only step 9's callback can say that
-- **`node scripts/checkout-test.mjs` guards the money path, and it runs on every commit
-  too.** `functions/` sits outside the Astro build: `contrast.mjs` reads `tokens.css` and
-  `verify.mjs` walks `src/` and `dist/`, so a `checkout.js` broken in half passes every
-  other gate in this repo. It runs the shipped handler on Node's own fetch primitives —
-  the same ones the Workers runtime supplies — rewriting exactly two imports: the
-  catalogue, so a case can set real stock without the shipped `products.json` ever being
-  edited to make a test pass, and `createHostedCheckout`, so a gateway failure is
-  deterministic. `GatewayError` stays real, because `checkout.js` branches on
-  `instanceof` and a stubbed class would pass that branch for the wrong reason. What it
-  cannot prove is anything about a live gateway, and it says so rather than implying
-  otherwise
-- All three scripts run on every commit via `.git/hooks/pre-commit`
+  Nothing on the confirmation screen claims the money arrived on its own: landing there
+  only means the push was accepted, and `pollPaymentStatus()` is what turns that into
+  "paid" — through the same `/api/mpesa/status` endpoint and `settle()` path the callback
+  itself uses, so the two cannot disagree about what counts as paid
+- **`node scripts/mpesa-test.mjs` and `node scripts/track-test.mjs` guard the money and
+  access paths, and both run on every commit.** `functions/` sits outside the Astro build:
+  `contrast.mjs` reads `tokens.css` and `verify.mjs` walks `src/` and `dist/`, so a broken
+  `stk.js`, callback handler or `track.js` would pass every other gate in this repo. Both
+  run the shipped handlers on Node's own fetch primitives — the same ones the Workers
+  runtime supplies — substituting only the catalogue and `fetch` itself, so a case can set
+  real stock or a real Daraja response shape without editing the shipped code to make a
+  test pass. What neither can prove is anything about a live Daraja shortcode, and
+  BUILD-ORDER section 9 says so rather than implying otherwise
+- All gates run on every commit via `.git/hooks/pre-commit`, and again in CI on every push
+  — see `.github/workflows/gates.yml`. The hook catches a mistake before it is committed;
+  CI catches the commit that shipped from a machine where nobody had run `cp
+  scripts/pre-commit .git/hooks/pre-commit` yet
 
 ## Concurrency
 

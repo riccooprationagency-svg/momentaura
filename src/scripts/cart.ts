@@ -39,7 +39,7 @@ type Order = Record<string, number>;
  * refused there, which is a failure at the worst moment in the flow. It is not
  * what stops the order. Everything on this side of the wire is the buyer's own
  * machine to edit, so a clamp here decides nothing that costs money:
- * functions/api/checkout.js re-reads stock from the catalogue and rejects the
+ * functions/api/mpesa/stk.js re-reads stock from the catalogue and rejects the
  * line by name with the real figure. That check is the enforcement. This one
  * must never be mistaken for it, and must never be the reason the server check
  * is thought unnecessary — same division as re-pricing, for the same reason.
@@ -111,6 +111,15 @@ const qa = (selector: string): HTMLElement[] =>
   Array.from(document.querySelectorAll<HTMLElement>(selector));
 
 const OFF = "aria-disabled";
+
+/* Reveals the one [data-status] block named `outcome`, hides the rest. Shared
+ * by /track's lookup result and /order-received's payment poll — both render
+ * one of a small set of named outcomes and nothing else, and two copies of
+ * "hide all, show one" is exactly the kind of drift CLAUDE.md's storage rule
+ * warns about elsewhere in this file. */
+function showStatus(outcome: string): void {
+  for (const state of qa("[data-status]")) state.hidden = state.dataset.status !== outcome;
+}
 
 /* ---------- the nav count ----------
  *
@@ -388,7 +397,7 @@ const formError = q("[data-checkout-error]");
  * catalogue rendered into the page, never read back out of storage. */
 const PLACED = "momentaura.placed.v1";
 
-/* The shape checkout.js mints, checked before the value is put on the screen.
+/* The shape stk.js mints, checked before the value is put on the screen.
  *
  * CLAUDE.md's storage rule ends "nothing crosses out of storage into the DOM:
  * the only values the script writes are numbers it computed and text the page
@@ -400,6 +409,12 @@ const PLACED = "momentaura.placed.v1";
  * whatever else ended up in that key. A snapshot that fails it is discarded
  * whole, the same way read() drops a quantity that is not an integer. */
 const REFERENCE = /^MA-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+/* CheckoutRequestID has no fixed shape in Daraja's own docs beyond "a string",
+ * so this is a sanity floor rather than a format check: non-empty, and short
+ * enough that nothing absurd ends up round-tripped into a fetch body. */
+const isCheckoutRequestId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length < 100;
 
 /* Put a message where the buyer will see it, and reveal it. Three sites wrote
  * these two lines out: the dropped connection inside send(), and each form's
@@ -501,25 +516,38 @@ if (form && submitButton) {
 
     const sent = await send(
       submitButton,
-      "Contacting the payment page",
-      "/api/checkout",
+      "Sending the payment prompt",
+      "/api/mpesa/stk",
       { items, name: data.get("name"), phone: data.get("phone"), email: data.get("email") },
       formError,
-      "The connection dropped before the payment page could be reached. " +
+      "The connection dropped before the payment prompt could be sent. " +
         "Nothing has been charged. Check your connection and try again."
     );
     if (!sent) return;
 
-    const body = sent.body as { url?: string; message?: string; field?: string; reference?: string };
+    const body = sent.body as {
+      message?: string;
+      field?: string;
+      reference?: string;
+      checkoutRequestId?: string;
+    };
 
-    if (sent.status === 200 && body.url && body.reference) {
+    /* AN STK PROMPT IS NOT A PAYMENT, and this branch does not claim one. A 200
+     * here means Daraja accepted the push and the buyer's phone is about to
+     * ring — /order-received is what polls for what actually happened. */
+    if (sent.status === 200 && body.reference && isCheckoutRequestId(body.checkoutRequestId)) {
       /* Snapshot, then clear, then leave — in that order. If the tab dies
        * part-way the buyer keeps their order rather than losing it to a
        * confirmation screen that never rendered. */
       try {
         window.localStorage.setItem(
           PLACED,
-          JSON.stringify({ reference: body.reference, items, at: Date.now() })
+          JSON.stringify({
+            reference: body.reference,
+            checkoutRequestId: body.checkoutRequestId,
+            items,
+            at: Date.now(),
+          })
         );
       } catch {
         /* Storage refused. The order still goes through; only the local copy of
@@ -527,9 +555,7 @@ if (form && submitButton) {
       }
       order = {};
       write(order);
-      /* The gateway's hosted page. Its host was checked server-side before this
-       * URL was handed to us. */
-      window.location.href = body.url;
+      window.location.href = `/order-received/?ref=${encodeURIComponent(body.reference)}`;
       return;
     }
 
@@ -618,9 +644,10 @@ if (trackForm && trackButton && trackResult) {
       return;
     }
 
-    /* One of the set, and only one. Hiding them all first means an outcome this
-     * script does not recognise shows nothing rather than the last one. */
-    for (const state of qa("[data-status]")) state.hidden = state.dataset.status !== outcome;
+    /* One of the set, and only one. Hiding them all first (above) means an
+       outcome this script does not recognise shows nothing rather than the
+       last one. */
+    showStatus(outcome);
 
     if (outcome === "notfound") return;
 
@@ -645,10 +672,41 @@ if (trackForm && trackButton && trackResult) {
 /* ---------- the confirmation screen ----------
  *
  * Renders from the snapshot taken at submit, matched against the reference the
- * gateway sent us back with. It does not claim the payment succeeded: a redirect
- * is a URL and anyone can type it, and CLAUDE.md is explicit that only a
- * callback or a status query marks an order paid. Step 9 supplies that.
+ * STK push sent us back with. It does not claim the payment succeeded on its
+ * own: CLAUDE.md is explicit that only a callback or a status query marks an
+ * order paid, so this page starts on "pending" and polls /api/mpesa/status —
+ * the same endpoint the server-side grace window and idempotent settle() logic
+ * already cover — until the answer is paid or failed, or polling gives up.
  */
+
+/* 4s between polls, giving up past 8 minutes — well past CALLBACK_GRACE_MS
+ * (90s) on the server. A phone that has not been unlocked yet, or a slow
+ * network, is not unusual in the first minute or two, and giving up early
+ * would send a buyer who is still mid-PIN-entry off to /track with nothing
+ * there to find. Inlined rather than named: each is read at its one call site
+ * below, and the comment above is the budget this file can afford to spend
+ * explaining two numbers that would otherwise cost two more identifiers. */
+
+/* Fire-and-forget, deliberately: nothing here blocks paint, and a network drop
+ * just tries again on the next interval rather than surfacing a connection
+ * error over a payment that may still be going through. */
+function pollPaymentStatus(checkoutRequestId: string, reference: string, startedAt: number): void {
+  const retry = () =>
+    Date.now() - startedAt >= 480_000
+      ? showStatus("stalled")
+      : window.setTimeout(() => pollPaymentStatus(checkoutRequestId, reference, startedAt), 4_000);
+
+  fetch("/api/mpesa/status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ checkoutRequestId, reference }),
+  })
+    .then((r) => r.json())
+    .then((b: { status?: string }) =>
+      b.status && b.status !== "pending" ? showStatus(b.status === "paid" ? "paid" : "failed") : retry()
+    )
+    .catch(retry);
+}
 
 
 /* Working days from today. Saturday and Sunday are not dispatch days, and a
@@ -678,7 +736,11 @@ function paintReceived(): void {
 
   const wanted = new URLSearchParams(window.location.search).get("ref");
 
-  let snapshot: { reference?: string; items?: { slug: string; qty: number }[] } | null = null;
+  let snapshot: {
+    reference?: string;
+    checkoutRequestId?: string;
+    items?: { slug: string; qty: number }[];
+  } | null = null;
   try {
     const raw = window.localStorage.getItem(PLACED);
     if (raw) snapshot = JSON.parse(raw);
@@ -692,6 +754,7 @@ function paintReceived(): void {
     snapshot.items.length > 0 &&
     typeof snapshot.reference === "string" &&
     REFERENCE.test(snapshot.reference) &&
+    isCheckoutRequestId(snapshot.checkoutRequestId) &&
     /* The reference in the URL has to match the one we stored. Without this any
      * ?ref= would render the last order under a stranger's number. */
     (wanted === null || wanted === snapshot.reference);
@@ -723,6 +786,11 @@ function paintReceived(): void {
 
     received.hidden = false;
     receivedNone.hidden = true;
+
+    /* Starts on "pending" — the markup's own default — and polls until Daraja
+       has actually answered. isCheckoutRequestId() already proved the field
+       above, so this cast is a formality, not a trust boundary. */
+    pollPaymentStatus(snapshot.checkoutRequestId as string, snapshot.reference as string, Date.now());
   }
 }
 

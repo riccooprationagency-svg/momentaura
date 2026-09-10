@@ -173,5 +173,5 @@ a person decide what to revert.
 
 ## Devin Secrets Needed
 
-None. Everything above runs against local KV with fake Daraja values; real Daraja/IntaSend
+None. Everything above runs against local KV with fake Daraja values; real Daraja
 credentials are not required and the STK push path cannot be exercised without them.

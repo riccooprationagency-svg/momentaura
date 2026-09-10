@@ -25,11 +25,10 @@
  * traffic it describes, because only misses are counted.
  *
  * WHAT IT CANNOT DO YET, and this is stated on the page rather than hidden: it
- * reports what the system actually knows, and the system only knows the outcome
- * of orders that went through the M-Pesa path, because that is the only path
- * with a callback that settles anything. The IntaSend path of step 8 has no
- * webhook, so it writes nothing here. Until step 9's credentials exist there are
- * no settled orders to find. Recorded in BUILD-ORDER section 10.
+ * reports what the system actually knows, and every order now goes through the
+ * M-Pesa STK path, the only one with a callback that settles anything. Until a
+ * real Daraja shortcode exists, no push has ever left the machine, so there are
+ * no settled orders to find. Recorded in BUILD-ORDER section 9.
  */
 
 import catalogue from "../../src/data/products.json";
