@@ -221,7 +221,12 @@ export async function stkPush({ env, amount, msisdn, reference, description, cal
       TransactionType: env.MPESA_TRANSACTION_TYPE || "CustomerPayBillOnline",
       Amount: amount,
       PartyA: msisdn,
-      PartyB: shortcode,
+      /* Paybill: PartyB is the same number as BusinessShortCode, so it defaults
+         to it. Buy Goods till: BusinessShortCode is the Head Office number that
+         the password is built from, and PartyB is the till that receives the
+         money — set MPESA_PARTY_B to the till and MPESA_TRANSACTION_TYPE to
+         CustomerBuyGoodsOnline. */
+      PartyB: env.MPESA_PARTY_B || shortcode,
       PhoneNumber: msisdn,
       CallBackURL: callbackUrl,
       /* What the customer sees on the prompt and on their statement. */
