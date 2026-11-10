@@ -33,6 +33,7 @@ import Docket from "../../components/Docket.astro";
 import Button from "../../components/Button.astro";
 import ProductCard from "../../components/ProductCard.astro";
 import Gallery from "../../components/Gallery.astro";
+import { whatsappHref } from "../../lib/site";
 import {
   categories,
   products,
@@ -160,6 +161,17 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
           <span data-added-count>0</span> in your order. <a href="/order">See your order</a>.
         </p>
 
+        <!--
+          The route to a person, beside the decision rather than in the footer.
+          The prefilled text names the product, so the first message already
+          says which one — a buyer does not have to describe it from memory.
+        -->
+        <p class="detail__ask">
+          Questions about this item? <a href={whatsappHref(product)}
+            >Message MomentAura on WhatsApp</a
+          >.
+        </p>
+
         <hr class="detail__hair" />
 
         <p class="detail__terms">
@@ -263,9 +275,17 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
 
   .detail__closed,
   .detail__added,
+  .detail__ask,
   .detail__terms {
     color: var(--fg-muted);
     max-width: var(--measure);
+  }
+
+  /* A standalone action, so a full thumb-sized target like the category link. */
+  .detail__ask a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
   }
 
   .detail__hair {

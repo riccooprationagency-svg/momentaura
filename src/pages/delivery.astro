@@ -16,7 +16,7 @@
 // describes what the code does rather than a fact only Ric holds.
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
-import { site, known } from "../lib/site";
+import { site, known, phoneDisplay, telHref, whatsappHref } from "../lib/site";
 import { price } from "../lib/products";
 
 const zones = site.delivery.zones;
@@ -115,6 +115,17 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
 
       <Gap field="delivery.returnsWindowDays" />
       <Gap field="delivery.returnsCondition" />
+
+      <hr class="page__hair" />
+      <h2 class="page__sub">Questions about delivery</h2>
+      <p class="page__body page__reach">
+        <a href={whatsappHref("WEB-DELIVERY")}>Message MomentAura on WhatsApp</a>
+        <span>or</span>
+        <a href={telHref()}>Call {phoneDisplay()}</a>
+      </p>
+      <p class="page__body">
+        Every other way to reach a person is on the <a href="/contact">contact</a> page.
+      </p>
     </div>
   </section>
 </Base>
@@ -154,6 +165,19 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
     border-block-start: 1px solid var(--border);
     width: 100%;
     margin-block: var(--s-40);
+  }
+
+  .page__reach {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--s-8);
+  }
+
+  .page__reach a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
   }
 
   /* Figures in mono, area names in Archivo. The typeface switch is the signal

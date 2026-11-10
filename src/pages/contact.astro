@@ -1,90 +1,95 @@
 ---
 // Contact.
 //
-// THIS PAGE IS THE BLOCKER THREE ERROR STATES ARE WAITING ON. CLAUDE.md requires
-// a phone number on an error, and there has never been a real one — so the
-// blocked message on /order and the M-Pesa messages in /api/mpesa/stk and
-// /api/mpesa/status all end by routing someone here instead of printing a
-// number. Every one of those is currently a route to a page that cannot
-// finish the sentence.
+// Every way of reaching a person, each with one line saying what it is for, and
+// then the two things a buyer can do without reaching anyone: look an order up,
+// and read the delivery terms.
 //
-// It is still not invented, and it is not apologised for either. A number that
-// does not ring is worse than no number: it turns a buyer who was merely stuck
-// into one who has been lied to, at the moment they are already worried about
-// their money. And a paragraph explaining that there is no number yet is a stub
-// with better manners — the rule for this step is that a fact which does not
-// exist is not rendered.
+// WhatsApp leads, as the one filled button in the section, because it is the
+// route most buyers in Nairobi already have open. The number is the same for
+// calls, and it is said once rather than twice.
 //
-// So the routes that DO exist are rendered, and the ones that do not are absent.
-// What remains is true and useful: an order can be checked without an account,
-// and the delivery terms are one link away.
+// NO HOURS, AND NO RESPONSE TIME. Neither is known, and "replies within the
+// hour" is exactly the kind of sentence a buyer who has been ignored before
+// will test. contact.hours stays null in site.json and renders nothing until it
+// is real; the dev-only marker below says so.
 //
-// WHEN A REAL NUMBER LANDS, IT IS ONE COMMIT: site.json, then the three error
-// states above, wired through together. Recorded in BUILD-ORDER section 10 so it
-// is one edit rather than four rediscoveries.
+// Every href comes from lib/site.ts. Nothing here spells a number or an address.
 import Base from "../layouts/Base.astro";
+import Button from "../components/Button.astro";
 import Gap from "../components/Gap.astro";
-import { site, known } from "../lib/site";
+import {
+  emailParts,
+  known,
+  mailtoHref,
+  phoneDisplay,
+  site,
+  telHref,
+  whatsappHref,
+} from "../lib/site";
 
-const { phone, whatsapp, hours } = site.contact;
-const hasPhone = known(phone);
-const hasWhatsapp = known(whatsapp);
+const { hours } = site.contact;
 const hasHours = known(hours);
-const reachable = hasPhone || hasWhatsapp;
-
-// Digits only, for the tel: and wa.me hrefs. Never rendered as the label.
-const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
 ---
 
 <Base
   title="Contact — MomentAura"
-  description="How to reach a person about an order, and how to check one yourself."
+  description="WhatsApp and phone 0753 181 901, and email for general questions and order problems."
   system="light"
 >
   <section class="page">
     <div class="wrap page__inner">
       <h1 class="page__heading">Contact</h1>
 
-      {
-        reachable && (
-          <p class="page__body">
-            A person answers these. If it is about an order, have the reference ready — it
-            is on your confirmation screen and looks like MA-4KLM-2XQP.
-          </p>
-        )
-      }
+      <p class="page__body">
+        A person answers these. If it is about an order, have the reference ready — it is
+        on your confirmation screen and looks like MA-4KLM-2XQP.
+      </p>
 
-      {
-        hasPhone && (
-          <p class="reach">
-            <span class="reach__label">Phone</span>
-            <a class="reach__value" href={`tel:${digits(phone)}`}>{phone}</a>
-          </p>
-        )
-      }
+      <div class="reach reach--lead">
+        <p class="reach__label">WhatsApp</p>
+        <Button variant="filled" href={whatsappHref("WEB-CONTACT")}>
+          Message MomentAura on WhatsApp
+        </Button>
+        <p class="reach__for">
+          For anything — a product, an order, or delivery. The number is {phoneDisplay()}.
+        </p>
+      </div>
 
-      {
-        hasWhatsapp && (
-          <p class="reach">
-            <span class="reach__label">WhatsApp</span>
-            <a class="reach__value" href={`https://wa.me/${digits(whatsapp).replace(/^\+/, "")}`}>
-              {whatsapp}
-            </a>
-          </p>
-        )
-      }
+      <div class="reach">
+        <p class="reach__label">Phone</p>
+        <a class="reach__value" href={telHref()}>Call {phoneDisplay()}</a>
+        <p class="reach__for">The same number as WhatsApp, for a call instead of a message.</p>
+      </div>
+
+      <div class="reach">
+        <p class="reach__label">General questions</p>
+        <a class="reach__value" href={mailtoHref("general")}
+          >{emailParts("general")[0]}<wbr />{emailParts("general")[1]}</a
+        >
+        <p class="reach__for">Questions about a product, or anything not tied to an order.</p>
+      </div>
+
+      <div class="reach">
+        <p class="reach__label">Order problems</p>
+        <a class="reach__value" href={mailtoHref("orders")}
+          >{emailParts("orders")[0]}<wbr />{emailParts("orders")[1]}</a
+        >
+        <p class="reach__for">
+          Something wrong with an order already placed. Put the order reference in the
+          subject.
+        </p>
+      </div>
 
       {
         hasHours && (
-          <p class="reach">
-            <span class="reach__label">Hours</span>
-            <span class="reach__value">{hours}</span>
-          </p>
+          <div class="reach">
+            <p class="reach__label">Hours</p>
+            <p class="reach__value">{hours}</p>
+          </div>
         )
       }
 
-      <Gap field="contact.phone" />
-      <Gap field="contact.whatsapp" />
       <Gap field="contact.hours" />
 
       <h2 class="page__sub">Checking an order yourself</h2>
@@ -136,14 +141,22 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
     margin-block-end: var(--s-20);
   }
 
-  /* A way to reach a person is a checkable fact, so it sits in the data
-     register. The accent stays off it: --accent means "you can verify this" and
-     is confined to two sanctioned sites, and a phone number is an instruction to
-     act rather than a lead time to check. */
+  /* A way to reach a person is a checkable fact, so the number and the
+     addresses sit in the data register. The accent stays off all of it:
+     --accent means "you can verify this" and is confined to two sanctioned
+     sites, and a phone number is an instruction to act rather than a lead time
+     to check. */
   .reach {
     display: grid;
     gap: var(--s-8);
-    margin-block-end: var(--s-20);
+    justify-items: start;
+    padding-block: var(--s-20);
+    border-block-start: 1px dashed var(--border);
+  }
+
+  .reach--lead {
+    border-block-start: 0;
+    padding-block-start: 0;
   }
 
   .reach__label {
@@ -157,8 +170,16 @@ const digits = (value: string | null) => (value ?? "").replace(/[^\d+]/g, "");
     font-family: var(--font-mono);
     font-size: var(--t-body-sm);
     letter-spacing: var(--tr-docket);
-    display: flex;
-    align-items: center;
     min-height: var(--tap-target);
+    /* Block, not flex: a flex container makes the text one anonymous item and
+       the <wbr> after "@" stops being a line-break opportunity. Padding gives
+       the 44px target that flex centring gave before. */
+    display: block;
+    padding-block: var(--s-12);
+  }
+
+  .reach__for {
+    color: var(--fg-muted);
+    max-width: var(--measure);
   }
 </style>

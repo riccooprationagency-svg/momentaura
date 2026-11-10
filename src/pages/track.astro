@@ -27,6 +27,7 @@
 import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
 import Field from "../components/Field.astro";
+import OrderHelp from "../components/OrderHelp.astro";
 import { products, price } from "../lib/products";
 ---
 
@@ -132,6 +133,9 @@ import { products, price } from "../lib/products";
             than settled either way. Get in touch with the reference above and it will be
             sorted out by hand.
           </p>
+          <div class="track__help">
+            <OrderHelp source="WEB-TRACK" />
+          </div>
         </div>
 
         <h2 class="track__sub">What was ordered</h2>
@@ -264,6 +268,10 @@ import { products, price } from "../lib/products";
   .track__state--loose {
     border-block-start: 1px solid var(--border);
     padding-block-start: var(--s-40);
+  }
+
+  .track__help {
+    margin-block-start: var(--s-12);
   }
 
   .track__date {

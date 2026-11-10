@@ -55,13 +55,24 @@ export interface Site {
     /** The part of Nairobi they work from. Specific enough to be checkable. */
     area: string | null;
   };
+  /* The domain the Organization JSON-LD names. Kept apart from `url` on
+   * purpose: `url` drives canonical, the sitemap and robots.txt, and moving
+   * those is a separate change with its own review. Until that lands the two
+   * differ, and this one is used for nothing except the JSON-LD block. */
+  organizationUrl: string | null;
   contact: {
-    /** A number that rings and is answered. */
+    /** A number that rings and is answered, written as a buyer would read it. */
     phone: string | null;
     /** The WhatsApp number, if it is a different one. */
     whatsapp: string | null;
     /** When a person is actually there, e.g. "Mon-Sat, 9am-6pm". */
     hours: string | null;
+    email: {
+      /** General questions. */
+      general: string | null;
+      /** Problems with an order already placed. */
+      orders: string | null;
+    };
   };
   delivery: {
     dispatchFrom: string | null;
@@ -183,6 +194,105 @@ export const absolute = (path: string): string | null => {
   return base === null ? null : `${base}${path}`;
 };
 
-export const GAPS: Gap[] = CANDIDATES.filter((c) => !known(c.value)).map(
+/* ---------- reaching a person ----------
+ *
+ * EVERY tel:, mailto: and wa.me link on the site is built here, from the values
+ * above, and nowhere else. The number, the address and the shape of the
+ * prefilled WhatsApp text each live in exactly one place, so a changed number
+ * is one edit in site.json and a changed campaign format is one edit below.
+ *
+ * These throw at build time on a missing value rather than returning an empty
+ * href. A page that composes a contact link is claiming there is a way to reach
+ * a person, and `tel:` with nothing after it is that claim failing silently.
+ */
+
+const required = (value: string | null, key: string): string => {
+  if (!known(value)) throw new Error(`site.json ${key} is required by a contact link`);
+  return String(value).trim();
+};
+
+/* A Kenyan mobile number as written locally, "0753 181 901", to its
+   international form "+254753181901". Strict, because a malformed number in a
+   tel: href dials something else. */
+const international = (local: string, key: string): string => {
+  const digits = local.replace(/\D/g, "");
+  if (!/^0[17]\d{8}$/.test(digits)) {
+    throw new Error(`site.json ${key} "${local}" is not a Kenyan mobile number like 0712 345 678`);
+  }
+  return `+254${digits.slice(1)}`;
+};
+
+/** The phone number as a buyer reads it: "0753 181 901". */
+export const phoneDisplay = (): string => required(site.contact.phone, "contact.phone");
+
+/** The phone number in E.164: "+254753181901". */
+export const phoneE164 = (): string => international(phoneDisplay(), "contact.phone");
+
+export const telHref = (): string => `tel:${phoneE164()}`;
+
+/** The WhatsApp number as a buyer reads it. */
+export const whatsappDisplay = (): string => required(site.contact.whatsapp, "contact.whatsapp");
+
+export const email = (which: "general" | "orders"): string =>
+  required(site.contact.email[which], `contact.email.${which}`);
+
+/* The address split after "@", for a <wbr> between the halves. At 390px the
+   longer address does not fit on one line, and a break the browser picks for
+   itself lands mid-domain ("co" / ".ke"), which reads as a different address. */
+export const emailParts = (which: "general" | "orders"): [string, string] => {
+  const [local, domain] = email(which).split("@");
+  return [`${local}@`, domain];
+};
+
+export const mailtoHref = (which: "general" | "orders"): string => `mailto:${email(which)}`;
+
+/* Where on the site a conversation started. The code is in the prefilled text,
+   visible to the buyer and editable before sending, so it is a label rather
+   than a tracker: nothing reaches WhatsApp until they tap, and nothing on this
+   site records that they did. */
+export type WhatsappSource =
+  | "WEB-CONTACT"
+  | "WEB-FOOTER"
+  | "WEB-DELIVERY"
+  | "WEB-ORDER"
+  | "WEB-CHECKOUT"
+  | "WEB-TRACK";
+
+/**
+ * A wa.me link with the campaign code in the prefilled text.
+ *
+ *   whatsappHref("WEB-FOOTER")
+ *     -> "Hi MomentAura — WEB-FOOTER"
+ *   whatsappHref({ slug: "crew-tee", name: "Crew tee" })
+ *     -> "Hi MomentAura, a question about the Crew tee — WEB-PRODUCT-crew-tee"
+ */
+export const whatsappHref = (source: WhatsappSource | { slug: string; name: string }): string => {
+  const number = international(whatsappDisplay(), "contact.whatsapp").slice(1);
+  const text =
+    typeof source === "string"
+      ? `Hi MomentAura — ${source}`
+      : `Hi MomentAura, a question about the ${source.name} — WEB-PRODUCT-${source.slug}`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+};
+
+/* The one structured-data block the site emits. Organization and a single
+   customer-service contact point, and nothing else: no Product, no Offer, no
+   review markup. Every product is sold out and has no photograph, and schema
+   that a search engine renders as a rich result is a claim like any other. */
+export const organizationLd = () => ({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "MomentAura",
+  url: required(site.organizationUrl, "organizationUrl"),
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: phoneE164(),
+    email: email("general"),
+    contactType: "customer service",
+    areaServed: "KE",
+  },
+});
+
+export const GAPS: Gap[] =CANDIDATES.filter((c) => !known(c.value)).map(
   ({ key, what, blocks }) => ({ key, what, blocks })
 );

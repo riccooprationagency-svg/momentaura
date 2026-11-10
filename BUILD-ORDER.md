@@ -424,10 +424,16 @@ what it blocks; a production build never emits it.
 | `/track` | Everything. Form, four outcomes, not-found, line items, dispatch date | Nothing — this page is complete |
 | `/delivery` | Paying (in full), Dispatch | Areas and cost table → `delivery.zones`. Returns → `delivery.returnsWindowDays` **and** `returnsCondition`, both or neither |
 | `/about` | Kraft placeholder, what the shop sells, how it behaves | The named human → `owner.name`, `owner.photo`, `owner.area` |
-| `/contact` | Routes to `/track` and `/delivery` | **Every way of reaching a person** → `contact.phone`, `contact.whatsapp`, `contact.hours` |
+| `/contact` | WhatsApp, phone, both email addresses, routes to `/track` and `/delivery` (phase-1-contact) | Hours → `contact.hours`. Never a response time |
 | `/privacy` | Everything | Nothing — it describes code, not facts |
 
-**`/contact` is the thinnest and the most expensive.** It currently offers no way to reach
+**phase-1-contact landed the number, and the function error copy is still open.**
+`/order`, `/checkout` and `/track` now carry it beside their errors in markup
+(`OrderHelp.astro`). The messages inside `/api/mpesa/stk` and `/api/mpesa/status` were
+left alone because that step was not allowed to touch payment code. What follows is the
+history.
+
+**`/contact` was the thinnest and the most expensive.** It offered no way to reach
 a human at all, because there is no real number and one that does not ring is worse than
 none. Three error states already route here — the blocked message on `/order`, the failure
 messages in `/api/checkout`, and the M-Pesa messages in `/api/mpesa/stk` — and each is a
