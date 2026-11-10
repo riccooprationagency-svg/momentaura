@@ -52,5 +52,11 @@ node scripts/mpesa-test.mjs
 # invisible when it works and silent when it breaks.
 node scripts/track-test.mjs
 
+# The host redirect in front of every request. Its two exemptions are what a
+# gate is for: a preview host that starts redirecting makes every pull request
+# unreviewable, and an /api/ path that starts redirecting is an M-Pesa callback
+# that never settles a payment that really arrived.
+node scripts/redirect-test.mjs
+
 echo "  gates passed."
 echo ""

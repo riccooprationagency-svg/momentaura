@@ -81,18 +81,18 @@ const TOKEN_PATH = "s3cr3t-callback-path";
  * disagree — the CallBackURL check would otherwise pass by matching a literal
  * that nothing else in the file uses.
  *
- * It is momentaura.store because that is the domain that is actually owned. It
- * was momentaura.co.ke, which was invented here and registered nowhere, and a
- * test fixture naming a host that is not ours is a small untruth in the one
- * file that exists to catch untruths about the money path.
+ * It is momentaurastores.co.ke because that is the canonical domain
+ * (src/data/site.json `url`, since phase-2-domain-crawl). The old domain was
+ * replaced, and momentaura.co.ke before it was invented here and registered
+ * nowhere — a test fixture naming a host that is not ours is a small untruth
+ * in the one file that exists to catch untruths about the money path.
  *
- * IT IS NOT WHAT MPESA_CALLBACK_ORIGIN HOLDS IN PRODUCTION. That is the
- * .pages.dev URL until the custom domain is connected, because Daraja go-live
- * needs a live HTTPS callback and momentaura.store will not be serving. The
- * handler builds the URL from the env var and asserts nothing about the host,
- * so this value is the shape of the thing rather than a claim about deployment.
- * See BUILD-ORDER section 11. */
-const ORIGIN = "https://momentaura.store";
+ * IT IS NOT A CLAIM ABOUT WHAT MPESA_CALLBACK_ORIGIN HOLDS IN PRODUCTION. That
+ * is a Cloudflare environment variable and may still be the .pages.dev URL.
+ * The handler builds the URL from the env var and asserts nothing about the
+ * host, so this value is the shape of the thing rather than a claim about
+ * deployment. See BUILD-ORDER section 11. */
+const ORIGIN = "https://momentaurastores.co.ke";
 
 let darajaMode = "ok";
 let tokenFetches = 0;

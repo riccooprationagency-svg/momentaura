@@ -16,6 +16,7 @@ import {
   mailtoHref,
   organizationLd,
   phoneDisplay,
+  publicFile,
   site,
   telHref,
   whatsappHref,
@@ -29,15 +30,22 @@ interface Props {
   /* Whether the page is worth indexing. TRUE BY DEFAULT, because most pages
    * here are things a buyer should be able to find, and a content page that
    * silently fell out of the index would be invisible in the one way nobody
-   * checks. The three that pass false are steps in a transaction, and
+   * checks. The four that pass false act on one buyer's order (/track joined at
+   * phase-2-domain-crawl), and
    * /order-received is the one that matters: it is reached holding an order
    * reference, and the reference is what opens an order on /track. robots.txt
-   * disallows the same three; this is the half that still holds for a crawler
+   * disallows the same four; this is the half that still holds for a crawler
    * that reached the URL without asking. */
   index?: boolean;
+  /* Whether this page has an address of its own. False only for the 404 page,
+   * which Cloudflare serves at every URL that does not exist: a canonical or an
+   * og:url there would name /404, a path nobody asked for, as the "real"
+   * address of whatever was mistyped. verify.mjs V13 asserts 404.html carries
+   * neither. */
+  addressable?: boolean;
 }
 
-const { title, description, system = "dark", index = true } = Astro.props;
+const { title, description, system = "dark", index = true, addressable = true } = Astro.props;
 
 const path = Astro.url.pathname;
 
@@ -45,11 +53,24 @@ const path = Astro.url.pathname;
    same origin helper, so the canonical a crawler reads and the URL the sitemap
    offers cannot disagree. Root stays "/", everything else loses its trailing
    slash. verify.mjs V13 asserts the two agree across every built page. */
-const canonical = absolute(path === "/" ? "/" : path.replace(/\/+$/, ""));
+const canonical = addressable ? absolute(path === "/" ? "/" : path.replace(/\/+$/, "")) : null;
 
-/* Absent until site.json carries a real photograph. See lib/site.ts — it is a
-   declared gap, not an oversight, and it appears the day the value lands. */
-const ogImage = site.ogImage ? absolute(site.ogImage) : null;
+/* Absent until site.json names a real photograph AND that file is in public/.
+   See lib/site.ts — it is a declared gap, not an oversight. The existence check
+   is what stops a typo in site.json shipping an og:image every link preview
+   fetches and gets a 404 for. */
+const ogImagePath = publicFile(site.ogImage);
+const ogImage = ogImagePath ? absolute(ogImagePath) : null;
+
+/* Icons, each linked only if the file is actually in public/. None exists yet:
+   the wordmark is not redrawn or retyped to make one, so a browser asking for
+   /favicon.ico gets an honest 404 until a real file is added. Adding the file
+   is the whole change; the link appears on the next build. */
+const ICONS = [
+  { href: publicFile("/favicon.svg"), rel: "icon", type: "image/svg+xml" },
+  { href: publicFile("/favicon.ico"), rel: "icon", type: "image/x-icon" },
+  { href: publicFile("/apple-touch-icon.png"), rel: "apple-touch-icon", type: "image/png" },
+].filter((icon) => icon.href !== null);
 const isCurrent = (href: string) =>
   href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
 
@@ -95,6 +116,8 @@ const ld = JSON.stringify(organizationLd()).replace(/</g, "\\u003c");
 
     {canonical && <link rel="canonical" href={canonical} />}
     {!index && <meta name="robots" content="noindex, follow" />}
+
+    {ICONS.map((icon) => <link rel={icon.rel} href={icon.href} type={icon.type} />)}
 
     {/* Open Graph, because most traffic arrives cold on one page from a
         WhatsApp link and the preview card is the first thing anyone sees of

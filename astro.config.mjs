@@ -5,10 +5,11 @@ import site from "./src/data/site.json" with { type: "json" };
 // client-side JS in the whole project and it ships as a plain module.
 //
 // `site` comes from src/data/site.json, which is where every fact about the shop
-// itself lives and where each one stays null until a real one exists. It is null
-// today, so Astro.site is undefined, and the canonical link, Open Graph tags,
-// sitemap and robots.txt all omit themselves rather than emit a hostname nobody
-// has registered. Set src/data/site.json's `url` and the four appear together.
+// itself lives and where each one stays null until a real one exists. It is
+// https://momentaurastores.co.ke, and it is the ONE origin value: the canonical
+// link, og:url, the sitemap, robots.txt, the Organization JSON-LD and the
+// .pages.dev redirect in functions/_middleware.js all read it. With it null,
+// all of them omit themselves rather than emit a hostname nobody has registered.
 //
 // A sitemap integration is not used, and not because of the dependency rule
 // alone: the sitemap is eleven lines of an endpoint that reads the same route

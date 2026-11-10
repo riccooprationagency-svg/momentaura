@@ -9,7 +9,7 @@
 # replace the local hook: the hook catches a mistake before it is committed,
 # CI catches it after, on `main`, where the cost of catching it late is highest.
 #
-# Mirrors scripts/pre-commit exactly — same build, same four scripts, same
+# Mirrors scripts/pre-commit exactly — same build, same five scripts, same
 # order — so "it failed in CI" and "it failed locally" are never two different
 # claims about the same commit.
 name: Gates
@@ -49,3 +49,6 @@ jobs:
       # every other gate in this job.
       - run: node scripts/mpesa-test.mjs
       - run: node scripts/track-test.mjs
+      # The host redirect in functions/_middleware.js, and its two exemptions:
+      # preview hosts and /api/, where the M-Pesa callback lands.
+      - run: node scripts/redirect-test.mjs

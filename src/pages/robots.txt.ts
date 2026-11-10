@@ -1,8 +1,9 @@
 /* robots.txt — an endpoint rather than a file in public/, because the one line
  * that matters in it is an absolute URL and public/ cannot know the domain.
  *
- * The three transactional paths are disallowed as well as absent from the
- * sitemap. The sitemap is an invitation and this is a refusal: leaving
+ * The four paths that act on one buyer's order are disallowed as well as absent
+ * from the sitemap. /track joined the original three in phase-2-domain-crawl;
+ * nothing that was closed has been opened. The sitemap is an invitation and this is a refusal: leaving
  * /order-received out of the sitemap does not stop a crawler that finds the URL
  * some other way, and that page is reached with an order reference in hand.
  *
@@ -13,7 +14,7 @@
 import type { APIRoute } from "astro";
 import { absolute } from "../lib/site";
 
-const CLOSED = ["/checkout", "/order", "/order-received"];
+const CLOSED = ["/checkout", "/order", "/order-received", "/track"];
 
 export const GET: APIRoute = () => {
   const sitemap = absolute("/sitemap.xml");
