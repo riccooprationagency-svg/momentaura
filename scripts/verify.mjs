@@ -1061,6 +1061,101 @@ if (existsSync(DIST)) {
  * nobody needs it and it is therefore still easy to mean.
  */
 
+/* ---------- V4 — the one ld+json block, held to an allowlist ----------
+ *
+ * Checking only the top-level @type let an Organization carry anything inside
+ * it: an aggregateRating nobody gave, a nested Product with an Offer, a review.
+ * Each of those is a claim a search engine may render as a rich result, and
+ * CLAUDE.md bans ratings before real reviews exist and stock or price figures
+ * that are not true. So the block is matched against the exact shape
+ * lib/site.ts organizationLd() emits: these keys and no others, at every
+ * depth. Only `contactPoint` may hold an object; every other value must be a
+ * string, so a nested object anywhere fails, and the message names its keys.
+ *
+ * Adding a field is a deliberate edit to LD_SHAPE, in the same commit that
+ * adds it to organizationLd(), which is the point.
+ */
+const LD_SHAPE = {
+  "@context": "string",
+  "@type": "Organization",
+  name: "string",
+  url: "string",
+  contactPoint: {
+    "@type": "ContactPoint",
+    telephone: "string",
+    email: "string",
+    contactType: "string",
+    areaServed: "string",
+  },
+};
+
+const kindOf = (v) => (v === null ? "null" : Array.isArray(v) ? "an array" : typeof v === "object" ? "an object" : typeof v);
+
+/** Every way `value` departs from `shape`, each naming the key at fault. */
+function ldViolations(value, shape = LD_SHAPE, path = "") {
+  const where = path || "the block";
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return [`${where} must be an object, found ${kindOf(value)}`];
+  }
+  const out = [];
+  for (const [key, v] of Object.entries(value)) {
+    const at = path ? `${path}.${key}` : key;
+    if (!Object.hasOwn(shape, key)) {
+      out.push(`key "${at}" is not permitted`);
+      continue;
+    }
+    const want = shape[key];
+    if (typeof want === "object") {
+      out.push(...ldViolations(v, want, at));
+    } else if (typeof v !== "string") {
+      const inner = v && typeof v === "object" ? ` holding keys ${Object.keys(v).map((k) => `"${at}.${k}"`).join(", ")}` : "";
+      out.push(`key "${at}" must be a string, found ${kindOf(v)}${inner}`);
+    } else if (want !== "string" && v !== want) {
+      out.push(`key "${at}" must be "${want}", found "${v}"`);
+    }
+  }
+  if (!Object.hasOwn(value, "@type")) out.push(`key "${path ? `${path}.` : ""}@type" is missing`);
+  return out;
+}
+
+/* Self-test. A check that has never been seen to fail is a comment, so V4
+   feeds itself the two claims this allowlist exists to stop, and the block
+   the site actually ships, before trusting any of it against dist/. */
+{
+  const good = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "MomentAura",
+    url: "https://momentaurastores.co.ke",
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+254753181901",
+      email: "customercare@momentaurastores.co.ke",
+      contactType: "customer service",
+      areaServed: "KE",
+    },
+  };
+  const cases = [
+    ["the shipped Organization block", good, null],
+    [
+      "a nested Product",
+      { ...good, contactPoint: { ...good.contactPoint, productSupported: { "@type": "Product", name: "Crew tee" } } },
+      "contactPoint.productSupported",
+    ],
+    ["an aggregateRating", { ...good, aggregateRating: { "@type": "AggregateRating", ratingValue: "5", reviewCount: "12" } }, "aggregateRating"],
+  ];
+  let ok = 0;
+  for (const [label, block, mustName] of cases) {
+    const found = ldViolations(block);
+    if (mustName === null) {
+      if (found.length === 0) ok++;
+      else fail("V4", `ld+json self-test: ${label} should pass, got: ${found.join("; ")}`);
+    } else if (found.some((m) => m.includes(`"${mustName}"`))) ok++;
+    else fail("V4", `ld+json self-test: ${label} should fail naming "${mustName}", got: ${found.join("; ") || "no violation"}`);
+  }
+  console.log(`  V4  ld+json self-test ${ok}/${cases.length} fixtures behave (1 passes, 2 fail by name)`);
+}
+
 if (existsSync(DIST)) {
   const files = walkAll(DIST);
   const bytes = (p) => statSync(p).size;
@@ -1109,10 +1204,11 @@ if (existsSync(DIST)) {
      * Organization JSON-LD to the shell. A browser never executes
      * application/ld+json, so it is outside what this check counts — but the
      * exemption is held as tightly as the rule it sits inside: one block per
-     * page at most, it must parse as JSON, and it must be the Organization
-     * block lib/site.ts builds. A second block, a Product block or anything
-     * that does not parse fails here, so this cannot become the route by which
-     * a page grows executable or claim-making markup of its own. */
+     * page at most, it must parse as JSON, and it must match LD_SHAPE above —
+     * the Organization block lib/site.ts builds, key for key at every depth.
+     * A second block, a Product, a rating, or anything that does not parse
+     * fails here, so this cannot become the route by which a page grows
+     * executable or claim-making markup of its own. */
     let ldBlocks = 0;
     for (const [, attrs, body] of tags) {
       if (/(?:^|\s)type=["']application\/ld\+json["']/i.test(attrs ?? "")) {
@@ -1124,8 +1220,8 @@ if (existsSync(DIST)) {
           fail("V4", `${rel(page)} carries an application/ld+json block that does not parse`);
           continue;
         }
-        if (data?.["@type"] !== "Organization") {
-          fail("V4", `${rel(page)} carries ld+json of type ${data?.["@type"]} — only the Organization block is permitted`);
+        for (const problem of ldViolations(data)) {
+          fail("V4", `${rel(page)} ld+json: ${problem} — only the Organization block in LD_SHAPE is permitted`);
         }
         continue;
       }
