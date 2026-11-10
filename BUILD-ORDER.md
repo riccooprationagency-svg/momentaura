@@ -422,7 +422,7 @@ what it blocks; a production build never emits it.
 | Page | Renders today | Absent, and what it needs |
 |---|---|---|
 | `/track` | Everything. Form, four outcomes, not-found, line items, dispatch date | Nothing — this page is complete |
-| `/delivery` | Paying (in full), Dispatch | Areas and cost table → `delivery.zones`. Returns → `delivery.returnsWindowDays` **and** `returnsCondition`, both or neither |
+| `/delivery` | Paying (in full), Dispatch, Delivery fees (`#fees`, from `delivery.zones` since phase 3) | Returns → `delivery.returnsWindowDays` **and** `returnsCondition`, both or neither |
 | `/about` | Kraft placeholder, what the shop sells, how it behaves | The named human → `owner.name`, `owner.photo`, `owner.area` |
 | `/contact` | WhatsApp, phone, both email addresses, routes to `/track` and `/delivery` (phase-1-contact) | Hours → `contact.hours`. Never a response time |
 | `/privacy` | Everything | Nothing — it describes code, not facts |

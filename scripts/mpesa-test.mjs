@@ -64,6 +64,22 @@ globalThis.__catalogue = [
   { slug: "faith-hoodie", name: "Faith hoodie", price: 3500, stock: 0 },
 ];
 
+/* The delivery fee table. Same move as the catalogue — the one import line in
+   _site.js is substituted, because Node refuses a bare JSON import — but the
+   value handed in is THE REAL site.json, read unedited, not a fixture. The fee
+   cases below assert the figures a buyer is actually charged, so a fee changed
+   in site.json without the test changing with it fails here, on purpose. */
+const sitePath = join(scratch, "_site.js");
+const siteSource = readFileSync(sitePath, "utf8");
+const sitePatched = siteSource.replace(
+  /^import site from .*$/m,
+  "const site = globalThis.__site;"
+);
+if (sitePatched === siteSource) throw new Error("could not find the site.json import — has _site.js moved it?");
+writeFileSync(sitePath, sitePatched, "utf8");
+
+globalThis.__site = JSON.parse(readFileSync(join(ROOT, "src", "data", "site.json"), "utf8"));
+
 const load = (rel) => import(pathToFileURL(join(scratch, rel)).href);
 
 const { onRequest: stk } = await load("mpesa/stk.js");
@@ -224,7 +240,17 @@ const lacks = (h, n, what) => {
   if (String(h).includes(n)) throw new Error(`${what}: LEAKS ${JSON.stringify(n)}`);
 };
 
-const ORDER = { items: [{ slug: "crew-tee", qty: 2 }], name: "Amina Wanjiru", phone: "0712345678" };
+/* Nairobi CBD is the free zone, so every amount this file asserted before
+   delivery fees existed (2 x 650 = 1300) is still the amount pushed. The fee
+   cases below change the county on purpose and say so. */
+const ORDER = {
+  items: [{ slug: "crew-tee", qty: 2 }],
+  name: "Amina Wanjiru",
+  phone: "0712345678",
+  county: "nairobi-cbd",
+  area: "Kilimani",
+  landmark: "Blue gate beside the chemist",
+};
 
 const push = (body = ORDER, env = baseEnv()) =>
   stk({ request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "POST", body: JSON.stringify(body) }), env });
@@ -464,6 +490,18 @@ const bad = [
   ["a phone that is not Kenyan", { ...ORDER, phone: "+447700900000" }, "Enter a Kenyan phone number"],
   ["a phone with too few digits", { ...ORDER, phone: "071234567" }, "Enter a Kenyan phone number"],
   ["a malformed email", { ...ORDER, email: "not-an-address" }, "That email address does not look right."],
+  ["no county", { ...ORDER, county: undefined }, "Choose the county the order is going to."],
+  ["a county key not in the fee table", { ...ORDER, county: "atlantis" }, "Choose the county the order is going to."],
+  ["the county LABEL instead of its key", { ...ORDER, county: "Kirinyaga" }, "Choose the county the order is going to."],
+  ["a county key from Object.prototype", { ...ORDER, county: "__proto__" }, "Choose the county the order is going to."],
+  ["a county that is not a string", { ...ORDER, county: { key: "nairobi-cbd" } }, "Choose the county the order is going to."],
+  ["no area", { ...ORDER, area: undefined }, "Enter the area or estate the order is going to."],
+  ["an area that is only spaces", { ...ORDER, area: "    " }, "Enter the area or estate the order is going to."],
+  ["an area past 80 characters", { ...ORDER, area: "K".repeat(81) }, "Enter the area or estate the order is going to."],
+  ["an area carrying a control character", { ...ORDER, area: "Kilimani\u0007" }, "Enter the area or estate the order is going to."],
+  ["no landmark", { ...ORDER, landmark: undefined }, "Enter a landmark a rider can find"],
+  ["an empty landmark", { ...ORDER, landmark: "" }, "Enter a landmark a rider can find"],
+  ["a landmark past 120 characters", { ...ORDER, landmark: "L".repeat(121) }, "Enter a landmark a rider can find"],
 ];
 
 for (const [label, body, fragment] of bad) {
@@ -478,6 +516,95 @@ for (const [label, body, fragment] of bad) {
     eq(kv.store.size, 0, "no order record was written");
   });
 }
+
+/* ================= delivery — the fee is the server's =================
+ *
+ * The county key is the only thing the browser says about delivery. Each case
+ * below checks the three places the figure has to agree — the response, the
+ * Amount in the request Daraja actually received, and the KV record the
+ * callback is settled against — because a fee that is right in one and wrong in
+ * another is a buyer charged one figure and shown another.
+ */
+
+const FEES = [
+  ["nairobi-cbd", "Nairobi CBD", 0],
+  ["nairobi-outside-cbd", "Nairobi (outside the CBD)", 200],
+  ["kirinyaga", "Kirinyaga", 250],
+  ["embu", "Embu", 150],
+  ["turkana", "Turkana", 800],
+];
+
+for (const [key, label, fee] of FEES) {
+  await check(`${label} is ${fee === 0 ? "free" : `KSh ${fee}`}, and the response, the push and the record agree`, async () => {
+    const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }], county: key });
+    eq(res.status, 200, "status");
+    const body = await res.json();
+    eq(body.total, 650 + fee, "total in the response");
+    eq(pushes[0].Amount, 650 + fee, "Amount sent to Daraja");
+    for (const copy of [await record(), await kv.get(`ref:${body.reference}`, "json")]) {
+      eq(copy.subtotal, 650, "stored subtotal");
+      eq(copy.delivery, { county: key, label, area: "Kilimani", landmark: "Blue gate beside the chemist", fee }, "stored delivery");
+      eq(copy.amount, 650 + fee, "stored amount is subtotal + fee");
+    }
+  });
+}
+
+await check("the fee is one per order, not one per item", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 3 }], county: "turkana" });
+  eq((await res.json()).total, 3 * 650 + 800, "total");
+  eq(pushes[0].Amount, 2750, "Amount sent to Daraja");
+});
+
+await check("A CLIENT-SUPPLIED FEE, SUBTOTAL OR TOTAL IS IGNORED", async () => {
+  const res = await push({
+    ...ORDER,
+    items: [{ slug: "crew-tee", qty: 1 }],
+    county: "kirinyaga",
+    fee: 0,
+    deliveryFee: 0,
+    delivery: { fee: 0, county: "nairobi-cbd" },
+    subtotal: 1,
+    total: 1,
+    amount: 1,
+  });
+  eq(res.status, 200, "status");
+  eq((await res.json()).total, 900, "total is 650 + 250, whatever the body said");
+  eq(pushes[0].Amount, 900, "Amount sent to Daraja");
+  const stored = await record();
+  eq([stored.subtotal, stored.delivery.fee, stored.delivery.county, stored.amount], [650, 250, "kirinyaga", 900], "record");
+});
+
+await check("a free-delivery county still pushes a positive amount", async () => {
+  await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }], county: "nairobi-cbd" });
+  if (!(pushes[0].Amount > 0)) throw new Error(`pushed ${pushes[0].Amount}`);
+});
+
+await check("area and landmark are stored as one trimmed line", async () => {
+  await push({ ...ORDER, area: "  Kahawa   Sukari\n", landmark: "\tStage\r\nby the  mosque " });
+  const stored = await record();
+  eq([stored.delivery.area, stored.delivery.landmark], ["Kahawa Sukari", "Stage by the mosque"], "cleaned");
+});
+
+await check("markup in the area is stored as text, not stripped or run", async () => {
+  /* Escaping happens where it is rendered — textContent in the cart, Astro on
+     the server side — so storing it verbatim is correct. What must hold is that
+     it is accepted as the string it is and reaches nothing as markup here. */
+  const res = await push({ ...ORDER, area: "<img src=x onerror=alert(1)>" });
+  eq(res.status, 200, "status");
+  eq((await record()).delivery.area, "<img src=x onerror=alert(1)>", "stored verbatim");
+  lacks(JSON.stringify(await res.json()), "<img", "the response does not echo it");
+});
+
+await check("every county in site.json is orderable, with its own fee", async () => {
+  const zones = globalThis.__site.delivery.zones;
+  eq(zones.length, 48, "47 counties, Nairobi split in two");
+  for (const zone of zones) {
+    pushes = [];
+    const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }], county: zone.key });
+    if (res.status !== 200) throw new Error(`${zone.key} refused with ${res.status}`);
+    eq(pushes[0].Amount, 650 + zone.cost, `${zone.key} amount`);
+  }
+});
 
 await check("a slug not in the catalogue is refused, never silently skipped", async () => {
   const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }, { slug: "not-a-product", qty: 1 }] });
@@ -910,7 +1037,7 @@ await check("the status response carries no amount, phone number or receipt", as
 /* ================= no secret in the source ================= */
 
 await check("no key, passkey or shortcode is written into the source", async () => {
-  for (const file of ["_daraja.js", "_order.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
+  for (const file of ["_daraja.js", "_order.js", "_site.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
     const src = readFileSync(join(API, file), "utf8");
     for (const pattern of [/passkey\s*=\s*["'][A-Za-z0-9]{8,}/i, /["'][A-Za-z0-9]{40,}["']/]) {
       const hitMatch = src.match(pattern);

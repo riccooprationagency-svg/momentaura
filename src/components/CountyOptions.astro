@@ -1,0 +1,38 @@
+---
+// The county <option>s, grouped by region, built from site.json delivery.zones.
+//
+// Each option posts its KEY and carries its fee as data-fee. The key is what the
+// server prices by; the fee is only what the cart shows before submitting, so a
+// buyer sees the figure they are about to be charged. Editing data-fee in
+// devtools changes the line on their own screen and nothing else: the server
+// recomputes the fee from the key and never reads a fee from the request.
+//
+// The fee is in the label too ("Kirinyaga — KSh 250"), so the choice is fully
+// informed with JavaScript off, and to a screen reader, which reads the label
+// and not a data attribute.
+//
+// The first option is an empty, disabled placeholder that starts selected. A
+// required <select> whose first real option is preselected cannot be left
+// unanswered, and preselecting a county would be guessing where the buyer lives.
+import { feeText, zonesByRegion } from "../lib/site";
+
+interface Props {
+  /** Text of the empty first option. */
+  placeholder?: string;
+}
+
+const { placeholder = "Choose a county" } = Astro.props;
+---
+
+<option value="" disabled selected>{placeholder}</option>
+{
+  zonesByRegion().map(({ region, zones }) => (
+    <optgroup label={region}>
+      {zones.map((zone) => (
+        <option value={zone.key} data-fee={zone.cost}>
+          {`${zone.name} — ${feeText(zone.cost)}`}
+        </option>
+      ))}
+    </optgroup>
+  ))
+}

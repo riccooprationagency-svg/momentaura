@@ -99,7 +99,20 @@ export async function onRequest({ request, env }) {
   const record = {
     reference: ref,
     items: order.lines.map((line) => ({ slug: line.slug, qty: line.qty })),
-    /* WHAT WE COMPUTED. The callback's figure is checked against this one. */
+    /* The two halves of the amount, as computed by readOrder(): the items at
+       catalogue prices, and the delivery fee for the county key. Kept so the
+       record says how the figure below was reached, and so /api/track can show
+       the breakdown the buyer saw at checkout rather than recomputing it from a
+       fee table that may have changed since. */
+    subtotal: order.subtotal,
+    /* Where it is going. `label` is the county as it read when the order was
+       placed; `county` is the key it was priced by. The landmark is for the
+       rider and is never returned to the browser. */
+    delivery: order.delivery,
+    /* WHAT WE COMPUTED: subtotal + delivery fee, whole KSh. This is the total,
+       the figure the push asks for, and the one the callback's amount is
+       checked against. Named `amount` rather than `total` because settle() and
+       every record already in KV carry it under that name. */
     amount: order.total,
     msisdn: order.msisdn,
     name: order.name,

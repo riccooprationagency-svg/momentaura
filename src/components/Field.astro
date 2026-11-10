@@ -13,6 +13,12 @@
 // focused field shows both: the outline every focusable thing on the site
 // shows, and the accent underline that says this one is a field. Belt and
 // braces on the screen where a buyer is typing their phone number.
+//
+// `select` renders a native <select> instead of an <input>, with the options
+// passed as children. Same class, same underline, same focus state — so the
+// accent's sanctioned site is still this one selector, and V3 needs no new row.
+// Native rather than scripted: it works with JavaScript off, it is the
+// platform's own picker on a phone, and it costs the cart nothing.
 interface Props {
   name: string;
   label: string;
@@ -22,6 +28,10 @@ interface Props {
   inputmode?: "text" | "tel" | "email";
   /** One line under the label. Says what is wanted, never what went wrong. */
   hint?: string;
+  /** Render a <select>; its <option>s are the children. */
+  select?: boolean;
+  /** Longest input the server accepts. Stated so the browser stops there too. */
+  maxlength?: number;
 }
 
 const {
@@ -32,6 +42,8 @@ const {
   autocomplete,
   inputmode,
   hint,
+  select = false,
+  maxlength,
 } = Astro.props;
 
 const id = `field-${name}`;
@@ -59,17 +71,33 @@ const describedby = [hintId, errorId].filter(Boolean).join(" ");
 
   {hint && <p class="field__hint" id={hintId}>{hint}</p>}
 
-  <input
-    class="field__input"
-    id={id}
-    name={name}
-    type={type}
-    required={required}
-    autocomplete={autocomplete}
-    inputmode={inputmode}
-    aria-describedby={describedby}
-    data-field={name}
-  />
+  {
+    select ? (
+      <select
+        class="field__input field__input--select"
+        id={id}
+        name={name}
+        required={required}
+        aria-describedby={describedby}
+        data-field={name}
+      >
+        <slot />
+      </select>
+    ) : (
+      <input
+        class="field__input"
+        id={id}
+        name={name}
+        type={type}
+        required={required}
+        autocomplete={autocomplete}
+        inputmode={inputmode}
+        maxlength={maxlength}
+        aria-describedby={describedby}
+        data-field={name}
+      />
+    )
+  }
 
   <!-- Filled and revealed by the cart. aria-live so the message is announced
        when it appears rather than only on the next focus. -->
@@ -122,6 +150,12 @@ const describedby = [hintId, errorId].filter(Boolean).join(" ");
     padding: 0;
     font-size: var(--t-body-sm);
     transition: border-color var(--dur) var(--ease);
+  }
+
+  /* The platform's own arrow stays — it is the only thing that says this line
+     opens a list — but no box and no fill, like every other field. */
+  .field__input--select {
+    cursor: pointer;
   }
 
   /* THE ACCENT. A state, never a fill. Two pixels, bottom border only.

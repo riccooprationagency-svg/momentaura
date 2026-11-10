@@ -117,6 +117,38 @@ function dispatchDate(record) {
   return LONG_DATE.format(workingDaysFrom(from, longest));
 }
 
+/* Matches price() in src/lib/products.ts and money() in the cart: integer KSh,
+ * en-KE grouping. A third copy, because this side of the wire cannot import
+ * either; the format is one line and the comment is the link between them. */
+const money = (value) => `KSh ${value.toLocaleString("en-KE")}`;
+
+/* What the order cost and where it is going, AS IT WAS RECORDED — read off the
+ * stored order, never recomputed from today's catalogue or fee table, because
+ * the buyer is checking what they were charged, not what it would cost now.
+ *
+ * Already formatted, so the page can put each value straight into its slot
+ * with textContent and the cart carries no formatting for it. Every key is a
+ * slot on /track; a key that is absent hides its line, which is how an order
+ * placed before delivery fees existed shows a total and nothing it does not
+ * have.
+ *
+ * THE LANDMARK IS NOT HERE, and must not be added. It is for the rider. A
+ * reference read aloud or screenshotted, plus a phone number, should not be
+ * enough to learn exactly where somebody's front gate is. County and area are
+ * what a buyer needs to recognise their own order. */
+function breakdown(record) {
+  const out = {};
+  const d = record.delivery;
+  if (d && typeof d === "object") {
+    if (typeof d.label === "string") out.county = d.label;
+    if (typeof d.area === "string") out.area = d.area;
+    if (Number.isInteger(d.fee)) out.fee = d.fee === 0 ? "Free" : money(d.fee);
+  }
+  if (Number.isInteger(record.subtotal)) out.subtotal = money(record.subtotal);
+  if (Number.isInteger(record.amount)) out.total = money(record.amount);
+  return out;
+}
+
 const json = (status, body, extra) =>
   new Response(JSON.stringify(body), {
     status,
@@ -216,6 +248,7 @@ export async function onRequest({ request, env }) {
     placedAt: record.createdAt ?? null,
     amount: record.amount,
     items: Array.isArray(record.items) ? record.items : [],
+    breakdown: breakdown(record),
     ...(dispatch ? { dispatchDate: dispatch } : {}),
   });
 }

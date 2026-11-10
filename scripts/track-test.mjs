@@ -51,6 +51,20 @@ const trackPatched = trackSource.replace(
 if (trackPatched === trackSource) throw new Error("could not find the catalogue import — has track.js moved it?");
 writeFileSync(trackPath, trackPatched, "utf8");
 
+/* track.js reaches _site.js through _order.js (for msisdnFrom). It needs no fee
+   here — a tracked order's breakdown is read off the stored record — but the
+   module has to load, so its one JSON import line is substituted the same way,
+   with the real site.json. */
+const sitePath = join(scratch, "_site.js");
+const siteSource = readFileSync(sitePath, "utf8");
+const sitePatched = siteSource.replace(
+  /^import site from .*$/m,
+  "const site = globalThis.__site;"
+);
+if (sitePatched === siteSource) throw new Error("could not find the site.json import — has _site.js moved it?");
+writeFileSync(sitePath, sitePatched, "utf8");
+globalThis.__site = JSON.parse(readFileSync(join(ROOT, "src", "data", "site.json"), "utf8"));
+
 globalThis.__catalogue = [
   { slug: "crew-tee", name: "Crew tee", price: 650, stock: 6, leadTimeDays: null },
   { slug: "quick-cap", name: "Quick cap", price: 900, stock: 4, leadTimeDays: 5 },
@@ -148,7 +162,7 @@ await check("the right reference and phone find the order", async () => {
 await check("the response carries nothing beyond what the buyer already knows", async () => {
   const res = await ask(GOOD);
   const text = await res.text();
-  eq(Object.keys(JSON.parse(text)).sort(), ["amount", "items", "placedAt", "reference", "status"], "keys");
+  eq(Object.keys(JSON.parse(text)).sort(), ["amount", "breakdown", "items", "placedAt", "reference", "status"], "keys");
   /* dispatchDate is absent here because crew-tee has no lead time; the cases
      below cover it being present. */
   lacks(text, "Amina", "the name");
@@ -202,13 +216,61 @@ await check("a wrong phone does not confirm the reference exists", async () => {
   lacks(text, "paid", "the status");
 });
 
-/* ---------- the dispatch date ---------- */
-
 /* Rewrites the stored order so a case can set its lines and status. */
 const store = async (patch) => {
   const current = await kv.get(`ref:${REFERENCE}`, "json");
   await kv.put(`ref:${REFERENCE}`, JSON.stringify({ ...current, ...patch }));
 };
+
+/* ---------- the delivery breakdown ----------
+ *
+ * The record shape stk.js writes since delivery fees: subtotal, a delivery
+ * object, and amount as their sum. The breakdown is read off the record as
+ * stored, never recomputed — so these cases store figures that do not match
+ * today's fee table, and the answer must still be the stored one. */
+
+const DELIVERED = {
+  items: [{ slug: "crew-tee", qty: 1 }],
+  subtotal: 650,
+  delivery: { county: "kirinyaga", label: "Kirinyaga", area: "Kutus", landmark: "Green kiosk at the stage", fee: 250 },
+  amount: 900,
+};
+
+await check("a found order shows county, area, subtotal, delivery and total", async () => {
+  await store(DELIVERED);
+  const body = await (await ask(GOOD)).json();
+  eq(
+    body.breakdown,
+    { county: "Kirinyaga", area: "Kutus", fee: "KSh 250", subtotal: "KSh 650", total: "KSh 900" },
+    "breakdown"
+  );
+});
+
+await check("THE LANDMARK IS NEVER RETURNED", async () => {
+  await store(DELIVERED);
+  const text = await (await ask(GOOD)).text();
+  lacks(text, "Green kiosk", "the landmark");
+  lacks(text, "landmark", "the landmark key");
+});
+
+await check("a free-delivery order reads Free, not KSh 0", async () => {
+  await store({ ...DELIVERED, delivery: { ...DELIVERED.delivery, label: "Nairobi CBD", fee: 0 }, amount: 650 });
+  const body = await (await ask(GOOD)).json();
+  eq([body.breakdown.fee, body.breakdown.total], ["Free", "KSh 650"], "fee and total");
+});
+
+await check("the breakdown is what was recorded, not today's fee table", async () => {
+  await store({ ...DELIVERED, delivery: { ...DELIVERED.delivery, fee: 999 }, amount: 1649 });
+  const body = await (await ask(GOOD)).json();
+  eq([body.breakdown.fee, body.breakdown.total], ["KSh 999", "KSh 1,649"], "stored figures");
+});
+
+await check("an order from before delivery fees shows its total and nothing it lacks", async () => {
+  const body = await (await ask(GOOD)).json();
+  eq(body.breakdown, { total: "KSh 1,300" }, "breakdown");
+});
+
+/* ---------- the dispatch date ---------- */
 
 await check("a settled order whose lines all have a lead time gets A DATE", async () => {
   await store({ items: [{ slug: "quick-cap", qty: 1 }], status: "paid", settledAt: Date.UTC(2026, 8, 2) });

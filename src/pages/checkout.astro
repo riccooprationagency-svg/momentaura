@@ -1,6 +1,13 @@
 ---
-// Checkout. Name and phone, an order summary, and one button that sends an
-// M-Pesa payment prompt to the phone number just entered.
+// Checkout. Name and phone, where it is going, an order summary with the
+// delivery fee, and one button that sends an M-Pesa payment prompt to the phone
+// number just entered.
+//
+// THE FEE ON THIS PAGE IS A PREVIEW. The cart reads it off the chosen option to
+// fill the Delivery and Total lines and the button, so the buyer sees the
+// figure before the prompt asks for it. The figure that is charged is computed
+// again by functions/api/_order.js from the county key, and the M-Pesa prompt
+// on the buyer's phone shows that one.
 //
 // NO CARD FIELD EXISTS HERE, and none may ever be added. M-Pesa is the only
 // payment method this shop takes, and the prompt is completed on the buyer's
@@ -15,8 +22,10 @@ import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
 import Field from "../components/Field.astro";
 import OrderHelp from "../components/OrderHelp.astro";
+import CountyOptions from "../components/CountyOptions.astro";
 import { products, price } from "../lib/products";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
+import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
 
 // Light, following the products it lists, exactly as /order does.
 ---
@@ -69,6 +78,40 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
           />
 
           <!--
+            Where it is physically going. The county is a native <select> of the
+            fee table's keys, each label carrying its fee, so the figure is in
+            front of the buyer before they choose and with JavaScript off. The
+            server prices delivery from the key it posts and nothing else.
+            Lengths match what functions/api/_order.js accepts.
+          -->
+          <Field
+            name="county"
+            label="County"
+            select
+            required
+            hint="The delivery fee is per order, not per item. All fees are on the delivery page."
+          >
+            <CountyOptions />
+          </Field>
+
+          <Field
+            name="area"
+            label="Area or estate"
+            autocomplete="address-level3"
+            maxlength={MAX_AREA}
+            required
+            hint="Like Kilimani, or Kahawa Sukari."
+          />
+
+          <Field
+            name="landmark"
+            label="Landmark"
+            maxlength={MAX_LANDMARK}
+            required
+            hint="A place a rider can find, e.g. a shop or stage."
+          />
+
+          <!--
             STATE WHAT HAPPENS BEFORE IT HAPPENS. Prose, above the button. Not
             a tooltip, not fine print under the fold, and not after the click.
           -->
@@ -85,7 +128,10 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
           <p class="checkout__error" id="checkout-error" data-checkout-error role="alert" hidden></p>
 
           <div class="checkout__actions">
-            <Button variant="filled" type="submit" data-checkout-submit>
+            <!-- data-pay is the label the cart extends with the total once a
+                 county is chosen: "Pay with M-Pesa — KSh 900". Until then, and
+                 with JavaScript off, it is the plain verb. -->
+            <Button variant="filled" type="submit" data-checkout-submit data-pay={`Pay with ${GATEWAY_NAME}`}>
               Pay with {GATEWAY_NAME}
             </Button>
             <a class="checkout__back" href="/order">Back to your order</a>
@@ -119,9 +165,22 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 
           <hr class="checkout__hair" />
 
+          <!--
+            Subtotal, Delivery, Total. The first is the lines at catalogue
+            prices; the other two wait for a county and say so until one is
+            chosen, rather than showing a total that is missing a fee.
+          -->
+          <p class="summary__row">
+            <span class="summary__total-label">Subtotal</span>
+            <span class="summary__total-value" data-order-total>KSh 0</span>
+          </p>
+          <p class="summary__row">
+            <span class="summary__total-label">Delivery</span>
+            <span class="summary__total-value" data-order-fee>Choose a county</span>
+          </p>
           <p class="summary__total">
             <span class="summary__total-label">Total</span>
-            <span class="summary__total-value" data-order-total>KSh 0</span>
+            <span class="summary__total-value" data-order-due>Choose a county</span>
           </p>
 
           <p class="summary__terms">
@@ -265,6 +324,7 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
     margin-block: var(--s-20);
   }
 
+  .summary__row,
   .summary__total {
     display: flex;
     justify-content: space-between;
@@ -272,6 +332,15 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
     gap: var(--s-20);
     font-family: var(--font-mono);
     letter-spacing: var(--tr-docket);
+  }
+
+  .summary__row {
+    margin-block-end: var(--s-8);
+  }
+
+  .summary__total {
+    border-block-start: 1px dashed var(--border);
+    padding-block-start: var(--s-8);
   }
 
   .summary__total-label {

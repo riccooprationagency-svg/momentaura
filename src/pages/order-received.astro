@@ -29,6 +29,7 @@
 // appears the moment a real lead time exists. A date computed from a null would
 // be a made-up commitment on the one screen a buyer keeps.
 import Base from "../layouts/Base.astro";
+import CountyOptions from "../components/CountyOptions.astro";
 import { products, price } from "../lib/products";
 ---
 
@@ -109,10 +110,34 @@ import { products, price } from "../lib/products";
           }
         </ul>
 
-        <p class="received__total">
-          <span class="received__total-label">Total</span>
+        <!--
+          Subtotal, Delivery, Total. The fee is looked up the way a line's price
+          is: the snapshot holds only the county KEY, and the cart sets it into
+          the hidden list of options below, which this page rendered from
+          site.json. Nothing about money is read out of storage. If the key is
+          missing or matches nothing, the two lines keep this wording, which is
+          true: the M-Pesa prompt on the phone shows the amount asked for.
+        -->
+        <p class="received__row">
+          <span class="received__total-label">Subtotal</span>
           <span class="received__total-value" data-order-total>KSh 0</span>
         </p>
+        <p class="received__row">
+          <span class="received__total-label">Delivery</span>
+          <span class="received__total-value" data-order-fee>Shown on the M-Pesa prompt</span>
+        </p>
+        <p class="received__total">
+          <span class="received__total-label">Total</span>
+          <span class="received__total-value" data-order-due>Shown on the M-Pesa prompt</span>
+        </p>
+
+        <!-- The fee lookup, never shown and never submitted: it is not inside
+             a form, and `hidden` takes it out of the page and the
+             accessibility tree. It is the same option list checkout renders, so
+             the fee on this screen is the fee checkout showed. -->
+        <select name="county" hidden aria-hidden="true" tabindex="-1">
+          <CountyOptions />
+        </select>
 
         <hr class="received__hair" />
 
@@ -242,6 +267,7 @@ import { products, price } from "../lib/products";
     font-variant-numeric: tabular-nums;
   }
 
+  .received__row,
   .received__total {
     display: flex;
     justify-content: space-between;
@@ -249,6 +275,14 @@ import { products, price } from "../lib/products";
     gap: var(--s-20);
     font-family: var(--font-mono);
     letter-spacing: var(--tr-docket);
+  }
+
+  /* Subtotal and Delivery sit above the rule; only Total carries it. */
+  .received__row {
+    margin-block-end: var(--s-8);
+  }
+
+  .received__total {
     border-block-start: 1px dashed var(--border);
     padding-block-start: var(--s-16);
   }
