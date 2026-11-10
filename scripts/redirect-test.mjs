@@ -18,24 +18,117 @@
  *   - with site.json `url` null the middleware must load and pass everything
  *     through, the same fail-quiet the pages follow
  *
- * The middleware is the shipped file. The null-url case runs a copy of it next
- * to a site.json with `url: null` in a scratch directory — the same move
- * track-test.mjs makes for the catalogue — so the real config is never edited
- * to make a test pass. Only next() is substituted, so a pass-through is
- * visible as the sentinel it returns.
+ * The middleware is the shipped file, with ONE line substituted: its bare
+ * `import site from "../src/data/site.json"`, which the Pages bundler accepts
+ * and Node refuses without an import attribute. A copy is written to a scratch
+ * directory with that line replaced by the config this test hands it — the
+ * same move track-test.mjs and mpesa-test.mjs make for the catalogue — and
+ * if the line is ever not found, the test throws rather than testing nothing.
+ * The real config is read and passed through unchanged for every case except
+ * the null-url ones, so it is never edited to make a test pass. Only next()
+ * is substituted otherwise, so a pass-through is visible as the sentinel it
+ * returns.
  *
  *   node scripts/redirect-test.mjs
  */
 
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const MIDDLEWARE = join(ROOT, "functions", "_middleware.js");
-const { onRequest, PRODUCTION_PAGES_HOST } = await import(pathToFileURL(MIDDLEWARE).href);
+const FUNCTIONS = join(ROOT, "functions");
+const MIDDLEWARE = join(FUNCTIONS, "_middleware.js");
+
+/* ---------- every file in functions/ compiles under the Pages bundler ----------
+ *
+ * A static check over ALL of functions/, not only this middleware, because the
+ * failure it guards is not this file's: PR #14 shipped
+ * `import site from "../src/data/site.json" with { type: "json" }`, every gate
+ * here passed, and the Cloudflare Pages build failed on both commits. Pages
+ * compiles Functions with wrangler 3, whose esbuild 0.17 rejects import
+ * attributes ("Expected ';' but found 'with'"). The older `assert { ... }` form
+ * is no escape: that esbuild accepts it, Node 22+ rejects it as a syntax error,
+ * and the tests here import the shipped files under Node. So neither form may
+ * appear in an import or re-export, and JSON is imported bare, as _order.js and
+ * track.js already do — the tests substitute that line.
+ *
+ * It lives here rather than in verify.mjs because verify.mjs walks src/ and
+ * dist/, and the functions/ rules live in the *-test.mjs scripts. It runs
+ * before anything is loaded, so it fails with a reason rather than with a
+ * stack trace from a later import. */
+const ATTRIBUTE_IMPORT =
+  /^\s*(?:import|export)\b[^;]*?["'][^"']+["']\s*(with|assert)\s*\{/m;
+
+const walkJs = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return walkJs(path);
+    return entry.name.endsWith(".js") ? [path] : [];
+  });
+
+{
+  /* The pattern proves itself first, on the shapes it must and must not match,
+     so a regex that silently matches nothing cannot report a clean tree. */
+  const MUST = [
+    'import site from "../src/data/site.json" with { type: "json" };',
+    "import data from './x.json' assert { type: 'json' };",
+    'import {\n  a,\n  b,\n} from "./y.json" with { type: "json" };',
+    'export { default } from "./z.json" with { type: "json" };',
+    'import "./side-effect.json" with { type: "json" };',
+  ];
+  const MUST_NOT = [
+    'import site from "../src/data/site.json";',
+    'import { settle } from "../../_pending.js";',
+    '/* JSON is imported bare, with no `with { type: "json" }` attribute */',
+  ];
+  const broken = [
+    ...MUST.filter((src) => !ATTRIBUTE_IMPORT.test(src)).map((src) => `misses: ${src}`),
+    ...MUST_NOT.filter((src) => ATTRIBUTE_IMPORT.test(src)).map((src) => `wrongly flags: ${src}`),
+  ];
+  if (broken.length) {
+    console.log("\n  FAIL  the import-attribute check does not behave:\n" + broken.map((b) => `        ${b}`).join("\n") + "\n");
+    process.exit(1);
+  }
+
+  const offenders = [];
+  for (const file of walkJs(FUNCTIONS)) {
+    const match = ATTRIBUTE_IMPORT.exec(readFileSync(file, "utf8"));
+    if (match) offenders.push(`${file.slice(ROOT.length + 1).replace(/\\/g, "/")}  (\`${match[1]} {\`)`);
+  }
+  if (offenders.length) {
+    console.log(
+      "\n  FAIL  import attributes in functions/ — Cloudflare's Pages Functions compiler\n" +
+        "        (wrangler 3 / esbuild 0.17) rejects `with { ... }`, and Node 22+ rejects\n" +
+        "        `assert { ... }`. Import JSON bare, as functions/api/_order.js does:\n" +
+        offenders.map((o) => `          ${o}`).join("\n") +
+        "\n"
+    );
+    process.exit(1);
+  }
+  console.log(`\n  pass  no import attributes in ${walkJs(FUNCTIONS).length} file(s) under functions/ (Pages bundler would reject them)`);
+}
+const SOURCE = readFileSync(MIDDLEWARE, "utf8");
+const SITE_IMPORT = /^import site from "\.\.\/src\/data\/site\.json";$/m;
+if (!SITE_IMPORT.test(SOURCE)) {
+  throw new Error("could not find the site.json import — has _middleware.js moved it?");
+}
+
+/* The shipped middleware, loaded against the given site config. */
+let loads = 0;
+const loadMiddleware = async (config) => {
+  const key = `__momentauraSite${++loads}`;
+  globalThis[key] = config;
+  const dir = join(tmpdir(), `momentaura-redirect-${process.pid}-${loads}`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "package.json"), '{"type":"module"}\n', "utf8");
+  writeFileSync(join(dir, "_middleware.js"), SOURCE.replace(SITE_IMPORT, `const site = globalThis.${key};`), "utf8");
+  return import(pathToFileURL(join(dir, "_middleware.js")).href);
+};
+
 const site = JSON.parse(readFileSync(join(ROOT, "src", "data", "site.json"), "utf8"));
+const { onRequest, PRODUCTION_PAGES_HOST } = await loadMiddleware(site);
 const CANONICAL = new URL(site.url).origin;
 
 const PASSED = new Response("next", { status: 299 });
@@ -143,20 +236,13 @@ await passes("the STK push endpoint is never redirected", `${prod}/api/mpesa/stk
 await passes("a GET under /api/ is never redirected either", `${prod}/api/track`);
 await passes("a POST outside /api/ is not redirected into losing its body", `${prod}/contact`, "POST");
 
-/* Null-domain mode. A copy of the shipped middleware beside a site.json whose
-   url is null, and one whose url is not a URL. Both must import without
-   throwing and pass every request through. */
+/* Null-domain mode. The shipped middleware against a config whose url is
+   null, and one whose url is not a URL. Both must load without throwing and
+   pass every request through. */
 for (const [label, url] of [["null", null], ["not a URL", "momentaurastores dot co dot ke"]]) {
-  const scratch = join(tmpdir(), `momentaura-redirect-${label.replace(/\W/g, "")}-${Date.now()}`);
-  mkdirSync(join(scratch, "functions"), { recursive: true });
-  mkdirSync(join(scratch, "src", "data"), { recursive: true });
-  writeFileSync(join(scratch, "package.json"), '{"type":"module"}\n', "utf8");
-  copyFileSync(MIDDLEWARE, join(scratch, "functions", "_middleware.js"));
-  writeFileSync(join(scratch, "src", "data", "site.json"), JSON.stringify({ ...site, url }), "utf8");
-
   let handler = null;
   try {
-    ({ onRequest: handler } = await import(pathToFileURL(join(scratch, "functions", "_middleware.js")).href));
+    ({ onRequest: handler } = await loadMiddleware({ ...site, url }));
     check(true, `with site.json url ${label}, the middleware loads without throwing`);
   } catch (error) {
     check(false, `with site.json url ${label}, the middleware loads without throwing`, String(error));

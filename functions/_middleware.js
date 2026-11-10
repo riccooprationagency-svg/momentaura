@@ -41,7 +41,13 @@
  * public/_headers applied, X-Robots-Tag included.
  */
 
-import site from "../src/data/site.json" with { type: "json" };
+/* A bare JSON import, with no `with { type: "json" }` attribute, and the same
+   form functions/api/_order.js and track.js use for products.json. Pages
+   compiles Functions with an esbuild that predates import attributes (wrangler
+   3's 0.17.19 fails with: Expected ";" but found "with"), so the attribute
+   broke the deploy while every local gate passed. The tests substitute this
+   line rather than importing the file raw, as they do for the catalogue. */
+import site from "../src/data/site.json";
 
 export const PRODUCTION_PAGES_HOST = "momentaura.pages.dev";
 
