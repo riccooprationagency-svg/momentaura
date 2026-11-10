@@ -1,0 +1,51 @@
+---
+// "Problem with an order?" and the two routes to a person who can fix one.
+//
+// Composed on /order, /checkout and /track — the three pages where a buyer has
+// money in motion or has already parted with it. CLAUDE.md wants a phone number
+// on every error, and the errors on those pages are written by the cart script
+// under a byte budget, so the number sits beside them in markup instead of
+// inside each message. It renders with JavaScript off, which is when a buyer
+// most needs a route that does not depend on the page working.
+//
+// Prose in Archivo, not mono: it is a sentence. The two links are each a full
+// 44px target, because a thumb is what taps them.
+import { emailParts, mailtoHref, phoneDisplay, whatsappHref, type WhatsappSource } from "../lib/site";
+
+interface Props {
+  source: Extract<WhatsappSource, "WEB-ORDER" | "WEB-CHECKOUT" | "WEB-TRACK">;
+}
+
+const { source } = Astro.props;
+---
+
+<p class="order-help">
+  <span>Problem with an order?</span>
+  <a href={whatsappHref(source)}>WhatsApp {phoneDisplay()}</a>
+  <span>or</span>
+  <a class="order-help__email" href={mailtoHref("orders")}
+    >{emailParts("orders")[0]}<wbr />{emailParts("orders")[1]}</a
+  >
+</p>
+
+<style>
+  .order-help {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--s-8);
+    color: var(--fg-muted);
+  }
+
+  .order-help a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+
+  /* An address is one unbreakable word, and at 390px the longer ones are wider
+     than the column. Breaking it is better than pushing the page sideways. */
+  .order-help__email {
+    overflow-wrap: anywhere;
+  }
+</style>

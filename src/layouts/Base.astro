@@ -10,7 +10,16 @@
 
 import "../styles/global.css";
 import devGuards from "../styles/dev-guards.css?raw";
-import { absolute, site } from "../lib/site";
+import {
+  absolute,
+  emailParts,
+  mailtoHref,
+  organizationLd,
+  phoneDisplay,
+  site,
+  telHref,
+  whatsappHref,
+} from "../lib/site";
 
 interface Props {
   title: string;
@@ -69,6 +78,11 @@ const FOOTER = [
 ];
 
 const year = new Date().getFullYear();
+
+/* Data, not code: a browser does not execute application/ld+json. "<" is
+   escaped so no value can close the tag early. verify.mjs V4 allows exactly
+   this one block per page and checks that it parses. */
+const ld = JSON.stringify(organizationLd()).replace(/</g, "\\u003c");
 ---
 
 <!doctype html>
@@ -119,6 +133,8 @@ const year = new Date().getFullYear();
       type="font/woff2"
       crossorigin
     />
+
+    <script is:inline type="application/ld+json" set:html={ld} />
 
     {import.meta.env.DEV && <style is:global set:html={devGuards} />}
   </head>
@@ -178,6 +194,14 @@ const year = new Date().getFullYear();
         <nav class="foot__links" aria-label="Footer">
           {FOOTER.map((item) => <a href={item.href}>{item.label}</a>)}
         </nav>
+
+        <div class="foot__links foot__reach">
+          <a href={whatsappHref("WEB-FOOTER")}>Message MomentAura on WhatsApp</a>
+          <a href={telHref()}>Call {phoneDisplay()}</a>
+          <a class="foot__email" href={mailtoHref("general")}
+            >{emailParts("general")[0]}<wbr />{emailParts("general")[1]}</a
+          >
+        </div>
 
         <p class="foot__legal">&copy; {year} MomentAura</p>
       </div>
@@ -381,6 +405,11 @@ const year = new Date().getFullYear();
   .foot__links a:hover {
     text-decoration: underline;
     text-underline-offset: var(--underline-offset);
+  }
+
+  /* The longest address is wider than a 390px column in one piece. */
+  .foot__email {
+    overflow-wrap: anywhere;
   }
 
   @media (max-width: 640px) {

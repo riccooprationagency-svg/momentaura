@@ -24,14 +24,14 @@
 //   Quote threshold  PRD FR-1.5 redirects an order of ten units or more to the
 //                    bulk path. That path is step 9. A threshold that routes
 //                    nowhere is worse than no threshold
-//   Phone number     CLAUDE.md wants a number on an error. There is no real one
-//                    in this repo, and inventing one is the exact dishonesty
-//                    the whole system exists to remove. The blocked message
-//                    says what happened and how to fix it, which the buyer can
-//                    do alone in one click, and /contact carries the number
-//                    once it exists
+//
+// The phone number CLAUDE.md wants on an error is OrderHelp, at the foot of the
+// section. The blocked message is written by the cart under a byte budget, so
+// the number sits beside it in markup rather than inside it, and it is there
+// in the empty state and with JavaScript off as well.
 import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
+import OrderHelp from "../components/OrderHelp.astro";
 import { products, price } from "../lib/products";
 
 // Light. Every product renders light while photography is missing, and an order
@@ -167,6 +167,10 @@ import { products, price } from "../lib/products";
           payment.
         </p>
       </div>
+
+      <div class="order__help">
+        <OrderHelp source="WEB-ORDER" />
+      </div>
     </div>
   </section>
 </Base>
@@ -190,6 +194,10 @@ import { products, price } from "../lib/products";
   .order__terms {
     color: var(--fg-muted);
     max-width: var(--measure);
+  }
+
+  .order__help {
+    margin-block-start: var(--s-40);
   }
 
   /* ---------- lines ---------- */

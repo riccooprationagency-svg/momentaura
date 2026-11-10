@@ -1105,7 +1105,30 @@ if (existsSync(DIST)) {
     const source = readFileSync(page, "utf8");
     const tags = [...source.matchAll(TAG)];
 
+    /* ONE DATA BLOCK, AND IT IS NOT A SCRIPT. phase-1-contact added the
+     * Organization JSON-LD to the shell. A browser never executes
+     * application/ld+json, so it is outside what this check counts — but the
+     * exemption is held as tightly as the rule it sits inside: one block per
+     * page at most, it must parse as JSON, and it must be the Organization
+     * block lib/site.ts builds. A second block, a Product block or anything
+     * that does not parse fails here, so this cannot become the route by which
+     * a page grows executable or claim-making markup of its own. */
+    let ldBlocks = 0;
     for (const [, attrs, body] of tags) {
+      if (/(?:^|\s)type=["']application\/ld\+json["']/i.test(attrs ?? "")) {
+        ldBlocks++;
+        let data = null;
+        try {
+          data = JSON.parse(body);
+        } catch {
+          fail("V4", `${rel(page)} carries an application/ld+json block that does not parse`);
+          continue;
+        }
+        if (data?.["@type"] !== "Organization") {
+          fail("V4", `${rel(page)} carries ld+json of type ${data?.["@type"]} — only the Organization block is permitted`);
+        }
+        continue;
+      }
       if (body.trim() !== "") {
         fail("V4", `${rel(page)} carries an inline <script> body — a page references the bundle, never inlines it`);
         continue;
@@ -1119,6 +1142,8 @@ if (existsSync(DIST)) {
         fail("V4", `${rel(page)} loads ${src[1]} — the only script any page may load is ${cartUrl}`);
       }
     }
+
+    if (ldBlocks > 1) fail("V4", `${rel(page)} carries ${ldBlocks} ld+json blocks — one Organization block per page`);
 
     const srcs = tags.filter(([, , body]) => body.trim() === "").length;
     if (srcs > 1) fail("V4", `${rel(page)} loads ${srcs} scripts — one file, referenced once`);

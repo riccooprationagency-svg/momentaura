@@ -14,6 +14,7 @@
 import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
 import Field from "../components/Field.astro";
+import OrderHelp from "../components/OrderHelp.astro";
 import { products, price } from "../lib/products";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 
@@ -129,6 +130,13 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
           </p>
         </aside>
       </div>
+
+      <!-- Outside the live grid, so it is on the page in the empty state and
+           with JavaScript off. A buyer whose prompt never arrived is the one
+           who needs it, and that buyer may be looking at either. -->
+      <div class="checkout__help">
+        <OrderHelp source="WEB-CHECKOUT" />
+      </div>
     </div>
   </section>
 </Base>
@@ -143,6 +151,10 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
   .checkout__heading {
     font-size: var(--t-heading);
     margin-block-end: var(--s-40);
+  }
+
+  .checkout__help {
+    margin-block-start: var(--s-40);
   }
 
   .checkout__empty {

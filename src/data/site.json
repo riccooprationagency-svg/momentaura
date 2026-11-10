@@ -1,5 +1,6 @@
 {
   "url": "https://momentaura.store",
+  "organizationUrl": "https://momentaurastores.co.ke",
   "ogImage": null,
   "owner": {
     "name": null,
@@ -7,9 +8,13 @@
     "area": null
   },
   "contact": {
-    "phone": null,
-    "whatsapp": null,
-    "hours": null
+    "phone": "0753 181 901",
+    "whatsapp": "0753 181 901",
+    "hours": null,
+    "email": {
+      "general": "customercare@momentaurastores.co.ke",
+      "orders": "orders@momentaurastores.co.ke"
+    }
   },
   "delivery": {
     "dispatchFrom": "Nairobi",
