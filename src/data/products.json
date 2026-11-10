@@ -68,5 +68,19 @@
     "stock": 0,
     "photos": [],
     "sizes": []
+  },
+  {
+    "slug": "t-shirt",
+    "name": "T-shirt",
+    "category": "apparel",
+    "price": 10,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 5,
+    "photos": [],
+    "sizes": []
   }
 ]
