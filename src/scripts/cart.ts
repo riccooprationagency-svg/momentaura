@@ -276,7 +276,14 @@ function paintLines(quantities: Order): HTMLElement[] {
     const due = money(total + +fee);
     text(document, "[data-order-fee]", +fee ? money(+fee) : "Free");
     text(document, "[data-order-due]", due);
-    if (submitButton) submitButton.textContent = `${submitButton.dataset.pay} — ${due}`;
+    /* Not while a submit is in flight: the button is saying "Sending the
+     * payment prompt" then, and send() restores the label it captured, so the
+     * submit handler repaints after every restore instead (below). Without
+     * both halves, a county changed mid-request left the button promising the
+     * old total next to a summary showing the new one. */
+    if (submitButton && submitButton.getAttribute(OFF) !== "true") {
+      submitButton.textContent = `${submitButton.dataset.pay} — ${due}`;
+    }
   }
   return shown;
 }
@@ -548,7 +555,9 @@ if (form && submitButton) {
       "The connection dropped before the payment prompt could be sent. " +
         "Nothing has been charged. Check your connection and try again."
     );
-    if (!sent) return;
+    /* send() has already restored the label it captured; repaint so the
+     * button states the total for the county chosen now. */
+    if (!sent) return paintOrder();
 
     const body = sent.body as {
       message?: string;
@@ -588,6 +597,7 @@ if (form && submitButton) {
     }
 
     sent.restore();
+    paintOrder();
 
     const message = body.message ?? "That did not go through. Nothing has been charged.";
     if (body.field && body.field !== "items") {
