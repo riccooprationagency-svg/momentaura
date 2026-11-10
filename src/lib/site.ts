@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import data from "../data/site.json";
 
 /* The facts about the shop itself, as opposed to the things it sells.
@@ -55,11 +57,6 @@ export interface Site {
     /** The part of Nairobi they work from. Specific enough to be checkable. */
     area: string | null;
   };
-  /* The domain the Organization JSON-LD names. Kept apart from `url` on
-   * purpose: `url` drives canonical, the sitemap and robots.txt, and moving
-   * those is a separate change with its own review. Until that lands the two
-   * differ, and this one is used for nothing except the JSON-LD block. */
-  organizationUrl: string | null;
   contact: {
     /** A number that rings and is answered, written as a buyer would read it. */
     phone: string | null;
@@ -180,6 +177,19 @@ const CANDIDATES: (Gap & { value: unknown })[] = [
   },
 ];
 
+/* A file in public/, by its site-rooted path ("/favicon.ico"), or null when no
+   such file exists. Build time only. A <link> or <meta> naming a file that was
+   never added is a 404 a browser or a link-preview crawler asks for on every
+   page, so these references appear the day the file does and not before. */
+export const publicFile = (path: string | null): string | null => {
+  if (!known(path)) return null;
+  const clean = String(path).trim();
+  /* From the project root, not import.meta.url: Astro bundles this module
+     into dist/ before running it, so a path relative to the module would
+     resolve against the bundle. Builds always run from the root. */
+  return existsSync(join(process.cwd(), "public", clean)) ? clean : null;
+};
+
 /* The origin, normalised, or null. Trailing slashes are stripped here rather
    than at each of the four call sites, because a sitemap of "//about" URLs is
    the kind of thing that builds clean and is found by a crawler. */
@@ -283,7 +293,9 @@ export const organizationLd = () => ({
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "MomentAura",
-  url: required(site.organizationUrl, "organizationUrl"),
+  /* The same origin the canonical, og:url, sitemap and robots.txt use, so the
+     five cannot disagree. */
+  url: required(origin(), "url"),
   contactPoint: {
     "@type": "ContactPoint",
     telephone: phoneE164(),

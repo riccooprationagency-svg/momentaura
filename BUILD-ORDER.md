@@ -619,56 +619,53 @@ empty state instead — nothing may have invented a hostname.
 Dropping `/track` from the list, inventing `/shop`, removing one `noindex`, and making
 `origin()` return a host while `site.json` is null each fail it.
 
-### The domain is momentaura.store, and it is deliberately not connected
+### The domain is momentaurastores.co.ke, connected and not yet indexed
 
-`site.url` is `https://momentaura.store` — registered, owned, and the domain the original
-Shopify store ran on. `momentaura.co.ke` appeared in eight places across the three test
-fixtures and was registered nowhere; it was invented for tests. It is gone. `mpesa-test.mjs`
-now holds one `ORIGIN` constant used by both the env fixture and the CallBackURL
-assertion, which previously matched a literal nothing else in the file used.
+Moved at phase-2-domain-crawl. `site.url` in `src/data/site.json` is
+`https://momentaurastores.co.ke`, and it is the **one** origin value: `astro.config.mjs`
+`site`, the canonical link, `og:url`, `sitemap.xml`, the `Sitemap:` line in `robots.txt`,
+the Organization JSON-LD and the `.pages.dev` redirect all read it. The `organizationUrl`
+key that phase 1 added as a holding value is gone. The previous domain did not resolve
+and is no longer referenced anywhere outside `docs/`, which records history.
 
-**The site ships to the Cloudflare Pages `.pages.dev` URL only.** momentaura.store stays
-unconnected and uncrawled until there is real stock and photography. Google forming a
-first impression of a shop with five out-of-stock products and kraft placeholders is a
-cost paid once and hard to undo, and a first impression is the entire subject of this
-build.
+**Two hosts serve the same build, and one now redirects.** `functions/_middleware.js`
+answers the production host `momentaura.pages.dev` with a 301 to the canonical domain,
+path and query preserved. Preview hosts (`<hash>.` and `<branch>.momentaura.pages.dev`)
+are never redirected, and nor is `/api/*`, because `MPESA_CALLBACK_ORIGIN` may still name
+the `.pages.dev` host and Safaricom does not follow a redirect on its callback POST.
+`scripts/redirect-test.mjs` holds both exemptions on every commit.
 
-So `public/_headers` carries `X-Robots-Tag: noindex, nofollow` on `/*`. Not `Disallow` in
-robots.txt: a disallowed page is not read, so its noindex is not read either, and a URL
-discovered from a link elsewhere can still be listed. noindex is read and obeyed.
+**Indexing still waits.** `public/_headers` carries `X-Robots-Tag: noindex, nofollow` on
+`/*` until the shop launches for search: real stock and photography first. Not `Disallow`
+in robots.txt: a disallowed page is not read, so its noindex is not read either. The
+canonicals and the sitemap already name the canonical domain, so nothing else changes on
+the day the header goes.
 
-The canonical links and the sitemap name momentaura.store while the site is served from
-.pages.dev, and that is correct rather than contradictory — they describe where the site
-lives, the header describes whether to index what is being served. The noindex is what
-makes the mismatch harmless in the meantime, and it means the canonicals are already
-right on the day the domain connects rather than being a second change to remember.
+**Unknown paths are real 404s.** With no `404.html` in the output, Pages treats a project
+as a single-page app and serves the homepage with 200 at every unknown path. `src/pages/
+404.astro` ends that. V13 asserts it exists, carries no canonical and is in no sitemap.
 
-**Search Console waits.** Submitting a sitemap that names a host which is not serving
-achieves nothing and starts a record of failed fetches. DNS TXT verification is preferred
+**Search Console waits** for the same launch decision. DNS TXT verification is preferred
 over the meta tag when it does happen, so no markup is owed to it.
 
-### What changes at go-live, in order
+### What changes at launch, in order
 
-1. Connect momentaura.store to the Pages project
-2. **Delete the `X-Robots-Tag` block from `public/_headers`.** Leaving it makes the real
+1. **Delete the `X-Robots-Tag` block from `public/_headers`.** Leaving it makes the real
    shop unfindable, silently, with every gate green. `verify.mjs` V13b prints a note on
-   every build for as long as the block exists, because no gate can detect a DNS change
-   that happens outside this repo — the header is correct today and wrong the moment the
-   domain is connected
-3. Set `MPESA_CALLBACK_ORIGIN` to `https://momentaura.store` and re-register the callback
-   URL with Daraja
-4. Then Search Console
+   every build for as long as the block exists
+2. Set `MPESA_CALLBACK_ORIGIN` to `https://momentaurastores.co.ke` and re-register the
+   callback URL with Daraja, if it still names the `.pages.dev` host
+3. Then Search Console
 
-### `MPESA_CALLBACK_ORIGIN` changes twice, and neither is in this repo
+### `MPESA_CALLBACK_ORIGIN` is not in this repo
 
-It is a Cloudflare environment variable, read only inside `functions/`, and it holds a
-different value at each of three points:
+It is a Cloudflare environment variable, read only inside `functions/`:
 
 | When | Value |
 |---|---|
-| Tests | `https://momentaura.store` — a fixture, asserting shape, not deployment |
-| Daraja go-live | the `.pages.dev` URL, because go-live needs a live HTTPS callback and momentaura.store will not be serving |
-| Custom domain connected | `https://momentaura.store` |
+| Tests | `https://momentaurastores.co.ke` — a fixture, asserting shape, not deployment |
+| Daraja go-live | the `.pages.dev` URL, if that is what was registered. `/api/*` is exempt from the redirect so this keeps working |
+| Canonical domain | `https://momentaurastores.co.ke` |
 
 The handler builds the callback URL from the env var and asserts nothing about the host,
 so nothing in the code needs to change at either step. What does need to change is the

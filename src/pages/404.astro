@@ -1,0 +1,92 @@
+---
+// Not found.
+//
+// THIS FILE IS WHAT ENDS THE SOFT 404. Cloudflare Pages decides how to answer an
+// unknown path by looking for 404.html in the build output. With none, it treats
+// the project as a single-page app and serves the homepage, with HTTP 200, at
+// every address that does not exist — /favicon.ico, /og.png, /anything. A
+// crawler then indexes the homepage under every mistyped URL, and a buyer who
+// followed a broken link lands on a page that pretends the link worked.
+// Astro emits this file as dist/404.html, and Pages serves it with a real 404.
+//
+// It is an error state, so CLAUDE.md's rule for errors applies: say what
+// happened, how to fix it, and carry a phone number. Not a joke, not an
+// illustration, not "oops". A suspicious buyer reads a broken page as the first
+// sign the shop has been abandoned; a plain one with a working number reads as
+// a mistyped address.
+//
+// No canonical and no og:url (addressable={false}): this page is served at
+// whatever address was asked for, so naming /404 as its address would be wrong.
+// Not in the sitemap. verify.mjs V13 asserts both.
+import Base from "../layouts/Base.astro";
+import { phoneDisplay, telHref } from "../lib/site";
+---
+
+<Base
+  title="Page not found — MomentAura"
+  description="There is no page at this address."
+  system="light"
+  addressable={false}
+>
+  <section class="page">
+    <div class="wrap page__inner">
+      <h1 class="page__heading">Page not found</h1>
+
+      <p class="page__body">
+        There is no page at this address. It may have been mistyped, or the link that
+        brought you here is out of date.
+      </p>
+
+      <ul class="page__routes" role="list">
+        <li><a href="/">Go to the homepage</a></li>
+        <li><a href="/track">Track an order</a></li>
+        <li><a href="/contact">Contact</a></li>
+      </ul>
+
+      <p class="page__body">
+        If you were following a link to an order or a product and it should be here, <a
+          class="page__call"
+          href={telHref()}>call {phoneDisplay()}</a
+        >.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    background-color: var(--bg);
+    color: var(--fg);
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__inner {
+    max-width: var(--max-width);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    margin-block-end: var(--s-40);
+  }
+
+  .page__body {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  .page__routes {
+    list-style: none;
+    display: grid;
+    gap: var(--s-8);
+    margin-block-end: var(--s-28);
+  }
+
+  /* Standalone routes, so each is a full thumb-sized target. */
+  .page__routes a,
+  .page__call {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+</style>

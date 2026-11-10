@@ -1429,6 +1429,19 @@ if (existsSync(DIST)) {
  * src/data/site.json's `url` null there is no honest absolute URL to write, so
  * the correct output is an empty urlset, no canonical anywhere and no Sitemap
  * line. Half of it appearing would mean something emitted a hostname it invented.
+ *
+ * ONE FILE IS NOT A PAGE, AND IT IS HELD TO ITS OWN RULE INSTEAD. dist/404.html
+ * (phase-2-domain-crawl) is the body Cloudflare Pages sends with a real 404 at
+ * every address that does not exist. It has no address of its own, so the
+ * three per-page rules above would each be wrong about it: listing /404 in the
+ * sitemap invites a crawler to an error, a canonical on it names /404 as the
+ * true address of whatever was mistyped, and closing it in robots.txt would be
+ * a Disallow line for a path nobody links to. So it is taken out of `built` and
+ * out of the per-page loop, and asserted directly: it must exist — without it
+ * Pages falls back to serving the homepage with 200 at every unknown path,
+ * which was the soft 404 this file was added to end — it carries no canonical
+ * and no og:url, and the sitemap does not name it. The exemption is by exact
+ * filename, so it cannot be widened by adding another page.
  */
 
 if (existsSync(DIST)) {
@@ -1450,9 +1463,22 @@ if (existsSync(DIST)) {
     const sitemap = readFileSync(sitemapPath, "utf8");
     const robots = readFileSync(robotsPath, "utf8");
 
+    /* The not-found body, asserted on its own terms — see the header above. */
+    const notFound = join(DIST, "404.html");
+    if (!existsSync(notFound)) {
+      fail("V13", "dist/404.html was not built — Cloudflare Pages will serve the homepage with 200 at every unknown path");
+    } else {
+      const page404 = readFileSync(notFound, "utf8");
+      if (/<link\s[^>]*rel=["']canonical["']/i.test(page404)) fail("V13", "dist/404.html carries a canonical — it has no address of its own");
+      if (/<meta\s[^>]*property=["']og:url["']/i.test(page404)) fail("V13", "dist/404.html carries og:url — it has no address of its own");
+    }
+    if (/<loc>[^<]*\/404(\.html)?\/?<\/loc>/.test(sitemap)) fail("V13", "the sitemap names /404 — a crawler is being invited to an error");
+
+    const isNotFound = (f) => rel(f) === "dist/404.html";
+
     /* The pages actually built, as the paths a crawler would ask for. */
     const built = walkAll(DIST)
-      .filter((f) => f.endsWith(".html"))
+      .filter((f) => f.endsWith(".html") && !isNotFound(f))
       .map((f) => "/" + rel(f).replace(/^dist\//, "").replace(/index\.html$/, "").replace(/\/$/, ""))
       .map((p) => (p === "" ? "/" : p));
 
@@ -1501,7 +1527,7 @@ if (existsSync(DIST)) {
     /* The canonical on each page, and the noindex that has to match robots.txt.
        Both are per-page, so both are read from the page rather than assumed. */
     let canonicals = 0;
-    for (const page of walkAll(DIST).filter((f) => f.endsWith(".html"))) {
+    for (const page of walkAll(DIST).filter((f) => f.endsWith(".html") && !isNotFound(f))) {
       const source = readFileSync(page, "utf8");
       const path = ("/" + rel(page).replace(/^dist\//, "").replace(/index\.html$/, "").replace(/\/$/, "")) || "/";
       const self = path === "" ? "/" : path;
@@ -1540,9 +1566,9 @@ if (existsSync(DIST)) {
 /* ---------- V13b — the preview is not indexable, and that is temporary ----------
  *
  * A note rather than a check, because there is nothing here to be right or wrong
- * about: a site-wide noindex is correct while the site is served from .pages.dev
- * and wrong the moment momentaura.store is connected, and the difference between
- * those two is a DNS change that happens outside this repo. No gate can see it.
+ * about: a site-wide noindex is correct until the shop launches for search and
+ * wrong from that day, and the difference between those two is a decision made
+ * outside this repo. No gate can see it.
  *
  * So it is reported on every build instead. The failure being guarded against is
  * not a bad header, it is a correct header nobody remembers to remove — which
@@ -1558,10 +1584,10 @@ if (existsSync(DIST)) {
     if (/^\s*X-Robots-Tag:\s*[^\n]*noindex/im.test(headers)) {
       notes.push(
         "dist/_headers carries a site-wide X-Robots-Tag: noindex. NOTHING ON THIS SITE\n" +
-          "        CAN BE INDEXED while it is there, which is intended for the .pages.dev\n" +
-          "        preview and wrong the moment momentaura.store is connected. Delete the\n" +
-          "        block in public/_headers at go-live. Do not submit the sitemap to Search\n" +
-          "        Console before then: it names momentaura.store, which is not serving."
+          "        CAN BE INDEXED while it is there, which is intended until the shop\n" +
+          "        launches for search and wrong from that day. Delete the block in\n" +
+          "        public/_headers at launch, and do not submit the sitemap to Search\n" +
+          "        Console before then."
       );
     }
   }

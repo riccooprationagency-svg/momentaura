@@ -9,7 +9,7 @@
  * correct; this only has to be reasonable.
  *
  * WHAT IS DELIBERATELY NOT IN IT. A sitemap is a statement that a URL is worth
- * indexing, so the three pages that are steps in a transaction are absent:
+ * indexing, so the four pages that act on one buyer's order are absent:
  *
  *   /checkout        a form with nothing to read, meaningless without a basket
  *   /order           the same, and it renders every product hidden
@@ -17,10 +17,16 @@
  *                    and a reference is the secret that opens an order on
  *                    /track — inviting a crawler to it is the one entry here
  *                    that would be a security mistake rather than a tidiness one
+ *   /track           a lookup form. Out since phase-2-domain-crawl, on Ric's
+ *                    call: it is reached from the footer, the confirmation
+ *                    screen and /contact, not from search, and an order lookup
+ *                    has nothing on it for a search result to describe. It was
+ *                    in until then, on the argument that a buyer may search for
+ *                    it by name; that trade is recorded here so it can be
+ *                    reversed in one line. robots.txt closes it and the page
+ *                    says noindex, because V13 holds all three in step
  *
- * /track stays in. It is a real page a buyer looks for by name, it holds no
- * order until someone types one, and a shop whose tracking page cannot be found
- * by searching for it is a shop that looks like it has no tracking page.
+ * 404.html is not a page at an address, so it is not here either. V13 knows.
  *
  * IT EMITS NOTHING UNTIL THE DOMAIN IS REAL. Sitemap URLs are absolute by
  * specification — there is no relative form — so with site.url null there is no
@@ -37,7 +43,7 @@ import { origin } from "../lib/site";
    written out anyway — and an exclusion list that is wrong fails open, into
    publishing a page, while an inclusion list that is wrong fails closed, into
    omitting one. V13 catches either. */
-const STATIC = ["/", "/about", "/contact", "/delivery", "/privacy", "/track"];
+const STATIC = ["/", "/about", "/contact", "/delivery", "/privacy"];
 
 const escape = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
