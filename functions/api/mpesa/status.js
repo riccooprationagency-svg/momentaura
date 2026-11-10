@@ -22,6 +22,12 @@
 
 import { DarajaError, queryStatus } from "../_daraja.js";
 import { CALLBACK_GRACE_MS, getPending, settle } from "../_pending.js";
+import { REACH } from "../_site.js";
+
+/* The browser does not show these — /order-received polls this endpoint and
+   reveals its own prose — but anything reading the response directly gets a
+   message that says what to do and who to call, like every other error here. */
+const UNREADABLE = `That request could not be read. Try again, or ${REACH}.`;
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), {
@@ -42,14 +48,14 @@ export async function onRequest({ request, env }) {
   try {
     payload = await request.json();
   } catch {
-    return json(400, { message: "That request could not be read." });
+    return json(400, { message: UNREADABLE });
   }
 
   const checkoutRequestId = payload && payload.checkoutRequestId;
   const claimed = payload && payload.reference;
 
   if (typeof checkoutRequestId !== "string" || !checkoutRequestId) {
-    return json(400, { message: "That request could not be read." });
+    return json(400, { message: UNREADABLE });
   }
 
   let record;
@@ -57,7 +63,7 @@ export async function onRequest({ request, env }) {
     record = await getPending(env, checkoutRequestId);
   } catch (error) {
     console.log(JSON.stringify({ at: "status", code: "kv_read_failed", detail: String(error) }));
-    return json(503, { message: "That order cannot be checked right now." });
+    return json(503, { message: `That order cannot be checked right now. Try again shortly, or ${REACH}.` });
   }
 
   /* BOTH HALVES MUST MATCH. The CheckoutRequestID alone is a bearer key to
@@ -67,7 +73,7 @@ export async function onRequest({ request, env }) {
      The same answer for "no such order" and "wrong reference", so neither
      confirms the other. */
   if (!record || typeof claimed !== "string" || claimed !== record.reference) {
-    return json(404, { message: "No order was found for that reference." });
+    return json(404, { message: `No order was found for that reference. If you have paid, ${REACH} with the reference.` });
   }
 
   /* Already terminal. No query, no write. */

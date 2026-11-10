@@ -33,6 +33,7 @@
 
 import catalogue from "../../src/data/products.json";
 import { msisdnFrom } from "./_order.js";
+import { ELSEWHERE, REACH } from "./_site.js";
 import { getPending, refKey } from "./_pending.js";
 import { addressOf, overBudget, recordMiss, secondsUntilReset } from "./_throttle.js";
 
@@ -51,7 +52,7 @@ const REFERENCE = /^MA-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 const NOT_FOUND =
   "That order cannot be found. Check the reference and the phone number — the " +
   "reference is on your confirmation screen, and the phone number is the one the " +
-  "payment went through. If both are right, get in touch on the contact page.";
+  `payment went through. If both are right, ${REACH}.${ELSEWHERE}`;
 
 /* Nairobi is UTC+3 all year — Kenya keeps no daylight saving — so the offset is
  * a constant rather than a lookup. */
@@ -183,8 +184,8 @@ export async function onRequest({ request, env }) {
       {
         message:
           `Too many lookups from this connection have come back empty. Try again in ` +
-          `${minutes} ${minutes === 1 ? "minute" : "minutes"}, or get in touch on the ` +
-          `contact page and the order will be looked up by hand.`,
+          `${minutes} ${minutes === 1 ? "minute" : "minutes"}, or ${REACH} and the order ` +
+          `will be looked up by hand.${ELSEWHERE}`,
       },
       { "Retry-After": String(wait) }
     );
@@ -194,7 +195,7 @@ export async function onRequest({ request, env }) {
   try {
     payload = await request.json();
   } catch {
-    return json(400, { message: "That request could not be read." });
+    return json(400, { message: `That request could not be read. Try again, or ${REACH}.` });
   }
 
   const reference = payload && typeof payload.reference === "string" ? payload.reference.trim().toUpperCase() : "";
@@ -222,7 +223,7 @@ export async function onRequest({ request, env }) {
   } catch (error) {
     console.log(JSON.stringify({ at: "track", code: "kv_read_failed", detail: String(error) }));
     return json(503, {
-      message: "Orders cannot be looked up right now. Try again shortly.",
+      message: `Orders cannot be looked up right now. Try again shortly, or ${REACH}.`,
     });
   }
 

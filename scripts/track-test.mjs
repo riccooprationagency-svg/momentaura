@@ -141,6 +141,9 @@ const eq = (a, b, what) => {
     throw new Error(`${what}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
   }
 };
+const has = (h, n, what) => {
+  if (!String(h).includes(n)) throw new Error(`${what}: ${JSON.stringify(String(h).slice(0, 200))} lacks ${JSON.stringify(n)}`);
+};
 const lacks = (h, n, what) => {
   if (String(h).includes(n)) throw new Error(`${what}: LEAKS ${JSON.stringify(n)}`);
 };
@@ -197,6 +200,14 @@ await check("A WRONG PHONE AND AN UNKNOWN REFERENCE GIVE THE IDENTICAL ANSWER", 
   eq(wrongPhone.status, noSuchOrder.status, "status");
   eq(wrongPhone.status, 404, "both are 404");
   eq(await wrongPhone.text(), await noSuchOrder.text(), "body");
+});
+
+await check("not found and a lookup failure both carry the phone number", async () => {
+  const phone = globalThis.__site.contact.phone;
+  if (!phone) throw new Error("site.json contact.phone is empty — nothing to assert against");
+  has((await (await ask({ ...GOOD, reference: "MA-ZZZZ-ZZZZ" })).json()).message, phone, "not found");
+  kv.failReads = true;
+  has((await (await ask(GOOD)).json()).message, phone, "lookup unavailable");
 });
 
 await check("not found reads as a correction with a route to contact, not an error", async () => {

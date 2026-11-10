@@ -20,19 +20,20 @@
 import { DarajaError, stkPush } from "../_daraja.js";
 import { MESSAGES, readOrder, reference } from "../_order.js";
 import { putPending, refKey } from "../_pending.js";
+import { REACH, Reach } from "../_site.js";
 
 /* What happened to the money, as opposed to what was wrong with the request.
  *
- * PHONE NUMBER: CLAUDE.md requires one on an error. There is no real number in
- * this repo and inventing one is the dishonesty the whole site exists to remove.
- * These route to /contact, which BUILD-ORDER section 10 owns. */
+ * PHONE NUMBER: CLAUDE.md requires one on an error, and every message here
+ * carries it — site.json contact.phone, through _site.js. These used to route
+ * to /contact because no real number existed; one does now. */
 const OUTCOME = {
   unavailable:
     `M-Pesa is not responding right now. Nothing has been charged. ` +
-    `Message us on the contact page and the order can be taken another way.`,
+    `${Reach} and the order can be taken another way.`,
   push_failed:
     `The M-Pesa prompt could not be sent to that number. Nothing has been charged. ` +
-    `Check the number and try again, or message us on the contact page.`,
+    `Check the number and try again, or ${REACH}.`,
 };
 
 const json = (status, body) =>
@@ -192,7 +193,7 @@ export async function onRequest({ request, env }) {
     return json(503, {
       message:
         `The prompt may have been sent, but this order could not be recorded. ` +
-        `Do not enter your PIN. Message us on the contact page with reference ${ref}.`,
+        `Do not enter your PIN. ${Reach} with reference ${ref}.`,
       reference: ref,
     });
   }

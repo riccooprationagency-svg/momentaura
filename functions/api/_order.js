@@ -17,7 +17,7 @@
  */
 
 import catalogue from "../../src/data/products.json";
-import { ZONES } from "./_site.js";
+import { REACH, ZONES } from "./_site.js";
 
 /* Same ceiling the cart applies on read. A request is not the cart, so it is
    restated here rather than assumed. */
@@ -68,18 +68,19 @@ function line(value, max) {
  * What HAPPENED TO THE MONEY is not here — that is different per gateway and
  * each endpoint owns its own wording for it.
  *
- * PHONE NUMBER: CLAUDE.md requires one on an error. There is no real number
- * anywhere in this repo and inventing one is the dishonesty the whole site
- * exists to remove — a number that does not ring is worse than no number. These
- * route to /contact, which BUILD-ORDER section 10 owns, and the number lands in
- * all of them at once when that page does. */
+ * PHONE NUMBER: CLAUDE.md requires one on an error. The messages about the
+ * order as a whole carry it, from site.json through _site.js. The ones naming a
+ * single field the buyer typed do not: the fix is in their own hands, the
+ * message sits under that field, and the page carries the number beside the
+ * form in markup (OrderHelp.astro). A phone number under every mistyped email
+ * address is noise, not help. */
 export const MESSAGES = {
-  bad_request: "That order could not be read. Go back to your order and try again.",
+  bad_request: `That order could not be read. Go back to your order and try again, or ${REACH}.`,
   empty: "There is nothing in your order yet.",
   name: "Enter the name the order is for.",
   phone: "Enter a Kenyan phone number, like 0712 345 678. M-Pesa sends the prompt to it.",
   email: "That email address does not look right. Leave it blank if you would rather not give one.",
-  gone: "One of the items in your order is no longer available. Go back to your order and remove it.",
+  gone: `One of the items in your order is no longer available. Go back to your order and remove it, or ${REACH}.`,
   county: "Choose the county the order is going to.",
   area: "Enter the area or estate the order is going to.",
   landmark: "Enter a landmark a rider can find, like a shop or a stage.",
@@ -201,11 +202,11 @@ export function readOrder(payload) {
 
     /* Named, and blocking. Never silently dropped. */
     if (product.stock === 0) {
-      return no(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it.`, "items");
+      return no(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it, or ${REACH}.`, "items");
     }
 
     if (qty > product.stock) {
-      return no(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again.`, "items");
+      return no(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again, or ${REACH}.`, "items");
     }
 
     const amount = product.price * qty;

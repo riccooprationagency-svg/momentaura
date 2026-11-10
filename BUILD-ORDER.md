@@ -427,11 +427,14 @@ what it blocks; a production build never emits it.
 | `/contact` | WhatsApp, phone, both email addresses, routes to `/track` and `/delivery` (phase-1-contact) | Hours → `contact.hours`. Never a response time |
 | `/privacy` | Everything | Nothing — it describes code, not facts |
 
-**phase-1-contact landed the number, and the function error copy is still open.**
-`/order`, `/checkout` and `/track` now carry it beside their errors in markup
-(`OrderHelp.astro`). The messages inside `/api/mpesa/stk` and `/api/mpesa/status` were
-left alone because that step was not allowed to touch payment code. What follows is the
-history.
+**phase-1-contact landed the number; phase-3-delivery-fees closed the function error
+copy.** `/order`, `/checkout` and `/track` carry it beside their errors in markup
+(`OrderHelp.astro`). Since phase 3 every order-level message written by `/api/mpesa/stk`,
+`/api/mpesa/status`, `/api/track` and `_order.js` carries it too, read from `site.json`
+through `functions/api/_site.js` (`REACH`), in one commit as planned below. Field-level
+corrections ("Enter the area…") do not: the fix is the buyer's, and OrderHelp sits beside
+the form. The blocked line on `/order` is written by the cart under its byte budget and
+also relies on OrderHelp beside it. What follows is the history.
 
 **`/contact` was the thinnest and the most expensive.** It offered no way to reach
 a human at all, because there is no real number and one that does not ring is worse than

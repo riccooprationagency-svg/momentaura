@@ -252,6 +252,9 @@ const ORDER = {
   landmark: "Blue gate beside the chemist",
 };
 
+const rawPushBody = (body, env = baseEnv()) =>
+  stk({ request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "POST", body }), env });
+
 const push = (body = ORDER, env = baseEnv()) =>
   stk({ request: new Request(`${ORIGIN}/api/mpesa/stk`, { method: "POST", body: JSON.stringify(body) }), env });
 
@@ -377,6 +380,30 @@ await check("a sold-out product is refused by name, and nothing is pushed", asyn
   eq(res.status, 409, "status");
   has((await res.json()).message, "Faith hoodie is sold out", "names the product");
   eq(pushes.length, 0, "no push was attempted");
+});
+
+/* CLAUDE.md: errors carry a phone number. The number is read from site.json
+   here as it is in _site.js, so a changed number changes both, and a message
+   that stops carrying it fails whatever the number is. */
+await check("EVERY ORDER-LEVEL ERROR CARRIES THE PHONE NUMBER FROM site.json", async () => {
+  const phone = globalThis.__site.contact.phone;
+  if (!phone) throw new Error("site.json contact.phone is empty — nothing to assert against");
+  const messages = [];
+  messages.push((await (await push({ ...ORDER, items: [{ slug: "faith-hoodie", qty: 1 }] })).json()).message);
+  messages.push((await (await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 7 }] })).json()).message);
+  messages.push((await (await push({ ...ORDER, items: [{ slug: "not-a-product", qty: 1 }] })).json()).message);
+  messages.push((await (await rawPushBody("{{{")).json()).message);
+  darajaMode = "token_down";
+  messages.push((await (await push()).json()).message);
+  darajaMode = "push_refused";
+  messages.push((await (await push()).json()).message);
+  for (const message of messages) has(message, phone, "the message");
+  for (const message of messages) lacks(message, "Message us", "the old route to /contact in place of a number");
+});
+
+await check("a field-level correction names the field and not the phone", async () => {
+  const message = (await (await push({ ...ORDER, area: "" })).json()).message;
+  lacks(message, globalThis.__site.contact.phone, "the area message");
 });
 
 await check("a quantity above stock is refused with the real figure", async () => {

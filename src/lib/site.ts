@@ -186,8 +186,9 @@ const CANDIDATES: (Gap & { value: unknown })[] = [
     value: site.contact.phone,
     what: "a number that rings and is answered",
     blocks:
-      "the Contact page, and the phone number CLAUDE.md requires on every error " +
-      "message in /api/mpesa/stk and /api/mpesa/status",
+      "the Contact page, OrderHelp on /order, /checkout and /track, and the phone " +
+      "number CLAUDE.md requires on every error message the Functions write " +
+      "(functions/api/_site.js REACH falls back to the contact page without it)",
   },
   {
     key: "contact.whatsapp",
