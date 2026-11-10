@@ -29,7 +29,11 @@
  *
  * The canonical origin is read from src/data/site.json, the same value that
  * drives the canonical link, og:url, the sitemap and robots.txt, so this file
- * cannot point somewhere the pages do not.
+ * cannot point somewhere the pages do not. With that value null or not a URL
+ * the pages omit every absolute URL, and this file does the same: it builds
+ * nothing at import time and passes every request through. A middleware that
+ * threw on load would take the whole site down, /api/ included, over a
+ * missing config value.
  *
  * COST. With this file present, Pages runs Functions in front of every request
  * rather than only /api/*. For every host but the one below, that is a hostname
@@ -41,9 +45,21 @@ import site from "../src/data/site.json" with { type: "json" };
 
 export const PRODUCTION_PAGES_HOST = "momentaura.pages.dev";
 
-const canonical = new URL(site.url);
+/* The canonical origin, or null. Never throws at load: a null or malformed
+   site.url leaves this null rather than escaping as an exception. try/catch
+   rather than URL.canParse, which not every Workers compatibility date has. */
+const CANONICAL_ORIGIN = (() => {
+  if (typeof site.url !== "string") return null;
+  try {
+    return new URL(site.url).origin;
+  } catch {
+    return null;
+  }
+})();
 
 export async function onRequest(context) {
+  if (CANONICAL_ORIGIN === null) return context.next();
+
   const { request } = context;
   const url = new URL(request.url);
 
@@ -55,8 +71,18 @@ export async function onRequest(context) {
 
   if (!redirect) return context.next();
 
-  /* Path and query preserved; only scheme, host and port change. */
-  const target = new URL(url.pathname + url.search, canonical.origin);
+  /* Path and query preserved; only scheme, host and port change.
+     The host is FIXED FIRST and the path is assigned to it, never parsed
+     against it. new URL(path, base) reads a path beginning "//" (or "///",
+     or "/\" which the parser normalises to "//") as a scheme-relative URL and
+     takes its host from the path, so https://momentaura.pages.dev//attacker.example
+     would have 301'd to attacker.example: an open redirect that starts with
+     the shop's own address. Assigning .pathname cannot change the host, so
+     the worst a hostile path can do is land on a 404 here.
+     scripts/redirect-test.mjs asserts the origin of every Location. */
+  const target = new URL(CANONICAL_ORIGIN);
+  target.pathname = url.pathname;
+  target.search = url.search;
 
   return new Response(null, {
     status: 301,

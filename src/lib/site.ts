@@ -294,8 +294,11 @@ export const organizationLd = () => ({
   "@type": "Organization",
   name: "MomentAura",
   /* The same origin the canonical, og:url, sitemap and robots.txt use, so the
-     five cannot disagree. */
-  url: required(origin(), "url"),
+     five cannot disagree. Omitted, not required, when site.json `url` is null:
+     every other absolute URL on the site omits itself in that mode, and a build
+     that threw here would make the domain a precondition for building at all.
+     V4's allowlist permits `url` without requiring it. */
+  ...(origin() === null ? {} : { url: origin() as string }),
   contactPoint: {
     "@type": "ContactPoint",
     telephone: phoneE164(),
