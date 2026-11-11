@@ -24,6 +24,29 @@ export interface Photo {
   height: number;
 }
 
+/**
+ * One size a product is made in, as Ric supplies it. Nothing here is a default.
+ *
+ * `sizes: []` means the product is ordered without one — a pendant, a one-size
+ * hat, or a garment whose sizes have not been supplied yet. Every product is
+ * [] today, because no size data has been given, and an invented S/M/L would
+ * be a claim about stock that does not exist.
+ *
+ * The label is what the buyer picks and what the order records. The two
+ * measurements are flat garment measurements in centimetres, null until
+ * measured. The size chart renders only when EVERY size has both: a chart with
+ * gaps asks the buyer to guess the missing row, which is the guess a chart is
+ * there to remove.
+ *
+ * functions/api/_order.js reads the same labels from products.json and refuses
+ * an order line whose size is not one of them.
+ */
+export interface Size {
+  label: string;
+  chestCm: number | null;
+  lengthCm: number | null;
+}
+
 export interface Product {
   slug: string;
   name: string;
@@ -36,7 +59,7 @@ export interface Product {
   dispatch: string | null;
   stock: number;
   photos: Photo[];
-  sizes: string[];
+  sizes: Size[];
   runSize?: number;
   runRemaining?: number;
   /** Optional and absent from the data, like the run fields above. No product
@@ -106,7 +129,36 @@ for (const product of products) {
       );
     }
   });
+
+  /* Sizes. The label is posted by the checkout form and matched exactly by the
+     server, so it is held to a short, printable string; a duplicate would make
+     two options that the order cannot tell apart. */
+  if (!Array.isArray(product.sizes)) {
+    throw new Error(`products.json: "${product.slug}" has no sizes array. Use [] for none.`);
+  }
+  const labels = new Set<string>();
+  product.sizes.forEach((size, i) => {
+    const where = `products.json: "${product.slug}" sizes[${i}]`;
+    const label = size?.label;
+    if (typeof label !== "string" || !/^[\w .\/-]{1,20}$/.test(label) || label.trim() !== label) {
+      throw new Error(`${where} needs a label of 1 to 20 letters, digits, spaces, dots, slashes or dashes.`);
+    }
+    if (labels.has(label)) throw new Error(`${where} repeats the label "${label}".`);
+    labels.add(label);
+    for (const key of ["chestCm", "lengthCm"] as const) {
+      const cm = size[key];
+      if (cm !== null && !(typeof cm === "number" && Number.isFinite(cm) && cm > 0)) {
+        throw new Error(`${where} ${key} is ${JSON.stringify(cm)} — a measurement in cm, or null until measured.`);
+      }
+    }
+  });
 }
+
+/** The size chart's rows, or null unless every size has both measurements. */
+export const sizeChart = (product: Product): Size[] | null =>
+  product.sizes.length > 0 && product.sizes.every((s) => s.chestCm !== null && s.lengthCm !== null)
+    ? product.sizes
+    : null;
 
 /** Integer KSh in the data, formatted only at the edge. */
 export const price = (value: number): string => `KSh ${value.toLocaleString("en-KE")}`;

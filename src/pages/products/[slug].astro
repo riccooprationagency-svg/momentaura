@@ -9,13 +9,13 @@
 //                    products.json as one 3:4 stack, and photos is [] on all
 //                    five, so what renders today is still the one kraft block
 //   Spec table       fabric weight, fit and print method are all null
-//   Size chart       no measurements, and sizes[] is empty on every product
 //   Box-opening      no image sequence, and it is the one elaborate moment on
 //                    the site — it arrives with real frames or not at all
-//   Size selector    sizes[] is empty on every product. An inert selector over
-//                    no options is worse than no selector: it is a control that
-//                    cannot be operated, on the page where the buyer is deciding
-//                    whether this shop works
+//
+// Built in phase 4 and dormant until there is data: the sizes line and the size
+// chart below render from sizes[], which is empty on every product. The size
+// itself is chosen at checkout, on the order line it sizes, not here — see the
+// note at the sizes line.
 //   Quantity         BUILD-ORDER named it, the step 6 ruling does not, and it
 //                    belongs with the cart in step 7 where a quantity has
 //                    somewhere to go. Step 7 put it there: the steppers live on
@@ -39,6 +39,7 @@ import {
   categories,
   products,
   relatedTo,
+  sizeChart,
   systemFor,
   price,
   type Category,
@@ -72,6 +73,7 @@ const system = systemFor(product);
 // page renders the closed state in practice; the open branch is the same
 // condition read the other way, not a second design.
 const soldOut = product.stock === 0;
+const chart = sizeChart(product);
 
 const meta = [product.name, price(product.price)].join(", ");
 const description = product.dispatch ? `${meta}. Dispatched from ${product.dispatch}.` : `${meta}.`;
@@ -129,16 +131,30 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
           functions/api/mpesa/stk.js re-reads stock from the catalogue and is
           what actually stops the order.
         -->
-        <Button
-          variant="filled"
-          disabled={soldOut}
-          data-add
-          data-slug={product.slug}
-          data-stock={product.stock}
-          describedby={soldOut ? "detail-closed" : undefined}
-        >
-          Add to order
-        </Button>
+        <!--
+          SOLD OUT IS A STATE, NOT A VERB. A sold-out product renders a disabled
+          control that says "Sold out" — never "Add to order", which an outlined
+          pill makes read as one more button to press. It is still rendered
+          rather than removed, still aria-disabled, and still points at the line
+          below that says why.
+
+          It carries no data-add, so the cart script never binds to it or
+          relabels it: there is no add handler on this page to defeat, and a
+          hand-edited order cannot make it read "Added to order". The label is
+          muted mono — CLAUDE.md's register for a short sold-out status beside a
+          product page action — and the Seal fill stays in the docket above.
+        -->
+        {
+          soldOut ? (
+            <Button variant="filled" disabled describedby="detail-closed">
+              <span class="detail__soldout">Sold out</span>
+            </Button>
+          ) : (
+            <Button variant="filled" data-add data-slug={product.slug} data-stock={product.stock}>
+              Add to order
+            </Button>
+          )
+        }
 
         {
           soldOut && (
@@ -158,6 +174,45 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
           It is the route onward: the button keeps its verb and says "Added to
           order", and this says how many and where they are.
         -->
+        <!--
+          SIZES, from products.json and nowhere else. The size is chosen at
+          checkout on the line it sizes, from a native <select> that posts with
+          the form: the cart script is held to a byte budget, and a picker here
+          would mean carrying a size through storage, the order page and back.
+          Saying so here is what keeps the buyer from looking for it.
+        -->
+        {
+          product.sizes.length > 0 && (
+            <p class="detail__sizes">
+              Sizes: {product.sizes.map((s) => s.label).join(", ")}. You choose one at checkout.
+            </p>
+          )
+        }
+
+        {
+          chart && (
+            <table class="detail__chart">
+              <caption class="detail__chart-caption">Size chart, in centimetres</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Size</th>
+                  <th scope="col">Chest</th>
+                  <th scope="col">Length</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chart.map((size) => (
+                  <tr>
+                    <th scope="row">{size.label}</th>
+                    <td>{size.chestCm}</td>
+                    <td>{size.lengthCm}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        }
+
         <p class="detail__added" data-added hidden>
           <span data-added-count>0</span> in your order. <a href="/order">See your order</a>.
         </p>
@@ -275,7 +330,52 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     justify-self: stretch;
   }
 
+  /* Short status beside an action: muted mono, uppercase, no fill. The muted
+     colour and outline come from the button's own disabled state. */
+  .detail__soldout {
+    font-family: var(--font-mono);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .detail__chart {
+    justify-self: stretch;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .detail__chart-caption {
+    text-align: start;
+    font-family: var(--font-sans);
+    font-size: var(--t-label);
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    padding-block-end: var(--s-8);
+  }
+
+  .detail__chart th,
+  .detail__chart td {
+    text-align: start;
+    padding-block: var(--s-8);
+    padding-inline-end: var(--s-20);
+    border-block-end: 1px solid var(--border);
+  }
+
+  /* A <th> is bold by default, which is over the 500 ceiling. */
+  .detail__chart th {
+    font-weight: var(--w-regular);
+  }
+
+  .detail__chart thead th {
+    color: var(--fg-muted);
+    text-transform: uppercase;
+  }
+
   .detail__closed,
+  .detail__sizes,
   .detail__added,
   .detail__ask,
   .detail__terms {
