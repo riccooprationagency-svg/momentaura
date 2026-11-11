@@ -33,6 +33,7 @@
 
 import catalogue from "../../src/data/products.json";
 import { msisdnFrom } from "./_order.js";
+import { ELSEWHERE, REACH } from "./_site.js";
 import { getPending, refKey } from "./_pending.js";
 import { addressOf, overBudget, recordMiss, secondsUntilReset } from "./_throttle.js";
 
@@ -51,7 +52,7 @@ const REFERENCE = /^MA-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 const NOT_FOUND =
   "That order cannot be found. Check the reference and the phone number — the " +
   "reference is on your confirmation screen, and the phone number is the one the " +
-  "payment went through. If both are right, get in touch on the contact page.";
+  `payment went through. If both are right, ${REACH}.${ELSEWHERE}`;
 
 /* Nairobi is UTC+3 all year — Kenya keeps no daylight saving — so the offset is
  * a constant rather than a lookup. */
@@ -117,6 +118,38 @@ function dispatchDate(record) {
   return LONG_DATE.format(workingDaysFrom(from, longest));
 }
 
+/* Matches price() in src/lib/products.ts and money() in the cart: integer KSh,
+ * en-KE grouping. A third copy, because this side of the wire cannot import
+ * either; the format is one line and the comment is the link between them. */
+const money = (value) => `KSh ${value.toLocaleString("en-KE")}`;
+
+/* What the order cost and where it is going, AS IT WAS RECORDED — read off the
+ * stored order, never recomputed from today's catalogue or fee table, because
+ * the buyer is checking what they were charged, not what it would cost now.
+ *
+ * Already formatted, so the page can put each value straight into its slot
+ * with textContent and the cart carries no formatting for it. Every key is a
+ * slot on /track; a key that is absent hides its line, which is how an order
+ * placed before delivery fees existed shows a total and nothing it does not
+ * have.
+ *
+ * THE LANDMARK IS NOT HERE, and must not be added. It is for the rider. A
+ * reference read aloud or screenshotted, plus a phone number, should not be
+ * enough to learn exactly where somebody's front gate is. County and area are
+ * what a buyer needs to recognise their own order. */
+function breakdown(record) {
+  const out = {};
+  const d = record.delivery;
+  if (d && typeof d === "object") {
+    if (typeof d.label === "string") out.county = d.label;
+    if (typeof d.area === "string") out.area = d.area;
+    if (Number.isInteger(d.fee)) out.fee = d.fee === 0 ? "Free" : money(d.fee);
+  }
+  if (Number.isInteger(record.subtotal)) out.subtotal = money(record.subtotal);
+  if (Number.isInteger(record.amount)) out.total = money(record.amount);
+  return out;
+}
+
 const json = (status, body, extra) =>
   new Response(JSON.stringify(body), {
     status,
@@ -151,8 +184,8 @@ export async function onRequest({ request, env }) {
       {
         message:
           `Too many lookups from this connection have come back empty. Try again in ` +
-          `${minutes} ${minutes === 1 ? "minute" : "minutes"}, or get in touch on the ` +
-          `contact page and the order will be looked up by hand.`,
+          `${minutes} ${minutes === 1 ? "minute" : "minutes"}, or ${REACH} and the order ` +
+          `will be looked up by hand.${ELSEWHERE}`,
       },
       { "Retry-After": String(wait) }
     );
@@ -162,7 +195,7 @@ export async function onRequest({ request, env }) {
   try {
     payload = await request.json();
   } catch {
-    return json(400, { message: "That request could not be read." });
+    return json(400, { message: `That request could not be read. Try again, or ${REACH}.` });
   }
 
   const reference = payload && typeof payload.reference === "string" ? payload.reference.trim().toUpperCase() : "";
@@ -190,7 +223,7 @@ export async function onRequest({ request, env }) {
   } catch (error) {
     console.log(JSON.stringify({ at: "track", code: "kv_read_failed", detail: String(error) }));
     return json(503, {
-      message: "Orders cannot be looked up right now. Try again shortly.",
+      message: `Orders cannot be looked up right now. Try again shortly, or ${REACH}.`,
     });
   }
 
@@ -216,6 +249,7 @@ export async function onRequest({ request, env }) {
     placedAt: record.createdAt ?? null,
     amount: record.amount,
     items: Array.isArray(record.items) ? record.items : [],
+    breakdown: breakdown(record),
     ...(dispatch ? { dispatchDate: dispatch } : {}),
   });
 }

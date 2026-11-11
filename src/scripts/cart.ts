@@ -204,12 +204,19 @@ const totalValue = q("[data-order-total]");
 const blockedNote = q("[data-order-blocked]");
 const checkout = q("[data-checkout]");
 
+/* The county <select>: the live one on /checkout, and a hidden copy of the same
+ * options on /order-received that the snapshot's county key is set into. Either
+ * way, the fee is read off the chosen option's data-fee — rendered from
+ * site.json at build time, the same way a line's price is — and never out of
+ * storage. */
+const county = q<HTMLSelectElement>("[name=county]");
+
 /* Read once, before anything can strip it. A blocked checkout drops its href
  * rather than leaning on aria-disabled to stop navigation — the rule
  * Button.astro already encodes for the build-time case, applied at runtime. */
 const checkoutHref = checkout ? checkout.getAttribute("href") : null;
 
-const text = (root: HTMLElement, selector: string, value: string): void => {
+const text = (root: ParentNode, selector: string, value: string): void => {
   const node = q(selector, root);
   if (node) node.textContent = value;
 };
@@ -258,6 +265,26 @@ function paintLines(quantities: Order): HTMLElement[] {
   }
 
   if (totalValue) totalValue.textContent = money(total);
+
+  /* DELIVERY, AS A PREVIEW. Only once a county is chosen — the placeholder
+   * option carries no data-fee — so the page never shows a total that is
+   * missing its fee; until then the Delivery and Total lines keep the page's
+   * own "Choose a county". The fee charged is recomputed by the server from
+   * the county key, never read from here. Free is written as Free. */
+  const fee = county?.selectedOptions[0]?.dataset.fee;
+  if (fee) {
+    const due = money(total + +fee);
+    text(document, "[data-order-fee]", +fee ? money(+fee) : "Free");
+    text(document, "[data-order-due]", due);
+    /* Not while a submit is in flight: the button is saying "Sending the
+     * payment prompt" then, and send() restores the label it captured, so the
+     * submit handler repaints after every restore instead (below). Without
+     * both halves, a county changed mid-request left the button promising the
+     * old total next to a summary showing the new one. */
+    if (submitButton && submitButton.getAttribute(OFF) !== "true") {
+      submitButton.textContent = `${submitButton.dataset.pay} — ${due}`;
+    }
+  }
   return shown;
 }
 
@@ -365,6 +392,8 @@ if (lines.length) {
     }
   }
 
+  county?.addEventListener("change", paintOrder);
+
   const clear = document.querySelector("[data-clear]");
   if (clear) {
     clear.addEventListener("click", () => {
@@ -448,10 +477,10 @@ const setFieldError = (field: string, message: string | null) => {
 };
 
 /* Both forms clear the same way: every field message off, then the one above
- * the button. Taking the fields and the slot as arguments is what stops that
- * being written twice with two chances to forget the second half. */
-const clearErrors = (fields: string[], slot: HTMLElement | null) => {
-  for (const field of fields) setFieldError(field, null);
+ * the button. Every field on the page rather than a list per form — each page
+ * carries one form, and a list is a second place to forget a new field. */
+const clearErrors = (slot: HTMLElement | null) => {
+  for (const field of qa("[data-field-error]")) setFieldError(field.dataset.fieldError!, null);
   if (slot) {
     slot.textContent = "";
     slot.hidden = true;
@@ -508,7 +537,7 @@ if (form && submitButton) {
     event.preventDefault();
     if (submitButton.getAttribute(OFF) === "true") return;
 
-    clearErrors(["name", "phone", "email"], formError);
+    clearErrors(formError);
 
     const data = new FormData(form);
     const items = Object.entries(order).map(([slug, qty]) => ({ slug, qty }));
@@ -518,12 +547,17 @@ if (form && submitButton) {
       submitButton,
       "Sending the payment prompt",
       "/api/mpesa/stk",
-      { items, name: data.get("name"), phone: data.get("phone"), email: data.get("email") },
+      /* Every field the form has — name, phone, email, county, area, landmark
+       * — by name, plus the items. No price and no fee: the server reads neither
+       * and the form has no field for either. */
+      { items, ...Object.fromEntries(data) },
       formError,
       "The connection dropped before the payment prompt could be sent. " +
         "Nothing has been charged. Check your connection and try again."
     );
-    if (!sent) return;
+    /* send() has already restored the label it captured; repaint so the
+     * button states the total for the county chosen now. */
+    if (!sent) return paintOrder();
 
     const body = sent.body as {
       message?: string;
@@ -546,6 +580,9 @@ if (form && submitButton) {
             reference: body.reference,
             checkoutRequestId: body.checkoutRequestId,
             items,
+            /* A key, like a slug — never the fee. The confirmation looks the
+             * fee up from the options rendered into its own page. */
+            county: data.get("county"),
             at: Date.now(),
           })
         );
@@ -560,6 +597,7 @@ if (form && submitButton) {
     }
 
     sent.restore();
+    paintOrder();
 
     const message = body.message ?? "That did not go through. Nothing has been charged.";
     if (body.field && body.field !== "items") {
@@ -595,7 +633,7 @@ if (trackForm && trackButton && trackResult) {
      * so hiding only the result leaves the last answer on screen underneath a
      * connection error — a buyer reading "that order cannot be found" about an
      * attempt that never reached the server. */
-    clearErrors(["reference", "trackphone"], trackError);
+    clearErrors(trackError);
     trackResult.hidden = true;
     for (const state of qa("[data-status]")) state.hidden = true;
 
@@ -605,7 +643,9 @@ if (trackForm && trackButton && trackResult) {
       trackButton,
       "Looking for the order",
       "/api/track",
-      { reference: data.get("reference"), phone: data.get("trackphone") },
+      /* The form's own fields by name — reference and phone, which are the
+       * two names the endpoint reads. */
+      Object.fromEntries(data),
       trackError,
       "The connection dropped before the order could be looked up. Check your connection and try again."
     );
@@ -618,6 +658,7 @@ if (trackForm && trackButton && trackResult) {
       reference?: string;
       dispatchDate?: string;
       items?: { slug: string; qty: number }[];
+      breakdown?: Record<string, string>;
       message?: string;
       field?: string;
     };
@@ -636,11 +677,11 @@ if (trackForm && trackButton && trackResult) {
 
     if (outcome === null) {
       /* A 400 the buyer can fix, or a 503 they cannot. Both belong above the
-       * button, except the two fields they typed themselves. */
+       * button, except the two fields they typed themselves — which the server
+       * names by the same names the form uses, so no translation is needed. */
       const message = body.message ?? "That order could not be looked up.";
-      if (body.field === "reference" || body.field === "phone") {
-        setFieldError(body.field === "phone" ? "trackphone" : "reference", message);
-      } else say(trackError, message);
+      if (body.field) setFieldError(body.field, message);
+      else say(trackError, message);
       return;
     }
 
@@ -664,6 +705,17 @@ if (trackForm && trackButton && trackResult) {
     }
 
     paintLines(toOrder(body.items));
+
+    /* County, area, subtotal, delivery and total, as recorded and already
+     * formatted by the server. Each [data-fill] names its key; one the server
+     * did not send hides its line, which is how an order placed before
+     * delivery fees shows a total and nothing it does not have. textContent,
+     * so an area typed as markup arrives as the text it is. */
+    for (const slot of qa("[data-fill]")) {
+      const value = body.breakdown?.[slot.dataset.fill!];
+      slot.textContent = value ?? "";
+      slot.parentElement!.hidden = !value;
+    }
 
     trackResult.hidden = false;
   });
@@ -740,6 +792,7 @@ function paintReceived(): void {
     reference?: string;
     checkoutRequestId?: string;
     items?: { slug: string; qty: number }[];
+    county?: string;
   } | null = null;
   try {
     const raw = window.localStorage.getItem(PLACED);
@@ -764,6 +817,11 @@ function paintReceived(): void {
 
     const refSlot = q("[data-received-ref]");
     if (refSlot) refSlot.textContent = snapshot.reference ?? "";
+
+    /* A key that matches no option selects nothing, so a missing or edited
+     * one leaves the Delivery and Total lines on the page's own wording
+     * rather than showing a fee for somewhere else. */
+    if (county) county.value = snapshot.county!;
 
     let longest = 0;
     let everyLineHasLead = true;

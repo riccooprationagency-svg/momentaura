@@ -1,0 +1,38 @@
+---
+// "Delivery from KSh 0 in Nairobi CBD. See delivery fees."
+//
+// The figure and the place are read off the cheapest row of the fee table, not
+// written here, so the sentence cannot go on naming a free zone after the table
+// stops having one. With no fee table it renders nothing — the same omission
+// /delivery makes — rather than a sentence with a hole in it.
+//
+// Prose in Archivo, muted, like the delivery-terms line it sits beside on /order
+// and on the product page.
+import { cheapestZone } from "../lib/site";
+import { price } from "../lib/products";
+
+const zone = cheapestZone();
+---
+
+{
+  zone && (
+    <p class="delivery-from">
+      Delivery from {price(zone.cost)} in {zone.name}. <a href="/delivery#fees">See delivery fees</a>.
+    </p>
+  )
+}
+
+<style>
+  .delivery-from {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+    margin-block-start: var(--s-12);
+  }
+
+  /* A standalone route, so a full thumb-sized target. */
+  .delivery-from a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+</style>

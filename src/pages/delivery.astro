@@ -16,11 +16,10 @@
 // describes what the code does rather than a fact only Ric holds.
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
-import { site, known, phoneDisplay, telHref, whatsappHref } from "../lib/site";
-import { price } from "../lib/products";
+import { site, known, feeText, phoneDisplay, telHref, whatsappHref, zonesByRegion } from "../lib/site";
 
-const zones = site.delivery.zones;
-const hasZones = known(zones);
+const hasZones = known(site.delivery.zones);
+const regions = zonesByRegion();
 const hasDispatch = known(site.delivery.dispatchFrom);
 // Both halves or neither. A window with no condition, or a condition with no
 // window, is half a promise.
@@ -72,29 +71,55 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
       }
 
       {
+        /*
+          The fee table, from site.json delivery.zones — the same rows the
+          checkout select is built from and the server prices by, so the figure
+          read here is the figure charged.
+
+          One <details> per region, Nairobi first and open: it is where most
+          orders go, and 48 rows in one table is a wall on a phone. Native
+          disclosure, so every fee is readable with JavaScript off, and a
+          browser's find-in-page opens a closed region to a match.
+
+          No delivery time is stated, here or anywhere. None has been supplied
+          for any county, and a duration nobody can hold the shop to is the
+          kind of claim this page exists not to make.
+        */
         hasZones && (
-          <>
+          <section id="fees" class="fees" aria-labelledby="fees-heading">
             <hr class="page__hair" />
-            <h2 class="page__sub">Areas and cost</h2>
-            <table class="zones">
-              <thead>
-                <tr>
-                  <th scope="col">Area</th>
-                  <th scope="col">Cost</th>
-                  <th scope="col">Working days</th>
-                </tr>
-              </thead>
-              <tbody>
-                {zones.map((zone) => (
-                  <tr>
-                    <td>{zone.name}</td>
-                    <td class="zones__figure">{price(zone.cost)}</td>
-                    <td class="zones__figure">{zone.days}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
+            <h2 class="page__sub" id="fees-heading">Delivery fees</h2>
+            <p class="page__body">
+              One fee per order, not per item, set by the county the order is going to.
+              Choose the county at checkout and the fee is added to the total before the
+              M-Pesa prompt is sent.
+            </p>
+            {regions.map(({ region, zones }, i) => (
+              <details class="fees__region" open={i === 0}>
+                <summary class="fees__summary">{region}</summary>
+                <table class="zones">
+                  <thead>
+                    <tr>
+                      <th scope="col">County</th>
+                      <th scope="col">Fee per order</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {zones.map((zone) => (
+                      <tr>
+                        <td>{zone.name}</td>
+                        <td class="zones__figure">{feeText(zone.cost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            ))}
+            <p class="page__body fees__note">
+              Towns outside Nairobi County, such as Ruiru, Kitengela, Rongai or Ngong, take
+              the fee of the county they are in.
+            </p>
+          </section>
         )
       }
 
@@ -204,6 +229,28 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
     text-align: start;
     padding-block: var(--s-12);
     border-block-end: 1px dashed var(--border);
+  }
+
+  .fees__region {
+    border-block-end: 1px solid var(--border);
+  }
+
+  /* The whole row is the control, at a full thumb-sized height. The platform's
+     disclosure marker stays: it is the only thing that says the row opens. */
+  .fees__summary {
+    display: list-item;
+    min-height: var(--tap-target);
+    padding-block: var(--s-12);
+    font-size: var(--t-body-sm);
+    cursor: pointer;
+  }
+
+  .fees__region .zones {
+    margin-block-end: var(--s-20);
+  }
+
+  .fees__note {
+    margin-block-start: var(--s-20);
   }
 
   .zones__figure {

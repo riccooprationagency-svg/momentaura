@@ -56,7 +56,7 @@ import { products, price } from "../lib/products";
         />
 
         <Field
-          name="trackphone"
+          name="phone"
           label="Phone"
           type="tel"
           inputmode="tel"
@@ -161,9 +161,41 @@ import { products, price } from "../lib/products";
           }
         </ul>
 
+        <!--
+          Where it is going and what it cost, AS RECORDED when the order was
+          placed — the server reads these off the stored order rather than
+          today's fee table. Each [data-fill] is one key of the response's
+          breakdown, already formatted; the cart hides any line whose key did
+          not come back, so an order from before delivery fees shows its total
+          and no empty rows.
+
+          Not the landmark. That is for the rider, and the server never sends
+          it: a reference and a phone number should not be enough to learn
+          where somebody's gate is.
+
+          No [data-order-total] here on purpose. That hook is the cart's own
+          sum of the lines at today's prices; on this page the figures are the
+          ones the buyer was charged.
+        -->
+        <p class="track__row">
+          <span class="track__total-label">County</span>
+          <span class="track__row-text" data-fill="county"></span>
+        </p>
+        <p class="track__row">
+          <span class="track__total-label">Area or estate</span>
+          <span class="track__row-text" data-fill="area"></span>
+        </p>
+        <p class="track__row">
+          <span class="track__total-label">Subtotal</span>
+          <span class="track__total-value" data-fill="subtotal"></span>
+        </p>
+        <p class="track__row">
+          <span class="track__total-label">Delivery</span>
+          <span class="track__total-value" data-fill="fee"></span>
+        </p>
         <p class="track__total">
           <span class="track__total-label">Total</span>
-          <span class="track__total-value" data-order-total>KSh 0</span>
+          <span class="track__total-value" data-fill="total"></span>
         </p>
       </div>
 
@@ -323,6 +355,7 @@ import { products, price } from "../lib/products";
     font-variant-numeric: tabular-nums;
   }
 
+  .track__row,
   .track__total {
     display: flex;
     justify-content: space-between;
@@ -330,8 +363,27 @@ import { products, price } from "../lib/products";
     gap: var(--s-20);
     font-family: var(--font-mono);
     letter-spacing: var(--tr-docket);
+  }
+
+  .track__row {
+    margin-block-end: var(--s-8);
+  }
+
+  .track__total {
     border-block-start: 1px dashed var(--border);
     padding-block-start: var(--s-16);
+  }
+
+  /* A county and an area are names, not figures, so they are set in Archivo:
+     the typeface switch to mono is reserved for the reader looking at a
+     number. Right-aligned to sit in the same column as the amounts, and
+     allowed to wrap, because an estate name can be longer than the space. */
+  .track__row-text {
+    font-family: var(--font-sans);
+    font-size: var(--t-body-sm);
+    letter-spacing: normal;
+    text-align: end;
+    overflow-wrap: anywhere;
   }
 
   .track__total-label {

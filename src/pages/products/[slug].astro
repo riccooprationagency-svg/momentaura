@@ -33,6 +33,7 @@ import Docket from "../../components/Docket.astro";
 import Button from "../../components/Button.astro";
 import ProductCard from "../../components/ProductCard.astro";
 import Gallery from "../../components/Gallery.astro";
+import DeliveryFrom from "../../components/DeliveryFrom.astro";
 import { whatsappHref } from "../../lib/site";
 import {
   categories,
@@ -177,6 +178,7 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
         <p class="detail__terms">
           Delivery dates and returns are on the <a href="/delivery">delivery terms</a> page.
         </p>
+        <DeliveryFrom />
       </div>
     </div>
   </section>

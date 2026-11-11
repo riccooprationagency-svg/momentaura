@@ -17,6 +17,7 @@
  */
 
 import catalogue from "../../src/data/products.json";
+import { REACH, ZONES } from "./_site.js";
 
 /* Same ceiling the cart applies on read. A request is not the cart, so it is
    restated here rather than assumed. */
@@ -39,24 +40,50 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
 
+/* Where it is going. Long enough for "Kahawa Sukari, off Thika Road" and for a
+ * landmark a rider can find, short enough that nothing absurd is stored against
+ * an order or read out over the phone. */
+export const MAX_AREA = 80;
+export const MAX_LANDMARK = 120;
+
+/* Typed text, made one line. Runs of whitespace (a pasted newline, a tab) become
+ * one space; anything else below 0x20, and DEL, refuses the field rather than
+ * being stored, because there is no honest reading of a control character in an
+ * estate name. Rendering is escaped wherever it happens — Astro escapes, and the
+ * cart writes through textContent — so this is about storing clean data, not
+ * about being the only defence against markup. Returns null when the value is
+ * not a string, is shorter than two characters, or is longer than `max`. */
+function line(value, max) {
+  if (typeof value !== "string") return null;
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length < 2 || clean.length > max) return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(clean)) return null;
+  return clean;
+}
+
 /* What is wrong with the request. Every message says what happened and what to
  * do about it, and none of them says "something went wrong".
  *
  * What HAPPENED TO THE MONEY is not here — that is different per gateway and
  * each endpoint owns its own wording for it.
  *
- * PHONE NUMBER: CLAUDE.md requires one on an error. There is no real number
- * anywhere in this repo and inventing one is the dishonesty the whole site
- * exists to remove — a number that does not ring is worse than no number. These
- * route to /contact, which BUILD-ORDER section 10 owns, and the number lands in
- * all of them at once when that page does. */
+ * PHONE NUMBER: CLAUDE.md requires one on an error. The messages about the
+ * order as a whole carry it, from site.json through _site.js. The ones naming a
+ * single field the buyer typed do not: the fix is in their own hands, the
+ * message sits under that field, and the page carries the number beside the
+ * form in markup (OrderHelp.astro). A phone number under every mistyped email
+ * address is noise, not help. */
 export const MESSAGES = {
-  bad_request: "That order could not be read. Go back to your order and try again.",
+  bad_request: `That order could not be read. Go back to your order and try again, or ${REACH}.`,
   empty: "There is nothing in your order yet.",
   name: "Enter the name the order is for.",
   phone: "Enter a Kenyan phone number, like 0712 345 678. M-Pesa sends the prompt to it.",
   email: "That email address does not look right. Leave it blank if you would rather not give one.",
-  gone: "One of the items in your order is no longer available. Go back to your order and remove it.",
+  gone: `One of the items in your order is no longer available. Go back to your order and remove it, or ${REACH}.`,
+  county: "Choose the county the order is going to.",
+  area: "Enter the area or estate the order is going to.",
+  landmark: "Enter a landmark a rider can find, like a shop or a stage.",
 };
 
 /* Order reference. Unambiguous read-aloud alphabet: no O/0, no I/1, no S/5,
@@ -89,9 +116,18 @@ const no = (status, message, field) => ({ ok: false, status, message, field });
 /**
  * Reads and re-prices an order request.
  *
+ * DELIVERY IS PRICED HERE TOO, by county key, from the fee table in site.json
+ * (via _site.js). The request names a county; it never names a fee. A `fee`,
+ * `delivery`, `subtotal` or `total` in the payload is not destructured and
+ * not read — the same rule as price, for the same reason.
+ *
+ * One flat fee per order, not per item.
+ *
  * @param {unknown} payload  whatever came off the wire, already JSON-parsed
  * @returns {{ok: true, name: string, email: string|null, msisdn: string,
  *            lines: {slug: string, name: string, qty: number, price: number, amount: number}[],
+ *            subtotal: number,
+ *            delivery: {county: string, label: string, area: string, landmark: string, fee: number},
  *            total: number}
  *          | {ok: false, status: number, message: string, field?: string}}
  */
@@ -100,7 +136,7 @@ export function readOrder(payload) {
     return no(400, MESSAGES.bad_request);
   }
 
-  const { items, name, phone, email } = payload;
+  const { items, name, phone, email, county, area, landmark } = payload;
 
   if (!Array.isArray(items) || items.length === 0) return no(400, MESSAGES.empty, "items");
   if (items.length > MAX_LINES) return no(400, MESSAGES.bad_request, "items");
@@ -122,11 +158,26 @@ export function readOrder(payload) {
     }
   }
 
+  /* ---------- where it is going ---------- */
+
+  /* A key from the table, or refused. An unknown key is never priced at zero or
+     at a default: a county this shop has no fee for is one it has not agreed to
+     deliver to. Own-property lookup on a Map, so "__proto__" and friends are
+     simply unknown keys. */
+  const zone = typeof county === "string" ? ZONES.get(county) : undefined;
+  if (!zone) return no(400, MESSAGES.county, "county");
+
+  const cleanArea = line(area, MAX_AREA);
+  if (cleanArea === null) return no(400, MESSAGES.area, "area");
+
+  const cleanLandmark = line(landmark, MAX_LANDMARK);
+  if (cleanLandmark === null) return no(400, MESSAGES.landmark, "landmark");
+
   /* ---------- re-price from our own catalogue ---------- */
 
   const lines = [];
   const seen = new Set();
-  let total = 0;
+  let subtotal = 0;
 
   for (const item of items) {
     if (item === null || typeof item !== "object") return no(400, MESSAGES.bad_request, "items");
@@ -151,19 +202,34 @@ export function readOrder(payload) {
 
     /* Named, and blocking. Never silently dropped. */
     if (product.stock === 0) {
-      return no(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it.`, "items");
+      return no(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it, or ${REACH}.`, "items");
     }
 
     if (qty > product.stock) {
-      return no(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again.`, "items");
+      return no(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again, or ${REACH}.`, "items");
     }
 
     const amount = product.price * qty;
-    total += amount;
+    subtotal += amount;
     lines.push({ slug, name: product.name, qty, price: product.price, amount });
   }
 
-  if (total <= 0) return no(400, MESSAGES.empty, "items");
+  if (subtotal <= 0) return no(400, MESSAGES.empty, "items");
 
-  return { ok: true, name: cleanName, email: cleanEmail, msisdn, lines, total };
+  /* Whole KSh, both halves computed here. A free-delivery county adds 0, and the
+     guard below is what stops a zero-amount push ever reaching Daraja however
+     the two halves change later. */
+  const total = subtotal + zone.cost;
+  if (!Number.isInteger(total) || total <= 0) return no(400, MESSAGES.empty, "items");
+
+  return {
+    ok: true,
+    name: cleanName,
+    email: cleanEmail,
+    msisdn,
+    lines,
+    subtotal,
+    delivery: { county: zone.key, label: zone.name, area: cleanArea, landmark: cleanLandmark, fee: zone.cost },
+    total,
+  };
 }

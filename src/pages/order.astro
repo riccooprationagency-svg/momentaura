@@ -32,6 +32,7 @@
 import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
 import OrderHelp from "../components/OrderHelp.astro";
+import DeliveryFrom from "../components/DeliveryFrom.astro";
 import { products, price } from "../lib/products";
 
 // Light. Every product renders light while photography is missing, and an order
@@ -123,10 +124,16 @@ import { products, price } from "../lib/products";
 
         <hr class="order__hair" />
 
+        <!--
+          Subtotal, not Total: the delivery fee depends on the county, which is
+          chosen at checkout, so the figure here is the items alone and says so
+          beside itself rather than in a footnote.
+        -->
         <p class="order__total">
-          <span class="order__total-label">Total</span>
+          <span class="order__total-label">Subtotal</span>
           <span class="order__total-value" data-order-total>KSh 0</span>
         </p>
+        <p class="order__fee-note">Delivery is calculated at checkout.</p>
 
         <!--
           The blocked state. Specific, and it names the product — a general
@@ -166,6 +173,7 @@ import { products, price } from "../lib/products";
             href="/delivery">delivery terms</a> page. Nothing is charged until you confirm
           payment.
         </p>
+        <DeliveryFrom />
       </div>
 
       <div class="order__help">
@@ -344,6 +352,15 @@ import { products, price } from "../lib/products";
   .order__total-value {
     font-size: var(--t-body-sm);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Directly under the figure it qualifies, aligned with it, so the two read
+     as one statement: this is the items, and delivery comes next. */
+  .order__fee-note {
+    font-size: var(--t-caption);
+    color: var(--fg-muted);
+    text-align: end;
+    margin-block-start: var(--s-8);
   }
 
   /* Prose. A sentence explaining why the order cannot be sent is Archivo at

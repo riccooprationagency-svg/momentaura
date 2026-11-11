@@ -20,13 +20,24 @@ import data from "../data/site.json";
  * dispatch "Nairobi".
  */
 
+/* One delivery fee row. THE FEE TABLE EXISTS ONCE, HERE IN site.json, and is
+ * read by three things that must never disagree: the /delivery table, the
+ * county <select> on /checkout, and functions/api/_site.js, which is what the
+ * server prices an order from. The form and the server speak in `key` and never
+ * in `name`: a label is copy and can be reworded, a key is a contract.
+ *
+ * There is no working-day count on a zone. The step 10 shape carried one, and
+ * no delivery duration has been supplied for any area, so a field that could
+ * only ever hold a guess was removed rather than left waiting for one. */
 export interface Zone {
+  /** Stable machine key, e.g. "nairobi-cbd". The form posts it; the server prices by it. */
+  key: string;
+  /** The group it is listed under on /delivery and at checkout, e.g. "Central". */
+  region: string;
   /** What a buyer would recognise as their area. */
   name: string;
-  /** Integer KSh, like every other price in this repo. */
+  /** Integer KSh, per order rather than per item, like every other price in this repo. 0 is free. */
   cost: number;
-  /** Working days from dispatch. Rendered as a date wherever a buyer acts on it. */
-  days: number;
 }
 
 export interface Site {
@@ -89,6 +100,39 @@ export const known = (value: unknown): boolean =>
       ? value.length > 0
       : typeof value === "string" && value.trim() !== "";
 
+/* A malformed fee row fails the build rather than reaching a page. The server
+ * drops a bad row on its own side as well (functions/api/_site.js), but the
+ * table a buyer reads and the select they choose from are built here, and a fee
+ * shown on /delivery that checkout then refuses is the same fact told two ways.
+ * Same move products.ts makes for a hand-edited photo entry. */
+{
+  const seen = new Set<string>();
+  for (const zone of site.delivery.zones) {
+    const where = `site.json delivery.zones "${zone.key}"`;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(zone.key)) throw new Error(`${where}: key must be lower-case kebab`);
+    if (seen.has(zone.key)) throw new Error(`${where}: duplicate key`);
+    seen.add(zone.key);
+    if (!known(zone.region) || !known(zone.name)) throw new Error(`${where}: region and name are required`);
+    if (!Number.isInteger(zone.cost) || zone.cost < 0) throw new Error(`${where}: cost must be a whole number of KSh, 0 or more`);
+  }
+}
+
+/** A fee as a buyer reads it. 0 is "Free", never "KSh 0", in a table or a label. */
+export const feeText = (cost: number): string => (cost === 0 ? "Free" : `KSh ${cost.toLocaleString("en-KE")}`);
+
+/** The zones grouped by region, in the order site.json lists them. */
+export const zonesByRegion = (): { region: string; zones: Zone[] }[] => {
+  const groups = new Map<string, Zone[]>();
+  for (const zone of site.delivery.zones) {
+    groups.set(zone.region, [...(groups.get(zone.region) ?? []), zone]);
+  }
+  return [...groups].map(([region, zones]) => ({ region, zones }));
+};
+
+/** The cheapest zone, for "Delivery from KSh 0 in Nairobi CBD", or null with no zones. */
+export const cheapestZone = (): Zone | null =>
+  site.delivery.zones.reduce<Zone | null>((low, zone) => (low === null || zone.cost < low.cost ? zone : low), null);
+
 /* What is still missing, what it blocks, and who can supply it.
  *
  * Derived from the data rather than written down twice, so this list cannot
@@ -142,8 +186,9 @@ const CANDIDATES: (Gap & { value: unknown })[] = [
     value: site.contact.phone,
     what: "a number that rings and is answered",
     blocks:
-      "the Contact page, and the phone number CLAUDE.md requires on every error " +
-      "message in /api/mpesa/stk and /api/mpesa/status",
+      "the Contact page, OrderHelp on /order, /checkout and /track, and the phone " +
+      "number CLAUDE.md requires on every error message the Functions write " +
+      "(functions/api/_site.js REACH falls back to the contact page without it)",
   },
   {
     key: "contact.whatsapp",
@@ -160,8 +205,11 @@ const CANDIDATES: (Gap & { value: unknown })[] = [
   {
     key: "delivery.zones",
     value: site.delivery.zones,
-    what: "the delivery zones with real costs and real working-day counts",
-    blocks: "the Delivery page's zone table, and any delivery cost at checkout",
+    what: "the delivery fee per county, a whole number of KSh per order",
+    blocks:
+      "the Delivery page's fee table, the county choice at checkout, and every " +
+      "order, because the server prices delivery from this list and refuses a " +
+      "county that is not on it",
   },
   {
     key: "delivery.returnsWindowDays",
