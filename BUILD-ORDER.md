@@ -1035,6 +1035,15 @@ loses nothing. **Returns is not built**: no returns field exists in the data and
 policy exists to describe. Materials repeats the docket's fabric-weight row, and is built
 because the brief names it — open.
 
+**Closed in `fix-product-page`: Materials and Delivery are cut.** Materials repeated the
+docket's fabric-weight row; Delivery was one line linking `/delivery`, which the nav, the
+footer and the "Delivery from" line already reach. Size and fit is the one section left,
+rendered only with a size chart and open by default. Below 900px the thumbnail strip now
+wraps rather than scrolling sideways, so the row lost its `tabindex` and scroll-snap.
+V17 now also requires the first radio to be `checked` and every radio to share one
+non-empty `name`; the passing fixture had no checked radio and is corrected. Twelve
+fixtures.
+
 **V17** asserts, on every built product page with a strip, that radios, labels and main
 images are equal in number and at least two, every label points at a radio, the first main
 image is not lazy, and the only executable script is the cart. Nine fixtures; negative-

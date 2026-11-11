@@ -204,11 +204,7 @@ const group = `photo-${product.slug}`;
         ))}
       </div>
 
-      <!-- tabindex: below 640px this row scrolls sideways when there are more
-           thumbnails than fit, and a scrolling region a keyboard cannot reach
-           is one a keyboard cannot scroll. The radios above take focus too;
-           this is for the row itself. -->
-      <div class="gallery__thumbs" role="group" aria-label="Photographs" tabindex="0">
+      <div class="gallery__thumbs" role="group" aria-label="Photographs">
         {photos.map((photo, i) => (
           <label class="gallery__thumb" for={`${group}-${i + 1}`}>
             <picture>
@@ -292,15 +288,15 @@ const group = `photo-${product.slug}`;
     display: none;
   }
 
-  /* Below 640px the strip is a row under the photograph that scrolls sideways
-     once there are more thumbnails than fit: six at 72px plus five 8px gaps is
-     472px, and a 390px phone has 350px between its gutters. Proximity rather
-     than mandatory snapping, so a short drag is never thrown to the next stop. */
+  /* Below 900px the strip is a row under the photograph that wraps onto a
+     second line once there are more thumbnails than fit: six at 72px plus five
+     8px gaps is 472px, and a 390px phone has 350px between its gutters. Every
+     thumbnail stays in view, so nothing has to be scrolled to be found and the
+     row needs no focus stop of its own — the radios are the keyboard path. */
   .gallery__thumbs {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--s-8);
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
   }
 
   /* 72 by 96, over the 44px touch minimum on both axes. A border, never a
@@ -310,7 +306,6 @@ const group = `photo-${product.slug}`;
      colour, not a size, and nothing beside it moves. */
   .gallery__thumb {
     flex: 0 0 var(--thumb-width);
-    scroll-snap-align: start;
     border: 1px solid transparent;
     border-radius: var(--radius-surface);
     cursor: pointer;
@@ -369,7 +364,6 @@ const group = `photo-${product.slug}`;
       grid-column: 1;
       grid-row: 1;
       flex-direction: column;
-      overflow-x: visible;
     }
   }
 </style>
