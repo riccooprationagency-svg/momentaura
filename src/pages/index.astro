@@ -19,9 +19,8 @@ import ProductReveal from "../components/ProductReveal.astro";
 import { categories, products } from "../lib/products";
 
 // The categories are derived from products.json in one place now, so the tiles
-// here and the pages they link to cannot drift apart. Three exist. Six was
-// written for a catalogue that still included watches and licensed panels, which
-// the legal deletion removed.
+// here and the pages they link to cannot drift apart. Six are declared in
+// src/lib/products.ts; a tile renders only for one that has products.
 
 // Two reveals, not five. Enough to establish the rhythm; five identical
 // placeholder screens would be five identical placeholder screens.

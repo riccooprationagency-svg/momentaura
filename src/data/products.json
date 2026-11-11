@@ -2,7 +2,7 @@
   {
     "slug": "faith-hoodie",
     "name": "Faith hoodie",
-    "category": "apparel",
+    "category": "hoodies",
     "price": 3500,
     "fabricWeight": null,
     "fit": null,
@@ -16,7 +16,7 @@
   {
     "slug": "crush-bucket-hat",
     "name": "Crush bucket hat",
-    "category": "apparel",
+    "category": "bucket-hats",
     "price": 800,
     "fabricWeight": null,
     "fit": null,
@@ -44,7 +44,7 @@
   {
     "slug": "personalised-hoodie",
     "name": "Personalised hoodie",
-    "category": "personalised",
+    "category": "hoodies",
     "price": 2800,
     "fabricWeight": null,
     "fit": null,
@@ -58,7 +58,7 @@
   {
     "slug": "crew-tee",
     "name": "Crew tee",
-    "category": "apparel",
+    "category": "t-shirts",
     "price": 650,
     "fabricWeight": null,
     "fit": null,
@@ -72,7 +72,7 @@
   {
     "slug": "t-shirt",
     "name": "T-shirt",
-    "category": "apparel",
+    "category": "t-shirts",
     "price": 10,
     "fabricWeight": null,
     "fit": null,
