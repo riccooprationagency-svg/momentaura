@@ -265,6 +265,7 @@ No exclamation marks. No "simply", "just", or "please". No "we" if it is one per
 ## Copy rules
 
 - **Sentence case for products and prose. Uppercase for nav, labels, headings, buttons**
+- Uppercase applies to the primary nav. Footer links are sentence case at caption size, and the email address must never be transformed.
 - Product names say what the thing is
 - Concrete nouns and numbers instead of adjectives
 - Prices always visible. Never "contact for price" under KSh 10,000
@@ -375,6 +376,7 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
 ## Legal
 
 - No licensed characters, no third-party trademarks, in imagery or copy. Ever
+- Naming a service in plain text to say where a link goes or how a payment is made (M-Pesa, WhatsApp, Facebook, Instagram) is allowed. Logos, wordmarks, icons and branded products are not.
 - Privacy policy and a working marketing opt-out ship with the first deploy
 - Never state a stock figure, capacity, date or lead time that is not true
 
