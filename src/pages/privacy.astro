@@ -65,10 +65,10 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
         browser data removes it, and nothing here can read it back.
       </p>
       <p class="page__body">
-        When you place an order, the browser also keeps the order reference and the
-        product codes and quantities of that order, so the confirmation page can still
-        show what you bought. It stays until your next order replaces it or you clear
-        your browser data.
+        When you place an order, the browser also keeps the order reference,
+        the {GATEWAY_NAME} payment request ID, the time the order was placed, and the product codes and
+        quantities of that order, so the confirmation page can still show what you bought.
+        It stays until your next order replaces it or you clear your browser data.
       </p>
 
       <h2 class="page__sub">What is collected when you order</h2>
@@ -107,9 +107,8 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 
       <h2 class="page__sub">Who else sees it</h2>
       <p class="page__body">
-        The person who runs MomentAura, who packs and sends the order. {GATEWAY_NAME},
-        which sees the payment details listed above because it is taking
-        the payment. The company hosting this site, because the pages and the order have
+        The person who runs MomentAura. {GATEWAY_NAME}, which sees the payment details
+        listed above because it is taking the payment. The company hosting this site, because the pages and the order have
         to pass through it. Your delivery details are used to get the order to you.
         Nothing is sold, shared for advertising, or handed to a data broker.
       </p>
