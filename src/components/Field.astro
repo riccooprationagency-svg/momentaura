@@ -32,6 +32,12 @@ interface Props {
   select?: boolean;
   /** Longest input the server accepts. Stated so the browser stops there too. */
   maxlength?: number;
+  /**
+   * id of the <form> this control posts with, for a field rendered outside it.
+   * A size picker sits on its own line of the order summary, beside the item it
+   * sizes, and the summary is not inside the form.
+   */
+  form?: string;
 }
 
 const {
@@ -44,6 +50,7 @@ const {
   hint,
   select = false,
   maxlength,
+  form,
 } = Astro.props;
 
 const id = `field-${name}`;
@@ -80,6 +87,7 @@ const describedby = [hintId, errorId].filter(Boolean).join(" ");
         required={required}
         aria-describedby={describedby}
         data-field={name}
+        form={form}
       >
         <slot />
       </select>

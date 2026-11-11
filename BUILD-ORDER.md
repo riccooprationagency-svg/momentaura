@@ -84,17 +84,18 @@ filter over a nine-item grid is furniture.
 |---|---|
 | Filters | Above. Revisit at roughly thirty products, not before |
 | Product description | No copy. Optional on `Product`, absent from the data, omitted while null — the same rule the docket applies to its null fields |
-| Size selector | `sizes[]` is empty on every product. A control that cannot be operated, on the page where the buyer is deciding whether this shop works, is worse than no control |
+| Size selector | **Built in phase 4, dormant.** `sizes[]` is empty on every product, so nothing renders. When a product has sizes, the size is chosen at checkout from a native `<select>` on that product's order line, posted as `size-<slug>` and checked by `_order.js` against the product's labels — not on the product page, because carrying a size through the cart would not fit the script budget. One size per product per order |
 | Quantity | Named here originally, not in the step 6 ruling. It belongs with the cart in step 7, where a quantity has somewhere to go |
 | Thumbnails | One crop per product at most, and no product has one |
 | Spec table | `fabricWeight`, `fit` and `printMethod` are null on every product |
-| Size chart | No measurements |
+| Size chart | **Built in phase 4, dormant.** Renders on a product page only when every size has `chestCm` and `lengthCm`. No measurements have been supplied |
 | Box-opening sequence | No frames. It is the one elaborate moment permitted site-wide and it arrives with real photography or not at all |
 
 **The out-of-stock ruling, as built.** Every product is `stock: 0`, so every product page
 renders it: the button present and disabled — `--fg-muted` text, `--fg-muted` outline set
-as the full `border` shorthand, no fill, `cursor: not-allowed`, `aria-disabled` — under a
-docket that stamps its Stock row,
+as the full `border` shorthand, no fill, `cursor: not-allowed`, `aria-disabled` — labelled
+"Sold out" in muted mono since phase 4, not "Add to order", and carrying no `data-add` so the
+cart never binds to or relabels it — under a docket that stamps its Stock row,
 above one line naming the product and saying it cannot be ordered. Never absent. A missing
 button leaves the buyer unsure whether the page is broken or the product unbuyable, and
 that ambiguity is the suspicion the whole system exists to reduce.

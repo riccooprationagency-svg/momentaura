@@ -47,7 +47,7 @@ import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
       </p>
 
       <div class="checkout__grid" data-order-live hidden>
-        <form class="checkout__form" data-checkout-form novalidate>
+        <form class="checkout__form" id="checkout-form" data-checkout-form novalidate>
           <h2 class="checkout__sub">Where it is going</h2>
 
           <Field
@@ -158,6 +158,23 @@ import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
                     <span data-qty>0</span> &times; {price(product.price)}
                   </span>
                   <span class="summary__amount" data-line-total />
+                  {/* THE SIZE, on the line it sizes, for a product made in
+                      sizes and no other. A native <select> that belongs to the
+                      form by its id, so it posts as size-<slug> with the rest
+                      of the fields and the cart script carries nothing for it:
+                      the line is revealed by the same painter that reveals the
+                      row, and its value never touches storage. The server
+                      matches it against the product's own labels.
+                      One size per product per order, because the order has one
+                      line per product — see the PR for phase 4. */}
+                  {product.sizes.length > 0 && (
+                    <div class="summary__size">
+                      <Field name={`size-${product.slug}`} label={`${product.name} size`} select required form="checkout-form">
+                        <option value="" disabled selected>Choose a size</option>
+                        {product.sizes.map((size) => <option value={size.label}>{size.label}</option>)}
+                      </Field>
+                    </div>
+                  )}
                 </li>
               ))
             }
@@ -292,6 +309,10 @@ import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
     grid-template-columns: 1fr auto;
     gap: var(--s-8) var(--s-20);
     align-items: baseline;
+  }
+
+  .summary__size {
+    grid-column: 1 / -1;
   }
 
   .summary__name {
