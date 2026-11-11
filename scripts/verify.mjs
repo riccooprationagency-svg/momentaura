@@ -18,6 +18,7 @@
  *   V14 images: reserved space, resolvable URLs, and a 200KB ceiling
  *   V15 Facebook and Instagram links match site.json, no tracking parameters
  *   V16 every category is declared, and every category page has a product card
+ *   V17 a product page's thumbnail strip switches with no script
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -1926,6 +1927,114 @@ function categoryViolations(declared, inData, pages) {
     console.log(
       `  V16 categories        ${declared.length} declared, ${inData.length} in products.json, ${built} page(s) built, ` +
         `${found.length === 0 ? "every page has a card" : `${found.length} violation(s)`}`
+    );
+  }
+}
+
+/* ---------- V17 — a product page's thumbnail strip switches with no script ----------
+ *
+ * Gallery.astro switches a product page's photographs with a radio group: one
+ * visually hidden radio per photograph, one <label> per thumbnail, one main
+ * image per photograph shown by :checked. The first attempt used JavaScript
+ * and broke the cart's byte budget, and nothing about this pattern fails
+ * loudly when it drifts. A radio short and the last thumbnail does nothing; a
+ * main image short and a thumbnail shows an empty frame; a lazy first image
+ * and the LCP waits on layout. Every one of those builds, renders and passes
+ * every other gate. So, in every built product page that carries a strip:
+ *
+ *   radios, labels and main images are equal in number, at least two
+ *   every label points at one of those radios
+ *   the first main image is not lazy
+ *   the only executable <script> is the cart — ld+json is data, never run,
+ *   and V4 already holds it to the one Organization block
+ *
+ * The last line is V4's rule asked again on exactly the pages where a script
+ * would be most tempting to add back.
+ */
+
+const CART_SRC = /^\/_astro\/cart\.[\w-]+\.js$/;
+/* A class list containing the name as a whole word: "gallery__thumb" is not
+   matched by "gallery__thumbs". attrOf is V15's, above. */
+const hasClass = (tag, name) => (attrOf(tag, "class") ?? "").split(/\s+/).includes(name);
+const attrIn = attrOf;
+const STRIP = /<div\b[^>]*\sclass\s*=\s*["'](?:[^"']*\s)?gallery__thumbs(?:\s[^"']*)?["']/i;
+
+/** pages: [{ name, html }]. Returns the violations, each naming its page. */
+function stripViolations(pages) {
+  const out = [];
+  for (const { name, html } of pages) {
+    if (!STRIP.test(html)) continue;
+
+    const radios = [...html.matchAll(/<input\b[^>]*>/gi)].map(([t]) => t).filter((t) => hasClass(t, "gallery__radio"));
+    const labels = [...html.matchAll(/<label\b[^>]*>/gi)].map(([t]) => t).filter((t) => hasClass(t, "gallery__thumb"));
+    const slides = [...html.matchAll(/<picture\b[^>]*>([\s\S]*?)<\/picture>/gi)].filter(([t]) => hasClass(t.slice(0, t.indexOf(">") + 1), "gallery__slide"));
+
+    if (radios.length !== labels.length || labels.length !== slides.length) {
+      out.push(`${name}  ${radios.length} radios, ${labels.length} labels, ${slides.length} main images — one of each per photograph`);
+    }
+    if (radios.length < 2) out.push(`${name}  a strip with ${radios.length} radio(s) — a strip switches between two or more`);
+
+    const ids = new Set(radios.filter((t) => /\stype\s*=\s*["']radio["']/i.test(t)).map((t) => attrIn(t, "id")));
+    for (const label of labels) {
+      const target = attrIn(label, "for");
+      if (!ids.has(target)) out.push(`${name}  thumbnail label for="${target}" points at no radio`);
+    }
+
+    const first = slides[0] && /<img\b[^>]*>/i.exec(slides[0][1]);
+    if (!first) out.push(`${name}  the first main image has no <img>`);
+    else if (attrIn(first[0], "loading") === "lazy") out.push(`${name}  the first main image is lazy — it is the LCP candidate`);
+
+    for (const [, attrs = "", body] of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+      if (/(?:^|\s)type=["']application\/ld\+json["']/i.test(attrs)) continue;
+      const src = attrIn(attrs, "src");
+      if (body.trim() !== "" || src === null || !CART_SRC.test(src)) {
+        out.push(`${name}  carries a script that is not the cart  ${src ?? "(inline)"}`);
+      }
+    }
+  }
+  return out;
+}
+
+{
+  /* Self-test. A check that has never been seen to fail is a comment. */
+  const radio = (n) => `<input class="gallery__radio sr-only" type="radio" name="photo-x" id="photo-x-${n}">`;
+  const label = (n) => `<label class="gallery__thumb" for="photo-x-${n}"><img src="/img/t.webp" alt="" width="3" height="4"></label>`;
+  const slide = (lazy) => `<picture class="gallery__slide"><img class="gallery__img" src="/img/m.webp" alt="m" width="3" height="4" loading="${lazy ? "lazy" : "eager"}"></picture>`;
+  const cart = `<script type="module" src="/_astro/cart.Ab12_x.js"></script>`;
+  const ld = `<script type="application/ld+json">{}</script>`;
+  const strip = ({ r = [1, 2, 3], l = [1, 2, 3], s = [false, true, true], scripts = ld + cart } = {}) =>
+    `${scripts}<div class="gallery gallery--switch">${r.map(radio).join("")}` +
+    `<div class="gallery__main">${s.map(slide).join("")}</div>` +
+    `<div class="gallery__thumbs" role="group" tabindex="0">${l.map(label).join("")}</div></div>`;
+  const cases = [
+    ["the shipped shape: three photographs, ld+json and the cart", strip(), null],
+    ["a page with no strip is not this check's business", `<div class="gallery">${slide(false)}</div><script>x()</script>`, null],
+    ["a radio missing", strip({ r: [1, 2] }), "2 radios, 3 labels, 3 main images"],
+    ["a main image missing", strip({ s: [false, true] }), "3 radios, 3 labels, 2 main images"],
+    ["a label pointing nowhere", strip({ l: [1, 2, 4] }), `for="photo-x-4" points at no radio`],
+    ["a strip of one", strip({ r: [1], l: [1], s: [false] }), "a strip with 1 radio(s)"],
+    ["the first main image lazy", strip({ s: [true, true, true] }), "the first main image is lazy"],
+    ["a gallery script beside the cart", strip({ scripts: cart + `<script type="module" src="/_astro/gallery.Zz9.js"></script>` }), "not the cart  /_astro/gallery.Zz9.js"],
+    ["an inline script", strip({ scripts: cart + `<script>go()</script>` }), "not the cart  (inline)"],
+  ];
+  let ok = 0;
+  for (const [label, html, mustSay] of cases) {
+    const found = stripViolations([{ name: "fixture", html }]);
+    if (mustSay === null ? found.length === 0 : found.some((m) => m.includes(mustSay))) ok++;
+    else fail("V17", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with "${mustSay}"`}, got: ${found.join("; ") || "no violation"}`);
+  }
+  console.log(`  V17 strip self-test   ${ok}/${cases.length} fixtures behave (2 pass, ${cases.length - 2} fail by name)`);
+
+  if (existsSync(DIST)) {
+    const pages = walkAll(join(DIST, "products"))
+      .filter((f) => f.endsWith(".html"))
+      .map((f) => ({ name: rel(f), html: readFileSync(f, "utf8") }));
+    const withStrip = pages.filter((p) => STRIP.test(p.html)).length;
+    const found = stripViolations(pages);
+    for (const v of found) fail("V17", v);
+    console.log(
+      `  V17 thumbnail strips  ${withStrip} of ${pages.length} product page(s) carry one` +
+        (withStrip === 0 ? " — no product has two photographs yet" : found.length === 0 ? ", every one matches and loads only the cart" : `, ${found.length} violation(s)`)
     );
   }
 }

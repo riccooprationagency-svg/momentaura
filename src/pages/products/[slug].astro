@@ -1,27 +1,32 @@
 ---
-// One product. Two columns, the object left at 3:4, everything a buyer needs to
-// decide on the right, both aligned top.
+// One product, in three rows.
+//
+//   Row 1  the object left at 3:4 — with a thumbnail strip beside it when there
+//          are two or more photographs — and everything a buyer needs to decide
+//          on the right, both aligned top
+//   Row 2  an accordion of information sections left, and one more photograph
+//          right when there are three or more. Otherwise the accordion takes
+//          the full width
+//   Row 3  more in the same category, up to four, and a link to all of it
+//
+// Below 900px it is one column in that order, and the row 2 photograph is
+// dropped: on a phone it would be the same photograph a third time, a long
+// scroll below everything a buyer acts on.
 //
 // Not built, each because the data or the photography does not exist. Decisions,
-// not gaps — see BUILD-ORDER section 6:
+// not gaps — see BUILD-ORDER sections 6 and 14:
 //
-//   Thumbnails       step 12 built the gallery. It renders every photograph in
-//                    products.json as one 3:4 stack, and photos is [] on all
-//                    five, so what renders today is still the one kraft block
-//   Spec table       fabric weight, fit and print method are all null
+//   Returns          no returns field exists in products.json, and no returns
+//                    policy exists to describe. The section is not scaffolded:
+//                    an empty heading over nothing would read as a policy
 //   Box-opening      no image sequence, and it is the one elaborate moment on
 //                    the site — it arrives with real frames or not at all
+//   Size buttons     the size is chosen at checkout, on the order line it
+//                    sizes. The cart stores slug and quantity only
 //
-// Built in phase 4 and dormant until there is data: the sizes line and the size
-// chart below render from sizes[], which is empty on every product. The size
-// itself is chosen at checkout, on the order line it sizes, not here — see the
-// note at the sizes line.
-//   Quantity         BUILD-ORDER named it, the step 6 ruling does not, and it
-//                    belongs with the cart in step 7 where a quantity has
-//                    somewhere to go. Step 7 put it there: the steppers live on
-//                    /order, not here. Adding twice from this page adds two,
-//                    which is the same answer with one fewer control on the
-//                    page where the buyer is still deciding
+// Quantity: the steppers live on /order. Adding twice from this page adds two,
+// which is the same answer with one fewer control on the page where the buyer
+// is still deciding.
 //
 // KNOWN, and blocked on data: the docket renders lead time as a duration, and
 // CLAUDE.md requires a date on a product page. leadTimeDays is null on every
@@ -75,18 +80,58 @@ const system = systemFor(product);
 const soldOut = product.stock === 0;
 const chart = sizeChart(product);
 
+// Gallery draws the strip from two photographs up; the page only has to make
+// room for it. The second-row photograph needs three: with two, the last one is
+// a thumbnail away already, and the second row would repeat half the shoot.
+const strip = product.photos.length >= 2;
+const closeup = product.photos.length >= 3;
+
+/* ---------- the information sections ----------
+ *
+ * Each renders only when its data exists, in this order, and the first one that
+ * renders is the one open. Delivery always renders, so there is always one.
+ *
+ * DETAILS is not here, though the brief named it, and the omission is a ruling
+ * rather than an oversight. Its content would be the description, and the
+ * description already sits in the right-hand column beside the price. The same
+ * paragraph twice on one page is a section that can be cut without losing
+ * information, and CLAUDE.md says to cut it.
+ *
+ * SIZE AND FIT renders when the size chart does: sizes[] non-empty and every
+ * size measured. With sizes and no measurements it would be a heading over a
+ * repeat of the sizes line above it. Fit is not repeated here: the docket
+ * already states it.
+ *
+ * MATERIALS renders when fabricWeight is set, and lists print method beside it
+ * when that is set too. Both are null on every product today. Fabric weight is
+ * also a docket row, so this section repeats one fact the docket states; it is
+ * built because the brief names it, and the PR asks whether it should stay.
+ */
+const sections = [
+  chart ? "size" : null,
+  "delivery",
+  product.fabricWeight ? "materials" : null,
+].filter((s): s is string => s !== null);
+
+const opens = (key: string) => sections[0] === key;
+
 const meta = [product.name, price(product.price)].join(", ");
 const description = product.dispatch ? `${meta}. Dispatched from ${product.dispatch}.` : `${meta}.`;
 ---
 
 <Base title={`${product.name} — MomentAura`} description={description}>
   <section class="detail" data-system={system}>
-    <div class="wrap detail__inner">
+    <div
+      class:list={[
+        "wrap",
+        "detail__inner",
+        { "detail__inner--strip": strip, "detail__inner--closeup": closeup },
+      ]}
+    >
       <!-- detail — the one surface that opts in, the same way it is the one
-           surface that passes `detail` to Docket below. It renders every
-           photograph, and the first eagerly at high fetch priority: it is above
-           the fold and the largest element on the page, so it is the LCP
-           candidate. CLAUDE.md's lazy rule is for what sits under it. -->
+           surface that passes `detail` to Docket below. The first photograph is
+           eager at high fetch priority: it is above the fold and the largest
+           element on the page, so it is the LCP candidate. -->
       <div class="detail__object">
         <Gallery product={product} detail />
       </div>
@@ -101,48 +146,43 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
         <p class="detail__price">{price(product.price)}</p>
 
         <!-- Description omitted while null, the same rule the docket applies to
-             its null fields. A bracketed stub is a visible absence; an omission
-             is simply not a claim. Describing how a garment feels before anyone
-             has handled one would be inventing facts. -->
+             its null fields. Describing how a garment feels before anyone has
+             handled one would be inventing facts. -->
         {product.description && <p class="prose detail__prose">{product.description}</p>}
 
-        <!-- detail — the one place the Seal fill is spent. Every other surface
-             composing Docket leaves it off by default. -->
-        <Docket product={product} detail />
+        <hr class="detail__hair" />
+
+        <!--
+          SIZES, from products.json and nowhere else. The size is chosen at
+          checkout on the line it sizes, from a native <select> that posts with
+          the form: the cart script is held to a byte budget, and a picker here
+          would mean carrying a size through storage, the order page and back.
+          Saying so here is what keeps the buyer from looking for it.
+        -->
+        {
+          product.sizes.length > 0 && (
+            <p class="detail__sizes">
+              Sizes: {product.sizes.map((s) => s.label).join(", ")}. You choose one at checkout.
+            </p>
+          )
+        }
 
         <!--
           The out-of-stock ruling. The button renders disabled, never absent.
 
           A missing button leaves the buyer wondering whether the page is broken
           or the product unbuyable, and that ambiguity is the suspicion this
-          whole system exists to reduce. Disabled, under a docket that stamps its
-          Stock row, above a line naming the product, is unambiguous: this
-          exists, it was made, it cannot be had right now.
+          whole system exists to reduce.
 
-          No stamp beside the button. The docket above already carries the one
-          Seal fill this page gets, and a second instance 80px below it is the
-          redundancy that drains the colour.
-        -->
-        <!--
-          data-stock is what the cart clamps the add handler against. It is a
-          courtesy so an honest buyer is not walked into a refusal at checkout,
-          not a control — it is rendered here from products.json at build time
-          and everything past that is the buyer's own machine to edit.
-          functions/api/mpesa/stk.js re-reads stock from the catalogue and is
-          what actually stops the order.
-        -->
-        <!--
           SOLD OUT IS A STATE, NOT A VERB. A sold-out product renders a disabled
-          control that says "Sold out" — never "Add to order", which an outlined
-          pill makes read as one more button to press. It is still rendered
-          rather than removed, still aria-disabled, and still points at the line
-          below that says why.
+          control that says "Sold out" in muted mono, carries no data-add so the
+          cart never binds to or relabels it, and points at the line below that
+          says why. No stamp beside it: the docket's Stock row carries the one
+          Seal fill this page gets.
 
-          It carries no data-add, so the cart script never binds to it or
-          relabels it: there is no add handler on this page to defeat, and a
-          hand-edited order cannot make it read "Added to order". The label is
-          muted mono — CLAUDE.md's register for a short sold-out status beside a
-          product page action — and the Seal fill stays in the docket above.
+          data-stock is what the cart clamps the add handler against. It is a
+          courtesy, not a control; functions/api/mpesa/stk.js re-reads stock from
+          the catalogue and is what actually stops the order.
         -->
         {
           soldOut ? (
@@ -165,76 +205,100 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
           )
         }
 
-        <!--
-          Prose, not mono. A sentence explaining state is Archivo at --t-body-sm
-          in --fg-muted, the same register as the line above — the mono rule
-          covers short status labels, not sentences.
-
-          Hidden until the order holds this product, and revealed by the cart.
-          It is the route onward: the button keeps its verb and says "Added to
-          order", and this says how many and where they are.
-        -->
-        <!--
-          SIZES, from products.json and nowhere else. The size is chosen at
-          checkout on the line it sizes, from a native <select> that posts with
-          the form: the cart script is held to a byte budget, and a picker here
-          would mean carrying a size through storage, the order page and back.
-          Saying so here is what keeps the buyer from looking for it.
-        -->
-        {
-          product.sizes.length > 0 && (
-            <p class="detail__sizes">
-              Sizes: {product.sizes.map((s) => s.label).join(", ")}. You choose one at checkout.
-            </p>
-          )
-        }
-
-        {
-          chart && (
-            <table class="detail__chart">
-              <caption class="detail__chart-caption">Size chart, in centimetres</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Size</th>
-                  <th scope="col">Chest</th>
-                  <th scope="col">Length</th>
-                </tr>
-              </thead>
-              <tbody>
-                {chart.map((size) => (
-                  <tr>
-                    <th scope="row">{size.label}</th>
-                    <td>{size.chestCm}</td>
-                    <td>{size.lengthCm}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        }
-
+        <!-- Hidden until the order holds this product, and revealed by the cart.
+             The button keeps its verb and says "Added to order"; this says how
+             many and where they are. Prose, so Archivo, not mono. -->
         <p class="detail__added" data-added hidden>
           <span data-added-count>0</span> in your order. <a href="/order">See your order</a>.
         </p>
 
-        <!--
-          The route to a person, beside the decision rather than in the footer.
-          The prefilled text names the product, so the first message already
-          says which one — a buyer does not have to describe it from memory.
-        -->
+        <!-- detail — the one place the Seal fill is spent. Every other surface
+             composing Docket leaves it off by default. -->
+        <Docket product={product} detail />
+
+        <!-- The route to a person, beside the decision rather than in the
+             footer. The prefilled text names the product. -->
         <p class="detail__ask">
           Questions about this item? <a href={whatsappHref(product)}
             >Message MomentAura on WhatsApp</a
           >.
         </p>
 
-        <hr class="detail__hair" />
-
-        <p class="detail__terms">
-          Delivery fees and how payment works are on the <a href="/delivery">delivery terms</a> page.
-        </p>
         <DeliveryFrom />
       </div>
+
+      <!--
+        Native <details>, no script. name="info" makes them one exclusive group
+        where the browser supports it, so opening one closes the other; where it
+        does not, each opens on its own, which loses nothing.
+      -->
+      <div class="detail__info">
+        {
+          sections.includes("size") ? (
+            <details class="info" name="info" open={opens("size")}>
+              <summary class="info__summary">Size and fit</summary>
+              <div class="info__body">
+                {chart && (
+                  <table class="detail__chart">
+                    <caption class="detail__chart-caption">Size chart, in centimetres</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Size</th>
+                        <th scope="col">Chest</th>
+                        <th scope="col">Length</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chart.map((size) => (
+                        <tr>
+                          <th scope="row">{size.label}</th>
+                          <td>{size.chestCm}</td>
+                          <td>{size.lengthCm}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </details>
+          ) : null
+        }
+
+        <details class="info" name="info" open={opens("delivery")}>
+          <summary class="info__summary">Delivery</summary>
+          <div class="info__body">
+            <p class="info__line">
+              Delivery fees and how payment works are on the <a href="/delivery">delivery terms</a> page.
+            </p>
+          </div>
+        </details>
+
+        {
+          sections.includes("materials") && (
+            <details class="info" name="info" open={opens("materials")}>
+              <summary class="info__summary">Materials</summary>
+              <dl class="info__body info__facts">
+                <dt>Fabric weight</dt>
+                <dd>{product.fabricWeight}</dd>
+                {product.printMethod && (
+                  <>
+                    <dt>Print method</dt>
+                    <dd>{product.printMethod}</dd>
+                  </>
+                )}
+              </dl>
+            </details>
+          )
+        }
+      </div>
+
+      {
+        closeup && (
+          <div class="detail__closeup">
+            <Gallery product={product} last />
+          </div>
+        )
+      }
     </div>
   </section>
 
@@ -245,7 +309,10 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     related.length > 0 && (
       <section class="related">
         <div class="wrap">
-          <h2 class="related__heading">More in {category.name}</h2>
+          <div class="related__head">
+            <h2 class="related__heading">More in {category.name}</h2>
+            <a class="related__all" href={`/${category.slug}`}>All {category.name}</a>
+          </div>
           <div class="related__grid">
             {related.map((item) => (
               <ProductCard product={item} />
@@ -289,9 +356,7 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
   }
 
   /* A standalone link, not a link inside prose, so it carries the same 44px hit
-     area as the nav links, the order count and the footer links. Twelve-point
-     mono is a small target to hit with a thumb, and this is the only route back
-     to the category from a product. */
+     area as the nav links, the order count and the footer links. */
   .detail__category a {
     text-decoration: none;
     display: inline-flex;
@@ -337,48 +402,10 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     letter-spacing: var(--tr-docket);
   }
 
-  .detail__chart {
-    justify-self: stretch;
-    border-collapse: collapse;
-    font-family: var(--font-mono);
-    font-size: var(--t-docket);
-    letter-spacing: var(--tr-docket);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .detail__chart-caption {
-    text-align: start;
-    font-family: var(--font-sans);
-    font-size: var(--t-label);
-    letter-spacing: var(--tr-label);
-    text-transform: uppercase;
-    color: var(--fg-muted);
-    padding-block-end: var(--s-8);
-  }
-
-  .detail__chart th,
-  .detail__chart td {
-    text-align: start;
-    padding-block: var(--s-8);
-    padding-inline-end: var(--s-20);
-    border-block-end: 1px solid var(--border);
-  }
-
-  /* A <th> is bold by default, which is over the 500 ceiling. */
-  .detail__chart th {
-    font-weight: var(--w-regular);
-  }
-
-  .detail__chart thead th {
-    color: var(--fg-muted);
-    text-transform: uppercase;
-  }
-
   .detail__closed,
   .detail__sizes,
   .detail__added,
-  .detail__ask,
-  .detail__terms {
+  .detail__ask {
     color: var(--fg-muted);
     max-width: var(--measure);
   }
@@ -397,19 +424,134 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     margin: 0;
   }
 
+  /* ---------- information sections ---------- */
+
+  /* Hairlines between sections, top and bottom of the group. Nothing else
+     separates them: no box, no fill, no icon. The disclosure marker is the
+     browser's own, left as it is. */
+  .detail__info {
+    border-block-start: 1px solid var(--border);
+  }
+
+  .info {
+    border-block-end: 1px solid var(--border);
+  }
+
+  .info__summary {
+    min-height: var(--tap-target);
+    padding-block: var(--s-12);
+    cursor: pointer;
+    font-size: var(--t-label);
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+  }
+
+  .info__body {
+    display: grid;
+    gap: var(--s-12);
+    justify-items: start;
+    padding-block-end: var(--s-20);
+  }
+
+  .info__line {
+    color: var(--fg-muted);
+    max-width: var(--measure);
+  }
+
+  /* Facts, so mono, in the docket's two-column shape without its ground. */
+  .info__facts {
+    grid-template-columns: auto 1fr;
+    gap: var(--s-8) var(--s-20);
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    line-height: var(--lh-docket);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .info__facts dt {
+    color: var(--fg-muted);
+    text-transform: uppercase;
+  }
+
+  .info__facts dd {
+    margin: 0;
+  }
+
+  .detail__chart {
+    justify-self: stretch;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .detail__chart th,
+  .detail__chart td {
+    text-align: start;
+    padding-block: var(--s-8);
+    padding-inline-end: var(--s-20);
+    border-block-end: 1px solid var(--border);
+  }
+
+  .detail__chart-caption {
+    text-align: start;
+    font-family: var(--font-sans);
+    font-size: var(--t-label);
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    padding-block-end: var(--s-8);
+  }
+
+  /* A <th> is bold by default, which is over the 500 ceiling. */
+  .detail__chart th {
+    font-weight: var(--w-regular);
+  }
+
+  .detail__chart thead th {
+    color: var(--fg-muted);
+    text-transform: uppercase;
+  }
+
+  /* Dropped below 900px. A lazy image that is display: none is never fetched,
+     so a phone does not pay for it. */
+  .detail__closeup {
+    display: none;
+  }
+
   /* ---------- related ---------- */
 
   .related {
     padding-block-end: var(--s-80);
   }
 
-  .related__heading {
-    font-size: var(--t-heading);
+  .related__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12) var(--s-20);
     margin-block-end: var(--s-40);
   }
 
-  /* Up to three, so the grid is the same three-column grid as the category page
-     and collapses at the same two breakpoints. */
+  .related__heading {
+    font-size: var(--t-heading);
+  }
+
+  /* A standalone route, so a full thumb-sized target, set as a label. */
+  .related__all {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
+    font-size: var(--t-label);
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+  }
+
+  /* Up to four. One column, two from 640px, three from 900px and four from
+     1100px, where four cards across the 1176px content box are 279px each —
+     over --card-min. At 900px four would be 194px, under it. */
   .related__grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -423,15 +565,42 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
   }
 
   @media (min-width: 900px) {
-    /* The object column takes the same 40% share as a homepage reveal, so the
-       two pages read as one system rather than two layouts. */
+    /* The photograph takes the same 40% share as a homepage reveal, so the two
+       pages read as one system rather than two layouts. With a strip, the
+       column grows by the strip and its gap rather than the photograph
+       shrinking to make room. */
     .detail__inner {
       grid-template-columns: var(--reveal-object) 1fr;
-      gap: var(--s-56);
+      gap: var(--s-80) var(--s-56);
+    }
+
+    .detail__inner--strip {
+      grid-template-columns: calc(var(--reveal-object) + var(--thumb-width) + var(--s-12)) 1fr;
+    }
+
+    /* Row 2. The accordion takes the full width unless there is a photograph
+       to sit beside it. */
+    .detail__info {
+      grid-column: 1 / -1;
+    }
+
+    .detail__inner--closeup .detail__info {
+      grid-column: 1;
+    }
+
+    .detail__closeup {
+      display: block;
+      grid-column: 2;
     }
 
     .related__grid {
       grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .related__grid {
+      grid-template-columns: repeat(4, 1fr);
     }
   }
 </style>

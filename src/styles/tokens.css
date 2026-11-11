@@ -156,6 +156,11 @@
      heading and detail flanking it. */
   --reveal-object: 40%;
 
+  /* A product page's thumbnail strip. 72px wide is 96px tall at the 3:4 crop,
+     over the touch minimum on both axes, and narrow enough that the strip does
+     not take the photograph's width — the page adds it to the object column. */
+  --thumb-width: 4.5rem;
+
   --underline-offset: 0.2em;
 
   /* Hero. A full viewport, now that the wordmark is set at --t-hero and fills

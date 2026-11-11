@@ -246,7 +246,7 @@ export const productsIn = (category: string): Product[] =>
 
 /** Related items: same category, never the product itself, never padded from
  *  another category. Fewer than the ceiling is a true answer. */
-export const relatedTo = (product: Product, limit = 3): Product[] =>
+export const relatedTo = (product: Product, limit = 4): Product[] =>
   productsIn(product.category)
     .filter((p) => p.slug !== product.slug)
     .slice(0, limit);

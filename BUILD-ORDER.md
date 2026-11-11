@@ -95,7 +95,7 @@ filter over a nine-item grid is furniture.
 | Product description | No copy. Optional on `Product`, absent from the data, omitted while null — the same rule the docket applies to its null fields |
 | Size selector | **Built in phase 4, dormant.** `sizes[]` is empty on every product, so nothing renders. When a product has sizes, the size is chosen at checkout from a native `<select>` on that product's order line, posted as `size-<slug>` and checked by `_order.js` against the product's labels — not on the product page, because carrying a size through the cart would not fit the script budget. One size per product per order |
 | Quantity | Named here originally, not in the step 6 ruling. It belongs with the cart in step 7, where a quantity has somewhere to go |
-| Thumbnails | One crop per product at most, and no product has one |
+| Thumbnails | **Built in section 14, dormant.** A radio-switched strip renders from two photographs up, and no product has one |
 | Spec table | `fabricWeight`, `fit` and `printMethod` are null on every product |
 | Size chart | **Built in phase 4, dormant.** Renders on a product page only when every size has `chestCm` and `lengthCm`. No measurements have been supplied |
 | Box-opening sequence | No frames. It is the one elaborate moment permitted site-wide and it arrives with real photography or not at all |
@@ -1001,3 +1001,46 @@ just deleted; both are rewritten against what actually guards the money path now
 in-repo comment naming `checkout.js`, `_gateway.js` or IntaSend as the live path is updated
 to name `stk.js`, `_daraja.js` and M-Pesa STK Push instead — `docs/` is exempted, per its
 own stated rule of being history rather than instruction.
+
+## 14 — Product page layout
+
+The product page in three rows, from a structure reference only — none of its
+photographs, copy, prices, colours or type entered the repo. Every product still has
+`photos: []`, so what changed on the committed site is small: the docket moved below the
+action, the delivery-terms line moved into an accordion, and the related row allows four.
+
+| Row | What | Renders today |
+|---|---|---|
+| 1 | Object left, with a thumbnail strip beside it from two photographs; name, price, description, hairline, sizes line, action, docket right | Strip: no. Description, sizes line: no data |
+| 2 | `<details name="info">` accordion left; the last photograph right from three photographs, dropped below 900px | Accordion: Delivery only, full width. Photograph: no |
+| 3 | "More in <category>", up to four, and "All <category>" | On the four products that share a category |
+
+**The strip has no script.** One visually hidden radio per photograph, one `<label>` per
+thumbnail, the main image shown by `:checked` through sibling selectors — not `:has()`,
+which older Android browsers lack and which would leave every main image hidden there.
+Arrow keys come from the radio group. CSS cannot count, so `Gallery.astro` carries one
+selector row per position up to `SWITCH_MAX` (6) and throws at build time above it. The
+closed attempt (PR #12) used JavaScript and broke the cart budget; the cart is untouched
+at 7,641 of 7,680 bytes.
+
+**The `sizes` arithmetic was wrong and is corrected.** `.wrap` is 1240px including its
+gutters, so the content box caps at 1176px at a 1240px viewport. The detail image is 471px
+at the cap, not 496px from 1340px. The page widens its object column by the strip and its
+gap, so the photograph is the same size with or without thumbnails.
+
+**Sections, and two rulings.** Size and fit renders with the size chart. Delivery always.
+Materials when `fabricWeight` is set. **Details is not built**: its content would be the
+description, which already sits beside the price, and CLAUDE.md says to cut a section that
+loses nothing. **Returns is not built**: no returns field exists in the data and no returns
+policy exists to describe. Materials repeats the docket's fabric-weight row, and is built
+because the brief names it — open.
+
+**V17** asserts, on every built product page with a strip, that radios, labels and main
+images are equal in number and at least two, every label points at a radio, the first main
+image is not lazy, and the only executable script is the cart. Nine fixtures; negative-
+tested on a scratch build by making the first image lazy, which failed both strip pages by
+name.
+
+**Verified on a scratch build only.** Four generated fixture images, run through
+`scripts/images.mjs` in a copy of the repo that was never pushed, at 1536px and inside a
+390px iframe. Nothing from it is committed.

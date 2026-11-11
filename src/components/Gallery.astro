@@ -11,30 +11,72 @@
 // product might one day have, and not one per rendition. Four kraft blocks stacked
 // down a product page announce the same absence four times and read as a broken
 // page rather than an honest one, which inverts the only reason the placeholder
-// exists. The absence is one fact. It is stated once.
+// exists. The absence is one fact. It is stated once. That is also why `last`
+// below renders nothing at all for a product with no photographs: the product
+// page has already spent its one placeholder in the object column.
 //
 // ---------- detail, and why it defaults to off ----------
 //
 // Same prop, same default and same reasoning as Docket's `detail`: off unless a
-// surface asks. On it renders every photograph, the first eager at high fetch
-// priority because it is the LCP element of a product page. Off it renders the
+// surface asks. On, it renders every photograph, the first eager at high fetch
+// priority because it is the LCP element of a product page. Off, it renders the
 // first photograph only, lazily.
 //
 // The default is the load-bearing part. A card in a grid of nine that forgot to
 // opt out would otherwise pull nine galleries of eager full-width images over a
 // metered connection, and nothing on the page would look wrong while it happened.
 // A surface that forgets to opt in shows one lazy image, which costs nothing.
+//
+// ---------- the strip, and why it has no script ----------
+//
+// With two or more photographs a detail view shows one at a time, chosen from a
+// strip of thumbnails. The choice is a radio group: one visually hidden radio
+// per photograph, one <label> per thumbnail, and the main image shown by
+// :checked. The browser supplies the rest — click, tap, Tab into the group and
+// arrow keys between photographs — with no JavaScript, so the cart stays the
+// only script on the site and its byte budget is untouched. The attempt that
+// used a script (closed PR #12) is what broke that budget.
+//
+// The radios come first in the markup so a sibling selector can reach both the
+// main image and the thumbnail from them. :has() would allow any order, but it
+// is missing from older Android browsers, and on those every main image would
+// stay hidden. Sibling selectors have worked everywhere for twenty years.
+//
+// CSS cannot count, so there is one selector row per position, up to SWITCH_MAX.
+// A product with more photographs than that fails the build here rather than
+// shipping a strip whose seventh thumbnail does nothing.
+//
+// A hidden main image is lazy and display: none, so the browser does not fetch
+// it until its thumbnail is chosen. The buyer pays for the photograph they look
+// at, plus a 400px thumbnail of each of the others.
 import { systemFor, type Product } from "../lib/products";
 
 interface Props {
   product: Product;
   detail?: boolean;
+  /** The product page's second-row photograph: the last one, lazily, and
+   *  nothing at all for a product with no photographs. */
+  last?: boolean;
 }
 
-const { product, detail = false } = Astro.props;
+const { product, detail = false, last = false } = Astro.props;
 
 const system = systemFor(product);
-const shown = detail ? product.photos : product.photos.slice(0, 1);
+const photos = product.photos;
+
+/* Must match the number of selector rows in the <style> below. */
+const SWITCH_MAX = 6;
+const switching = detail && !last && photos.length >= 2;
+
+if (switching && photos.length > SWITCH_MAX) {
+  throw new Error(
+    `Gallery: "${product.slug}" has ${photos.length} photographs and the strip switches at most ` +
+      `${SWITCH_MAX}. Add selector rows to src/components/Gallery.astro and raise SWITCH_MAX, or ` +
+      `drop a photograph with scripts/images.mjs.`
+  );
+}
+
+const shown = last ? photos.slice(-1) : detail ? photos : photos.slice(0, 1);
 
 /* ---------- deriving the other five URLs ----------
  *
@@ -54,7 +96,7 @@ const shown = detail ? product.photos : product.photos.slice(0, 1);
 const RENDITIONS = [400, 800, 1200];
 const NAMED = /^(\/img\/.+)-(\d+)\.([0-9a-f]{8})\.webp$/;
 
-const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
+const parse = (src: string): [string, string] => {
   const parsed = NAMED.exec(src);
   if (!parsed) {
     throw new Error(
@@ -62,8 +104,21 @@ const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
         `written. Expected /img/<slug>-<n>-800.<hash>.webp. Never hand-edit the photos array.`
     );
   }
-  const [, stem, , hash] = parsed;
+  return [parsed[1], parsed[3]];
+};
+
+const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
+  const [stem, hash] = parse(src);
   return RENDITIONS.map((w) => `${stem}-${w}.${hash}.${ext} ${w}w`).join(", ");
+};
+
+/* A thumbnail is 72px wide, 216 device pixels on a 3x phone, so the 400px
+   rendition is the largest it can ever use. Offering only that one keeps the
+   browser from fetching a 1200px file into a 72px box, and keeps V4 from
+   charging the page for one. */
+const thumbOf = (src: string, ext: "avif" | "webp"): string => {
+  const [stem, hash] = parse(src);
+  return `${stem}-${RENDITIONS[0]}.${hash}.${ext}`;
 };
 
 /* ---------- sizes ----------
@@ -73,37 +128,114 @@ const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
  * all: without it the browser assumes 100vw and fetches the largest file every
  * time, on the metered mobile connections this site is built for.
  *
- * These are the two layouts this component lands in, read off the grids in
- * [slug].astro, ProductReveal.astro and [category].astro. They round up. An
- * over-estimate costs bytes on one image; an under-estimate puts a soft
- * photograph on the page where a buyer is deciding whether the shop is real, and
- * of the two only one of them is recoverable by looking harder.
+ * Read off the grids in [slug].astro, ProductReveal.astro and [category].astro.
+ * The arithmetic, because the previous version of this comment got it wrong:
+ * .wrap is 1240px wide INCLUDING its two 32px gutters, so the content box stops
+ * growing at 1176px, and it stops at a 1240px viewport, not 1340. A 40% column
+ * of 1176 is 471px. Between 900 and 1240 it is 40% of (100vw - 64px), which is
+ * under 40vw, so 40vw rounds up. Below 900 the page is one column: 100vw less
+ * two gutters, 4rem above 640 and 2.5rem below.
+ *
+ * The strip does not take from the main image. The page widens its object
+ * column by the strip's width when there is one, so the photograph is the same
+ * size with or without thumbnails beside it.
+ *
+ * The second-row photograph sits in the other column: 1176 - 471 - 84 (strip
+ * and its gap) - 56 (column gap) = 565px at the cap, and under 60vw below it.
+ * Below 900 it is not displayed, and a lazy image that is display: none is not
+ * fetched, so the value there is never used.
+ *
+ * They round up. An over-estimate costs bytes on one image; an under-estimate
+ * puts a soft photograph on the page where a buyer is deciding whether the shop
+ * is real, and of the two only one of them is recoverable by looking harder.
  *
  * V2b exempts these for the same reason it exempts a media prelude: a
- * media-condition list is the one grammar var() does not resolve in, and this
- * is the only other place on the site that has one. The breakpoints below are
- * the three declared at the top of tokens.css — read and change them there.
+ * media-condition list is the one grammar var() does not resolve in. The
+ * breakpoints are the three declared at the top of tokens.css — read and change
+ * them there.
  */
-const SIZES = detail
-  ? "(min-width: 1340px) 496px, (min-width: 900px) 38vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
-  : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
+const SIZES = last
+  ? "(min-width: 1240px) 565px, 60vw"
+  : detail
+    ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
+    : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
+
+const group = `photo-${product.slug}`;
 ---
 
-<div class="gallery">
-  {
-    system === "light" ? (
-      /* One block. See the note at the top of this file. */
-      <div class="photo-pending" aria-hidden="true">
-        {product.name}
+{
+  system === "light" ? (
+    /* One block, and none at all in the second row. See the note at the top. */
+    !last && (
+      <div class="gallery">
+        <div class="photo-pending" aria-hidden="true">
+          {product.name}
+        </div>
       </div>
-    ) : (
-      shown.map((photo, i) => {
+    )
+  ) : switching ? (
+    <div class="gallery gallery--switch">
+      {photos.map((_, i) => (
+        <input
+          class="gallery__radio sr-only"
+          type="radio"
+          name={group}
+          id={`${group}-${i + 1}`}
+          checked={i === 0}
+        />
+      ))}
+
+      <div class="gallery__main">
+        {photos.map((photo, i) => (
+          <picture class="gallery__slide">
+            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
+            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
+            <img
+              class="gallery__img"
+              src={photo.src}
+              alt={photo.alt}
+              width={photo.width}
+              height={photo.height}
+              loading={i === 0 ? "eager" : "lazy"}
+              fetchpriority={i === 0 ? "high" : undefined}
+              decoding="async"
+            />
+          </picture>
+        ))}
+      </div>
+
+      <!-- tabindex: below 640px this row scrolls sideways when there are more
+           thumbnails than fit, and a scrolling region a keyboard cannot reach
+           is one a keyboard cannot scroll. The radios above take focus too;
+           this is for the row itself. -->
+      <div class="gallery__thumbs" role="group" aria-label="Photographs" tabindex="0">
+        {photos.map((photo, i) => (
+          <label class="gallery__thumb" for={`${group}-${i + 1}`}>
+            <picture>
+              <source type="image/avif" srcset={thumbOf(photo.src, "avif")} />
+              <img
+                class="gallery__thumb-img"
+                src={thumbOf(photo.src, "webp")}
+                alt=""
+                width={photo.width}
+                height={photo.height}
+                decoding="async"
+              />
+            </picture>
+            <span class="sr-only">{photo.alt}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  ) : (
+    <div class={last ? "gallery gallery--last" : "gallery"}>
+      {shown.map((photo, i) => {
         /* Eager and high priority for the first image of a detail view only —
            it is above the fold and the largest thing on the page, so it is the
            LCP candidate. Everything else is below the fold, which is where
            CLAUDE.md's lazy rule applies, and that includes the first image of a
            card or a homepage reveal: both sit under a 70dvh hero. */
-        const lead = detail && i === 0;
+        const lead = detail && !last && i === 0;
 
         return (
           <picture>
@@ -121,15 +253,12 @@ const SIZES = detail
             />
           </picture>
         );
-      })
-    )
-  }
-</div>
+      })}
+    </div>
+  )
+}
 
 <style>
-  /* A stack, never a carousel. A carousel needs a script, and the cart is the
-     only script this site ships; it also hides photographs behind an
-     interaction on the page where a buyer is trying to see all of them. */
   .gallery {
     display: grid;
     gap: var(--s-12);
@@ -140,12 +269,107 @@ const SIZES = detail
      fails to load — a 404 image with no ratio collapses the column and moves
      everything under it, which is the layout shift the attributes exist to
      prevent, arriving by the other door. */
-  .gallery__img {
+  .gallery__img,
+  .gallery__thumb-img {
     aspect-ratio: 3 / 4;
     object-fit: cover;
     border-radius: var(--radius-surface);
     width: 100%;
     height: auto;
     display: block;
+  }
+
+  /* ---------- the switch ---------- */
+
+  /* The hidden radios are positioned absolutely by .sr-only. Anchoring them
+     here keeps a focused radio inside the gallery, so focusing one never
+     scrolls the page somewhere else. */
+  .gallery--switch {
+    position: relative;
+  }
+
+  .gallery__slide {
+    display: none;
+  }
+
+  /* Below 640px the strip is a row under the photograph that scrolls sideways
+     once there are more thumbnails than fit: six at 72px plus five 8px gaps is
+     472px, and a 390px phone has 350px between its gutters. Proximity rather
+     than mandatory snapping, so a short drag is never thrown to the next stop. */
+  .gallery__thumbs {
+    display: flex;
+    gap: var(--s-8);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  /* 72 by 96, over the 44px touch minimum on both axes. A border, never a
+     shadow, and never the accent — the accent means "you can check this", and
+     which photograph is on screen is not a fact about the product. Every
+     thumbnail carries a transparent 1px border so choosing one changes a
+     colour, not a size, and nothing beside it moves. */
+  .gallery__thumb {
+    flex: 0 0 var(--thumb-width);
+    scroll-snap-align: start;
+    border: 1px solid transparent;
+    border-radius: var(--radius-surface);
+    cursor: pointer;
+    transition: border-color var(--dur) var(--ease);
+  }
+
+  /* One row per position, to SWITCH_MAX. The radio's position among the
+     radios picks the main image and the thumbnail at the same position. */
+  .gallery__radio:nth-of-type(1):checked ~ .gallery__main > :nth-child(1),
+  .gallery__radio:nth-of-type(2):checked ~ .gallery__main > :nth-child(2),
+  .gallery__radio:nth-of-type(3):checked ~ .gallery__main > :nth-child(3),
+  .gallery__radio:nth-of-type(4):checked ~ .gallery__main > :nth-child(4),
+  .gallery__radio:nth-of-type(5):checked ~ .gallery__main > :nth-child(5),
+  .gallery__radio:nth-of-type(6):checked ~ .gallery__main > :nth-child(6) {
+    display: block;
+  }
+
+  .gallery__radio:nth-of-type(1):checked ~ .gallery__thumbs > :nth-child(1),
+  .gallery__radio:nth-of-type(2):checked ~ .gallery__thumbs > :nth-child(2),
+  .gallery__radio:nth-of-type(3):checked ~ .gallery__thumbs > :nth-child(3),
+  .gallery__radio:nth-of-type(4):checked ~ .gallery__thumbs > :nth-child(4),
+  .gallery__radio:nth-of-type(5):checked ~ .gallery__thumbs > :nth-child(5),
+  .gallery__radio:nth-of-type(6):checked ~ .gallery__thumbs > :nth-child(6) {
+    border-color: var(--fg);
+  }
+
+  /* The radio has focus but cannot be seen, so its thumbnail wears the ring —
+     the same ring global.css gives every other focusable element. */
+  .gallery__radio:nth-of-type(1):focus-visible ~ .gallery__thumbs > :nth-child(1),
+  .gallery__radio:nth-of-type(2):focus-visible ~ .gallery__thumbs > :nth-child(2),
+  .gallery__radio:nth-of-type(3):focus-visible ~ .gallery__thumbs > :nth-child(3),
+  .gallery__radio:nth-of-type(4):focus-visible ~ .gallery__thumbs > :nth-child(4),
+  .gallery__radio:nth-of-type(5):focus-visible ~ .gallery__thumbs > :nth-child(5),
+  .gallery__radio:nth-of-type(6):focus-visible ~ .gallery__thumbs > :nth-child(6) {
+    outline: 2px solid var(--fg);
+    outline-offset: 2px;
+  }
+
+  /* From 900px the page is two columns and the strip stands to the left of the
+     photograph, top-aligned with it. Six thumbnails are 6 x 96 + 5 x 8 = 616px
+     tall against a 628px photograph at the 471px cap, so the strip never runs
+     past the photograph at full width. Between 900 and 1240 the photograph is
+     shorter and the strip may run on below it; nothing overlaps. */
+  @media (min-width: 900px) {
+    .gallery--switch {
+      grid-template-columns: var(--thumb-width) 1fr;
+      align-items: start;
+    }
+
+    .gallery__main {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .gallery__thumbs {
+      grid-column: 1;
+      grid-row: 1;
+      flex-direction: column;
+      overflow-x: visible;
+    }
   }
 </style>
