@@ -209,9 +209,26 @@ export function readOrder(payload) {
       return no(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again, or ${REACH}.`, "items");
     }
 
+    /* THE SIZE, for a product that is made in sizes, and only for one. The
+       checkout form posts it as its own field, size-<slug>, from a native
+       <select> on that line, so it reaches here beside the items rather than
+       inside them. Matched exactly against the labels in products.json: a
+       label that is not one of them is refused rather than stored, because an
+       order for a size nobody makes is an order that cannot be packed.
+       A product with no sizes ignores the field entirely — the form posts one
+       per sized product whether or not it is in the order. */
+    const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+    let size = null;
+    if (sizes.length > 0) {
+      const field = `size-${slug}`;
+      const chosen = Object.hasOwn(payload, field) ? payload[field] : undefined;
+      size = sizes.find((s) => s.label === chosen)?.label ?? null;
+      if (size === null) return no(400, `Choose a size for the ${product.name}.`, field);
+    }
+
     const amount = product.price * qty;
     subtotal += amount;
-    lines.push({ slug, name: product.name, qty, price: product.price, amount });
+    lines.push({ slug, name: product.name, qty, price: product.price, amount, size });
   }
 
   if (subtotal <= 0) return no(400, MESSAGES.empty, "items");

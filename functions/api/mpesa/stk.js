@@ -99,7 +99,11 @@ export async function onRequest({ request, env }) {
    * which Daraja's STK API does not offer. Recorded in BUILD-ORDER section 9. */
   const record = {
     reference: ref,
-    items: order.lines.map((line) => ({ slug: line.slug, qty: line.qty })),
+    /* A size only on a line whose product is made in sizes, so a record for a
+       pendant does not carry `size: null` that reads as a missing answer. */
+    items: order.lines.map((line) =>
+      line.size === null ? { slug: line.slug, qty: line.qty } : { slug: line.slug, qty: line.qty, size: line.size }
+    ),
     /* The two halves of the amount, as computed by readOrder(): the items at
        catalogue prices, and the delivery fee for the county key. Kept so the
        record says how the figure below was reached, and so /api/track can show

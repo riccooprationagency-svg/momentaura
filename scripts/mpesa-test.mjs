@@ -62,6 +62,19 @@ writeFileSync(orderPath, orderPatched, "utf8");
 globalThis.__catalogue = [
   { slug: "crew-tee", name: "Crew tee", price: 650, stock: 6 },
   { slug: "faith-hoodie", name: "Faith hoodie", price: 3500, stock: 0 },
+  /* A fixture, not shop data: no product in products.json has sizes yet. Two
+     labels, one with measurements and one without, because the server reads
+     only the label and must not care whether the chart could render. */
+  {
+    slug: "sized-tee",
+    name: "Sized tee",
+    price: 900,
+    stock: 4,
+    sizes: [
+      { label: "M", chestCm: 52, lengthCm: 70 },
+      { label: "L", chestCm: null, lengthCm: null },
+    ],
+  },
 ];
 
 /* The delivery fee table. Same move as the catalogue — the one import line in
@@ -706,6 +719,74 @@ await check("push responses are never cached", async () => {
   const res = await push();
   eq(res.headers.get("Cache-Control"), "no-store", "Cache-Control");
   eq(res.headers.get("X-Content-Type-Options"), "nosniff", "nosniff");
+});
+
+/* ================= sizes — checked against the product's own list =================
+   The checkout form posts a size as its own field, size-<slug>, from a native
+   <select> on that line. The cart script never sees it. */
+
+const SIZED = { ...ORDER, items: [{ slug: "sized-tee", qty: 1 }] };
+
+for (const [label, extra] of [
+  ["no size at all", {}],
+  ["an empty size", { "size-sized-tee": "" }],
+  ["a size the product is not made in", { "size-sized-tee": "XXL" }],
+  ["a size in the wrong case", { "size-sized-tee": "m" }],
+  ["a size that is not a string", { "size-sized-tee": 1 }],
+  ["a size given as an object", { "size-sized-tee": { label: "M" } }],
+  ["a size sent inside the item instead of the form field", { items: [{ slug: "sized-tee", qty: 1, size: "M" }] }],
+]) {
+  await check(`A SIZED PRODUCT WITHOUT A VALID SIZE IS REFUSED: ${label}`, async () => {
+    const res = await push({ ...SIZED, ...extra });
+    eq(res.status, 400, "status");
+    const body = await res.json();
+    eq(body.field, "size-sized-tee", "names the line's own size field");
+    has(body.message, "Choose a size for the Sized tee", "says what to do");
+    eq(pushes.length, 0, "nothing was pushed");
+    eq(kv.store.size, 0, "no order record was written");
+  });
+}
+
+await check("a valid size is pushed at the catalogue price and stored on the record", async () => {
+  const res = await push({ ...SIZED, items: [{ slug: "sized-tee", qty: 2 }], "size-sized-tee": "L" });
+  eq(res.status, 200, "status");
+  eq(pushes[0].Amount, 1800, "2 x 900, Nairobi CBD is free");
+  eq((await record()).items, [{ slug: "sized-tee", qty: 2, size: "L" }], "record items");
+});
+
+await check("a size posted for a product made in no sizes is ignored, and not stored", async () => {
+  const res = await push({ ...ORDER, "size-crew-tee": "M" });
+  eq(res.status, 200, "status");
+  eq((await record()).items, [{ slug: "crew-tee", qty: 2 }], "record items carry no size key");
+});
+
+await check("a size field for a sized product not in the order is ignored", async () => {
+  const res = await push({ ...ORDER, "size-sized-tee": "nonsense" });
+  eq(res.status, 200, "the form posts every sized line's field, in the order or not");
+});
+
+await check("a sized line and an unsized line in one order: only the sized one carries a size", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }, { slug: "sized-tee", qty: 1 }], "size-sized-tee": "M" });
+  eq(res.status, 200, "status");
+  eq((await record()).items, [{ slug: "crew-tee", qty: 1 }, { slug: "sized-tee", qty: 1, size: "M" }], "record items");
+});
+
+/* ================= sold out — the client cannot get one through =================
+   The cart never offers a sold-out product, but storage and the request are the
+   buyer's to edit. These are the hand-edited cart and the direct call. */
+
+await check("A SOLD-OUT PRODUCT FROM A HAND-EDITED CART IS REFUSED, WHATEVER ELSE IS IN IT", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "crew-tee", qty: 1 }, { slug: "faith-hoodie", qty: 1 }] });
+  eq(res.status, 409, "status");
+  has((await res.json()).message, "Faith hoodie is sold out", "names the product");
+  eq(pushes.length, 0, "nothing was pushed");
+  eq(kv.store.size, 0, "no order record was written");
+});
+
+await check("a sold-out product with a client-supplied price or stock is still refused", async () => {
+  const res = await push({ ...ORDER, items: [{ slug: "faith-hoodie", qty: 1, price: 1, stock: 99 }] });
+  eq(res.status, 409, "status");
+  eq(pushes.length, 0, "nothing was pushed");
 });
 
 /* ================= the callback ================= */
