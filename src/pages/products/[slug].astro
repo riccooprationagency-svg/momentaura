@@ -4,9 +4,9 @@
 //   Row 1  the object left at 3:4 — with a thumbnail strip beside it when there
 //          are two or more photographs — and everything a buyer needs to decide
 //          on the right, both aligned top
-//   Row 2  an accordion of information sections left, and one more photograph
-//          right when there are three or more. Otherwise the accordion takes
-//          the full width
+//   Row 2  the size chart left, when there is one, and one more photograph
+//          right when there are three or more. Otherwise the chart takes the
+//          full width
 //   Row 3  more in the same category, up to four, and a link to all of it
 //
 // Below 900px it is one column in that order, and the row 2 photograph is
@@ -86,35 +86,21 @@ const chart = sizeChart(product);
 const strip = product.photos.length >= 2;
 const closeup = product.photos.length >= 3;
 
-/* ---------- the information sections ----------
+/* ---------- the information section ----------
  *
- * Each renders only when its data exists, in this order, and the first one that
- * renders is the one open. Delivery always renders, so there is always one.
+ * One: SIZE AND FIT, rendered when the size chart is — sizes[] non-empty and
+ * every size measured. With sizes and no measurements it would be a heading over
+ * a repeat of the sizes line above it. Fit is not repeated here: the docket
+ * already states it. It opens by default; it is the only section.
  *
- * DETAILS is not here, though the brief named it, and the omission is a ruling
- * rather than an oversight. Its content would be the description, and the
- * description already sits in the right-hand column beside the price. The same
- * paragraph twice on one page is a section that can be cut without losing
- * information, and CLAUDE.md says to cut it.
+ * Cut, each because it repeated something already on the page, and CLAUDE.md
+ * says a section that can be cut without losing information is cut:
  *
- * SIZE AND FIT renders when the size chart does: sizes[] non-empty and every
- * size measured. With sizes and no measurements it would be a heading over a
- * repeat of the sizes line above it. Fit is not repeated here: the docket
- * already states it.
- *
- * MATERIALS renders when fabricWeight is set, and lists print method beside it
- * when that is set too. Both are null on every product today. Fabric weight is
- * also a docket row, so this section repeats one fact the docket states; it is
- * built because the brief names it, and the PR asks whether it should stay.
+ *   Details    the description, which sits beside the price
+ *   Materials  the docket's fabric-weight row
+ *   Delivery   one line linking /delivery, which the nav, the footer and
+ *              the "Delivery from" line beside the docket already reach
  */
-const sections = [
-  chart ? "size" : null,
-  "delivery",
-  product.fabricWeight ? "materials" : null,
-].filter((s): s is string => s !== null);
-
-const opens = (key: string) => sections[0] === key;
-
 const meta = [product.name, price(product.price)].join(", ");
 const description = product.dispatch ? `${meta}. Dispatched from ${product.dispatch}.` : `${meta}.`;
 ---
@@ -228,69 +214,39 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
       </div>
 
       <!--
-        Native <details>, no script. name="info" makes them one exclusive group
-        where the browser supports it, so opening one closes the other; where it
-        does not, each opens on its own, which loses nothing.
+        Native <details>, no script, open by default. A buyer who has seen the
+        chart can fold it away; one who has not is not made to look for it.
       -->
-      <div class="detail__info">
-        {
-          sections.includes("size") ? (
-            <details class="info" name="info" open={opens("size")}>
+      {
+        chart && (
+          <div class="detail__info">
+            <details class="info" open>
               <summary class="info__summary">Size and fit</summary>
               <div class="info__body">
-                {chart && (
-                  <table class="detail__chart">
-                    <caption class="detail__chart-caption">Size chart, in centimetres</caption>
-                    <thead>
+                <table class="detail__chart">
+                  <caption class="detail__chart-caption">Size chart, in centimetres</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Size</th>
+                      <th scope="col">Chest</th>
+                      <th scope="col">Length</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chart.map((size) => (
                       <tr>
-                        <th scope="col">Size</th>
-                        <th scope="col">Chest</th>
-                        <th scope="col">Length</th>
+                        <th scope="row">{size.label}</th>
+                        <td>{size.chestCm}</td>
+                        <td>{size.lengthCm}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {chart.map((size) => (
-                        <tr>
-                          <th scope="row">{size.label}</th>
-                          <td>{size.chestCm}</td>
-                          <td>{size.lengthCm}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </details>
-          ) : null
-        }
-
-        <details class="info" name="info" open={opens("delivery")}>
-          <summary class="info__summary">Delivery</summary>
-          <div class="info__body">
-            <p class="info__line">
-              Delivery fees and how payment works are on the <a href="/delivery">delivery terms</a> page.
-            </p>
           </div>
-        </details>
-
-        {
-          sections.includes("materials") && (
-            <details class="info" name="info" open={opens("materials")}>
-              <summary class="info__summary">Materials</summary>
-              <dl class="info__body info__facts">
-                <dt>Fabric weight</dt>
-                <dd>{product.fabricWeight}</dd>
-                {product.printMethod && (
-                  <>
-                    <dt>Print method</dt>
-                    <dd>{product.printMethod}</dd>
-                  </>
-                )}
-              </dl>
-            </details>
-          )
-        }
-      </div>
+        )
+      }
 
       {
         closeup && (
@@ -424,11 +380,10 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     margin: 0;
   }
 
-  /* ---------- information sections ---------- */
+  /* ---------- the information section ---------- */
 
-  /* Hairlines between sections, top and bottom of the group. Nothing else
-     separates them: no box, no fill, no icon. The disclosure marker is the
-     browser's own, left as it is. */
+  /* A hairline above and below. No box, no fill, no icon. The disclosure
+     marker is the browser's own, left as it is. */
   .detail__info {
     border-block-start: 1px solid var(--border);
   }
@@ -451,30 +406,6 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     gap: var(--s-12);
     justify-items: start;
     padding-block-end: var(--s-20);
-  }
-
-  .info__line {
-    color: var(--fg-muted);
-    max-width: var(--measure);
-  }
-
-  /* Facts, so mono, in the docket's two-column shape without its ground. */
-  .info__facts {
-    grid-template-columns: auto 1fr;
-    gap: var(--s-8) var(--s-20);
-    font-family: var(--font-mono);
-    font-size: var(--t-docket);
-    line-height: var(--lh-docket);
-    letter-spacing: var(--tr-docket);
-  }
-
-  .info__facts dt {
-    color: var(--fg-muted);
-    text-transform: uppercase;
-  }
-
-  .info__facts dd {
-    margin: 0;
   }
 
   .detail__chart {
@@ -578,8 +509,8 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
       grid-template-columns: calc(var(--reveal-object) + var(--thumb-width) + var(--s-12)) 1fr;
     }
 
-    /* Row 2. The accordion takes the full width unless there is a photograph
-       to sit beside it. */
+    /* Row 2. The chart takes the full width unless there is a photograph to
+       sit beside it. */
     .detail__info {
       grid-column: 1 / -1;
     }

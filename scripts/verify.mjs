@@ -1944,6 +1944,11 @@ function categoryViolations(declared, inData, pages) {
  *
  *   radios, labels and main images are equal in number, at least two
  *   every label points at one of those radios
+ *   the first radio is checked — with none checked, every main image is
+ *     display: none and the page opens on an empty frame
+ *   every radio carries the same non-empty name — a missing name or a second
+ *     one splits the group, two can be checked at once, and arrow keys stop
+ *     moving between photographs
  *   the first main image is not lazy
  *   the only executable <script> is the cart — ld+json is data, never run,
  *   and V4 already holds it to the one Organization block
@@ -1974,6 +1979,14 @@ function stripViolations(pages) {
     }
     if (radios.length < 2) out.push(`${name}  a strip with ${radios.length} radio(s) — a strip switches between two or more`);
 
+    if (radios.length && !/\schecked(?=[\s>=/])/i.test(radios[0])) {
+      out.push(`${name}  the first radio is not checked — the page would open on an empty frame`);
+    }
+    const names = new Set(radios.map((t) => attrIn(t, "name") ?? ""));
+    if (names.has("")) out.push(`${name}  a radio has no name — every radio in the strip shares one`);
+    const named = [...names].filter((n) => n !== "");
+    if (named.length > 1) out.push(`${name}  radios split across ${named.length} names (${named.join(", ")}) — every radio in the strip shares one`);
+
     const ids = new Set(radios.filter((t) => /\stype\s*=\s*["']radio["']/i.test(t)).map((t) => attrIn(t, "id")));
     for (const label of labels) {
       const target = attrIn(label, "for");
@@ -1997,15 +2010,17 @@ function stripViolations(pages) {
 
 {
   /* Self-test. A check that has never been seen to fail is a comment. */
-  const radio = (n) => `<input class="gallery__radio sr-only" type="radio" name="photo-x" id="photo-x-${n}">`;
+  /* name null leaves the attribute off. The shipped shape checks the first. */
+  const radio = (n, { checked, name }) =>
+    `<input class="gallery__radio sr-only" type="radio"${name === null ? "" : ` name="${name}"`} id="photo-x-${n}"${checked ? " checked" : ""}>`;
   const label = (n) => `<label class="gallery__thumb" for="photo-x-${n}"><img src="/img/t.webp" alt="" width="3" height="4"></label>`;
   const slide = (lazy) => `<picture class="gallery__slide"><img class="gallery__img" src="/img/m.webp" alt="m" width="3" height="4" loading="${lazy ? "lazy" : "eager"}"></picture>`;
   const cart = `<script type="module" src="/_astro/cart.Ab12_x.js"></script>`;
   const ld = `<script type="application/ld+json">{}</script>`;
-  const strip = ({ r = [1, 2, 3], l = [1, 2, 3], s = [false, true, true], scripts = ld + cart } = {}) =>
-    `${scripts}<div class="gallery gallery--switch">${r.map(radio).join("")}` +
+  const strip = ({ r = [1, 2, 3], l = [1, 2, 3], s = [false, true, true], scripts = ld + cart, first = true, names = [] } = {}) =>
+    `${scripts}<div class="gallery gallery--switch">${r.map((n, i) => radio(n, { checked: first && i === 0, name: names[i] === undefined ? "photo-x" : names[i] })).join("")}` +
     `<div class="gallery__main">${s.map(slide).join("")}</div>` +
-    `<div class="gallery__thumbs" role="group" tabindex="0">${l.map(label).join("")}</div></div>`;
+    `<div class="gallery__thumbs" role="group">${l.map(label).join("")}</div></div>`;
   const cases = [
     ["the shipped shape: three photographs, ld+json and the cart", strip(), null],
     ["a page with no strip is not this check's business", `<div class="gallery">${slide(false)}</div><script>x()</script>`, null],
@@ -2013,6 +2028,9 @@ function stripViolations(pages) {
     ["a main image missing", strip({ s: [false, true] }), "3 radios, 3 labels, 2 main images"],
     ["a label pointing nowhere", strip({ l: [1, 2, 4] }), `for="photo-x-4" points at no radio`],
     ["a strip of one", strip({ r: [1], l: [1], s: [false] }), "a strip with 1 radio(s)"],
+    ["no radio checked", strip({ first: false }), "the first radio is not checked"],
+    ["a radio with no name", strip({ names: ["photo-x", null, "photo-x"] }), "a radio has no name"],
+    ["radios across two names", strip({ names: ["photo-x", "photo-x", "photo-y"] }), "radios split across 2 names"],
     ["the first main image lazy", strip({ s: [true, true, true] }), "the first main image is lazy"],
     ["a gallery script beside the cart", strip({ scripts: cart + `<script type="module" src="/_astro/gallery.Zz9.js"></script>` }), "not the cart  /_astro/gallery.Zz9.js"],
     ["an inline script", strip({ scripts: cart + `<script>go()</script>` }), "not the cart  (inline)"],
