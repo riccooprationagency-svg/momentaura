@@ -1875,6 +1875,12 @@ function categoryViolations(declared, inData, pages) {
       if (inData.includes(slug)) out.push(`category "${slug}" has products but no built page`);
       continue;
     }
+    /* Built with nothing in the data behind it. A card on such a page would be
+       one the data does not account for, so a card does not excuse it. */
+    if (!inData.includes(slug)) {
+      out.push(`category "${slug}" has no products but has a built page`);
+      continue;
+    }
     if (!/<article\b[^>]*\sclass\s*=\s*["'](?:[^"']*\s)?card(?:\s[^"']*)?["']/i.test(html)) {
       out.push(`category "${slug}" page has no product card`);
     }
@@ -1896,7 +1902,8 @@ function categoryViolations(declared, inData, pages) {
   const cases = [
     ["the shipped shape: one declared, one empty and unbuilt", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: null }], null],
     ["a category nobody declared", ["hoodies"], ["hoodies", "scarves"], [{ slug: "hoodies", html: card }], `"scarves" is in products.json but not declared`],
-    ["an empty category given a page", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: "<main><div class=\"grid\"></div></main>" }], `"watches" page has no product card`],
+    ["an empty category given a page", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: "<main><div class=\"grid\"></div></main>" }], `"watches" has no products but has a built page`],
+    ["an empty category given a page that still carries a card", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: card }], `"watches" has no products but has a built page`],
     ["a category with products and no page", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: null }], `"hoodies" has products but no built page`],
     ["a card class that only contains the word", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: `<article class="card__meta">` }], `"hoodies" page has no product card`],
   ];
