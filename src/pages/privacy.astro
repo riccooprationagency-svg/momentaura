@@ -16,6 +16,7 @@
 // Deliberately NOT dated. A "last updated" line is a fact like any other and it
 // is the first thing to rot; the file's history in the repo is the real record.
 import Base from "../layouts/Base.astro";
+import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 ---
 
 <Base
@@ -46,6 +47,15 @@ import Base from "../layouts/Base.astro";
         lose. There are no cookies. Checking an order needs its reference and the phone
         number it was placed with, and nothing more.
       </p>
+      <!-- functions/api/_throttle.js: a miss is counted in KV under the
+           connecting address for one ten-minute window, and the key expires
+           after twenty minutes. A successful lookup writes nothing. -->
+      <p class="page__body">
+        If an order lookup finds nothing, the internet address it came from is counted
+        for ten minutes, so that guessing at other people's orders cannot go on without
+        limit. The count is deleted automatically after twenty minutes. A lookup that
+        finds your order is not recorded.
+      </p>
 
       <h2 class="page__sub">What your browser stores</h2>
       <p class="page__body">
@@ -54,38 +64,52 @@ import Base from "../layouts/Base.astro";
         stock figure. It never leaves your device until you go to checkout. Clearing your
         browser data removes it, and nothing here can read it back.
       </p>
+      <p class="page__body">
+        When you place an order, the browser also keeps the order reference,
+        the {GATEWAY_NAME} payment request ID, the time the order was placed, and the product codes and
+        quantities of that order, so the confirmation page can still show what you bought.
+        It stays until your next order replaces it or you clear your browser data.
+      </p>
 
       <h2 class="page__sub">What is collected when you order</h2>
       <p class="page__body">
         Your name, your phone number, where the order is going — the county, the area or
         estate, and a landmark — and an email address if you choose to give one. The
-        email is optional and is only ever used to send you a receipt. Nothing subscribes
-        you to anything, because there is no mailing list to subscribe to.
+        email is optional and is not used for anything except a receipt. Nothing
+        subscribes you to anything, because there is no mailing list to subscribe to.
+      </p>
+      <!-- functions/api/_daraja.js stkPush(): the request carries the phone number
+           (PartyA, PhoneNumber), the amount, the order reference
+           (AccountReference) and "MomentAura <reference>" (TransactionDesc).
+           The name, the email and the delivery details are not in it. -->
+      <p class="page__body">
+        Your phone number is required because {GATEWAY_NAME} sends the payment prompt to
+        it. To take the payment, {GATEWAY_NAME} is given your phone number, the amount and
+        the order reference. Your name, your email and your delivery details are not sent
+        to {GATEWAY_NAME}.
       </p>
       <p class="page__body">
-        Your phone number is required because M-Pesa sends the payment prompt to it. Your
-        name and phone number are passed to the payment provider to take the payment, and
-        to nobody else.
-      </p>
-      <p class="page__body">
-        <strong>No card details are ever entered on this site.</strong> Payment happens on
-        the payment provider's own secure page. This site has no card form anywhere in it
-        and never will.
+        <strong>No card details are ever entered on this site.</strong> The payment
+        prompt arrives on your own phone and you enter your PIN there, so your PIN never
+        passes through this site. This site has no card form anywhere in it and never
+        will.
       </p>
 
       <h2 class="page__sub">How long it is kept</h2>
       <p class="page__body">
-        A pending order — the product codes, the quantities, the amount, your name, your
-        phone number, the delivery county, area and landmark, and the email if you gave
-        one — is held for seven days so the payment
-        can be matched to the order and so you can look it up. After that it expires
-        automatically.
+        An order — the product codes, the quantities, the amount, your name, your phone
+        number, the delivery county, area and landmark, the email if you gave one, and
+        once it is paid the {GATEWAY_NAME} receipt number — is held for seven days from
+        the last time it changed: when it is placed, and again when the payment is
+        confirmed or fails. That is so the payment can be matched to the order and so you
+        can look it up. After that it expires automatically.
       </p>
 
       <h2 class="page__sub">Who else sees it</h2>
       <p class="page__body">
-        The payment provider, because they are taking the payment. The company hosting
-        this site, because the pages and the order have to pass through it. Nobody else.
+        The person who runs MomentAura. {GATEWAY_NAME}, which sees the payment details
+        listed above because it is taking the payment. The company hosting this site, because the pages and the order have
+        to pass through it. Your delivery details are used to get the order to you.
         Nothing is sold, shared for advertising, or handed to a data broker.
       </p>
 
