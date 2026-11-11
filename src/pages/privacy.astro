@@ -43,11 +43,26 @@ const networks = [known(site.social?.facebook) && "Facebook", known(site.social?
       <hr class="page__hair" />
 
       <h2 class="page__sub">What is not collected</h2>
+      <!-- Cloudflare Web Analytics is switched on for the Pages project, so
+           Cloudflare injects its beacon into every page at the edge. It is not
+           in the repo and not in dist/, which makes it invisible to V4 and to
+           every other gate: the build stays green whether this paragraph is true
+           or not. This paragraph is the only place the site's own copy admits
+           the beacon exists. If Web Analytics is ever switched off in the Pages
+           dashboard, revert this paragraph in the same change. Every claim about
+           what it records is taken from developers.cloudflare.com/web-analytics
+           (data-origin-and-collection, faq); none of those pages mention
+           cookies, so this paragraph does not either. -->
       <p class="page__body">
-        There are no analytics on this site. No tracking pixels, no advertising tags, no
-        session recording, no third-party scripts of any kind. The fonts are served from
-        this site rather than from a font network, so loading a page does not tell anyone
-        else that you did.
+        The site counts page visits with Cloudflare's own analytics. Every page loads one
+        script for it from Cloudflare's servers, at static.cloudflareinsights.com, which
+        reports each page view and how long the page took to load. Cloudflare's
+        documentation says it does not record the part of an address after a question
+        mark, does not follow a visitor from one website to another, and keeps every
+        report for 7 days and about one in ten after that. There are no tracking pixels,
+        no advertising tags and no session recording. The fonts are served from this site
+        rather than from a font network, so loading a page does not tell anyone else that
+        you did.
       </p>
       <p class="page__body">
         There are no accounts and no passwords, so there is no store of credentials to
