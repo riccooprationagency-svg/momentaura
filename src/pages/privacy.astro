@@ -17,6 +17,13 @@
 // is the first thing to rot; the file's history in the repo is the real record.
 import Base from "../layouts/Base.astro";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
+import { known, site } from "../lib/site";
+
+/* The networks the footer actually links to, so the sentence below names only
+   those and disappears with them. Validated in lib/site.ts before this runs. */
+const networks = [known(site.social?.facebook) && "Facebook", known(site.social?.instagram) && "Instagram"].filter(
+  (name): name is string => typeof name === "string"
+);
 ---
 
 <Base
@@ -120,6 +127,16 @@ import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
         than this one. This site sends nothing to WhatsApp until you tap a link. The
         message it starts with carries a short code naming the page you tapped it on, such
         as WEB-CONTACT, and you can see and change it before you send.
+        {
+          networks.length > 0 && (
+            <>
+              Following the {networks.join(" or ")} link in the footer leaves this site, and
+              that visit is handled under {networks.map((n) => `${n}'s`).join(" or ")} own
+              terms rather than this policy; this site sends nothing to
+              {networks.length > 1 ? " either" : " it"} until you tap.
+            </>
+          )
+        }
       </p>
       <p class="page__body">
         Messages sent to the email addresses on the <a href="/contact">contact</a> page

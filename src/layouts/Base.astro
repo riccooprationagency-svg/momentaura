@@ -18,6 +18,7 @@ import {
   phoneDisplay,
   publicFile,
   site,
+  socialLinks,
   telHref,
   whatsappHref,
 } from "../lib/site";
@@ -97,6 +98,13 @@ const FOOTER = [
   { href: "/contact", label: "Contact" },
   { href: "/privacy", label: "Privacy" },
 ];
+
+/* The shop's own Facebook and Instagram pages, from site.json through the
+   validator in lib/site.ts. Text only: no logo, no icon, no brand mark, because
+   CLAUDE.md bans third-party trademarks in imagery. Plain links, no
+   target="_blank", and noreferrer so following one does not tell the other
+   site which page it came from. verify.mjs V15 holds all of this on dist/. */
+const SOCIAL = socialLinks();
 
 const year = new Date().getFullYear();
 
@@ -225,6 +233,18 @@ const ld = JSON.stringify(organizationLd()).replace(/</g, "\\u003c");
             >{emailParts("general")[0]}<wbr />{emailParts("general")[1]}</a
           >
         </div>
+
+        {
+          SOCIAL.length > 0 && (
+            <nav class="foot__links" aria-label="MomentAura on social media">
+              {SOCIAL.map((link) => (
+                <a href={link.href} rel="noopener noreferrer">
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          )
+        }
 
         <p class="foot__legal">&copy; {year} MomentAura</p>
       </div>
