@@ -80,8 +80,23 @@ export async function onRequest({ request, env }) {
      reference alongside it means guessing an id gets you nothing, because the
      reference is minted separately and never appears in Daraja's traffic.
      The same answer for "no such order" and "wrong reference", so neither
-     confirms the other. */
-  if (!record || typeof claimed !== "string" || claimed !== record.reference) {
+     confirms the other.
+
+     AND THE RECORD MUST BE THE ONE STORED UNDER THAT ID. The id is a KV key
+     taken from the request, and the same namespace holds the buyer's copy
+     under ref:<reference>. Sent "ref:MA-…" with its reference, the lookup
+     found that copy and the reference check passed — so the reference alone,
+     which is screenshotted and read aloud, returned the order's status and
+     amounts, and could steer a Daraja query and settle() at a key that is not
+     a CheckoutRequestID. Only the canonical record carries its own id equal
+     to the key it lives under; the ref: copy never does. A positive match
+     rather than a refused prefix, so a key shape added later is refused too. */
+  if (
+    !record ||
+    record.checkoutRequestId !== checkoutRequestId ||
+    typeof claimed !== "string" ||
+    claimed !== record.reference
+  ) {
     return json(404, { message: `No order was found for that reference. If you have paid, ${REACH} with the reference.` });
   }
 

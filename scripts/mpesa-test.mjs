@@ -1109,6 +1109,27 @@ await check("an order from before delivery fees reports its total and nothing it
   eq(breakdown, { total: "KSh 1,300" }, "breakdown");
 });
 
+/* Greptile P1 on #17. The id is a KV key from the request, and the buyer's
+   copy lives in the same namespace under ref:<reference>. Asking for that key
+   with its own reference must not reach the order at all — not its status,
+   not its amounts, and not a Daraja query or a settle at that key. */
+for (const settledFirst of [false, true]) {
+  await check(`THE REFERENCE ALONE CANNOT READ AN ORDER THROUGH ITS ref: KEY (${settledFirst ? "settled" : "pending, past grace"})`, async () => {
+    const body = await pushThenAge(120_000);
+    if (settledFirst) await hit(callbackBody());
+    const before = (await record()).status;
+    const res = await askStatus({ checkoutRequestId: `ref:${body.reference}`, reference: body.reference });
+    const text = await res.text();
+    eq(res.status, 404, "status");
+    has(text, "No order was found", "the same answer as no such order");
+    lacks(text, "breakdown", "the breakdown key");
+    lacks(text, "1,300", "the total");
+    eq(queries.length, 0, "Daraja was not queried");
+    eq((await record()).status, before, "the order was not touched");
+    eq((await kv.get(`ref:${body.reference}`, "json")).status, before, "nor its ref: copy");
+  });
+}
+
 await check("a wrong reference gets no amounts", async () => {
   const body = await pushThenAge(10_000);
   const res = await askStatus({ checkoutRequestId: body.checkoutRequestId, reference: "MA-WRON-GREF" });
