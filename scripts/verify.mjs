@@ -16,6 +16,7 @@
  *   V13 the sitemap, the canonicals and robots.txt agree with dist/
  *   V13b a note while the built site carries a site-wide noindex
  *   V14 images: reserved space, resolvable URLs, and a 200KB ceiling
+ *   V15 Facebook and Instagram links match site.json, no tracking parameters
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -1743,6 +1744,102 @@ if (existsSync(DIST)) {
           "        re-run scripts/images.mjs for the product they belong to."
       );
     }
+  }
+}
+
+/* ---------- V15 — links to Facebook and Instagram are the ones site.json names ----------
+ *
+ * The footer links to the shop's own Facebook and Instagram pages. lib/site.ts
+ * refuses a bad value in site.json at build time; this is the other half, on
+ * what was actually built, because a template could still spell a URL of its
+ * own, or drop the rel, and the page would look exactly the same.
+ *
+ *   every <a> to facebook.com or instagram.com has an href equal, character
+ *     for character, to a value in site.json `social`
+ *   it carries rel with both noopener and noreferrer, and no target
+ *   every set value is linked from every page that has the footer
+ *   no href anywhere in dist/ contains fbclid or utm_
+ *
+ * The last line is the one that matters most. A tracking parameter looks and
+ * works exactly like a clean link, which is how the one this list started from
+ * arrived with ?fbclid= on the end, and /privacy says this site carries no
+ * tracking.
+ */
+
+const SOCIAL_HOST = /^https?:\/\/([a-z0-9-]+\.)*(facebook\.com|instagram\.com|fb\.com|fb\.me|instagr\.am)([/?#:]|$)/i;
+const attrOf = (tag, name) => {
+  const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  return m ? (m[1] ?? m[2] ?? m[3]) : null;
+};
+
+/** Every way a set of pages departs from the rules above. pages: [{ name, html }]. */
+function socialViolations(pages, expected) {
+  const out = [];
+  for (const { name, html } of pages) {
+    for (const [, href] of html.matchAll(/\shref\s*=\s*["']([^"']*)["']/gi)) {
+      if (/fbclid|utm_/i.test(href)) out.push(`${name}  href carries a tracking parameter  ${href}`);
+    }
+    for (const [tag] of html.matchAll(/<a\b[^>]*>/gi)) {
+      const href = attrOf(tag, "href");
+      if (href === null || !SOCIAL_HOST.test(href)) continue;
+      if (!expected.includes(href)) out.push(`${name}  href is not a value in site.json social  ${href}`);
+      const rels = (attrOf(tag, "rel") ?? "").toLowerCase().split(/\s+/);
+      if (!rels.includes("noopener") || !rels.includes("noreferrer")) {
+        out.push(`${name}  ${href} needs rel="noopener noreferrer"`);
+      }
+      if (attrOf(tag, "target") !== null) out.push(`${name}  ${href} carries target — a plain link opens in place`);
+    }
+    /* Only what sits inside the footer counts as the footer linking it. A link
+       the page body happens to carry would otherwise hide a footer that lost
+       its social nav. */
+    const footer = html.match(/<footer\b[\s\S]*?<\/footer>/i);
+    if (footer) {
+      const hrefs = [...footer[0].matchAll(/<a\b[^>]*>/gi)].map(([tag]) => attrOf(tag, "href"));
+      for (const want of expected) {
+        if (!hrefs.includes(want)) out.push(`${name}  footer does not link ${want}`);
+      }
+    }
+  }
+  return out;
+}
+
+{
+  const siteData = JSON.parse(readFileSync(join(SRC, "data", "site.json"), "utf8"));
+  const expected = Object.values(siteData.social ?? {}).filter((v) => typeof v === "string");
+
+  /* Self-test. A check that has never been seen to fail is a comment. */
+  const FB = "https://www.facebook.com/profile.php?id=61583976851603";
+  const IG = "https://www.instagram.com/momentaura.9/";
+  const link = (href, rel = ' rel="noopener noreferrer"') => `<a href="${href}"${rel}>x</a>`;
+  const page = (...links) => `<footer>${links.join("")}</footer>`;
+  const cases = [
+    ["the shipped footer", page(link(FB), link(IG)), null],
+    ["fbclid on the Instagram link", page(link(FB), link(`${IG}?fbclid=abc`)), "tracking parameter"],
+    ["utm_ on an internal link", page(link(FB), link(IG), link("/about?utm_source=x")), "tracking parameter"],
+    ["a URL site.json does not name", page(link(FB), link(IG), link("https://instagram.com/momentaura.9/")), "not a value in site.json"],
+    ["noreferrer missing", page(link(FB), link(IG, ' rel="noopener"')), "needs rel"],
+    ["target on the link", page(link(FB), link(IG, ' rel="noopener noreferrer" target="_blank"')), "carries target"],
+    ["a footer missing one", page(link(FB)), "does not link"],
+    ["both links in the body, an empty footer", `<main>${link(FB)}${link(IG)}</main><footer></footer>`, "footer does not link"],
+  ];
+  let ok = 0;
+  for (const [label, html, mustSay] of cases) {
+    const found = socialViolations([{ name: "fixture", html }], [FB, IG]);
+    if (mustSay === null ? found.length === 0 : found.some((m) => m.includes(mustSay))) ok++;
+    else fail("V15", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with "${mustSay}"`}, got: ${found.join("; ") || "no violation"}`);
+  }
+  console.log(`  V15 social self-test  ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+
+  if (existsSync(DIST)) {
+    const pages = walkAll(DIST)
+      .filter((f) => f.endsWith(".html"))
+      .map((f) => ({ name: rel(f), html: readFileSync(f, "utf8") }));
+    const found = socialViolations(pages, expected);
+    for (const v of found) fail("V15", v);
+    console.log(
+      `  V15 social links      ${expected.length} in site.json, ${pages.length} page(s), ` +
+        `${found.length === 0 ? "every link matches, no tracking parameters" : `${found.length} violation(s)`}`
+    );
   }
 }
 

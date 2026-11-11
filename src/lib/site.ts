@@ -82,6 +82,16 @@ export interface Site {
       orders: string | null;
     };
   };
+  /* The shop's own pages elsewhere. Optional as a block and null per value, and
+   * a null renders as nothing: no link, and no empty footer nav. These are
+   * pages that exist, not a way to reach a person, so nothing on Contact reads
+   * them. */
+  social?: {
+    /** "https://www.facebook.com/..." exactly, no tracking parameters. */
+    facebook: string | null;
+    /** "https://www.instagram.com/..." exactly, no tracking parameters. */
+    instagram: string | null;
+  };
   delivery: {
     dispatchFrom: string | null;
     zones: Zone[];
@@ -116,6 +126,61 @@ export const known = (value: unknown): boolean =>
     if (!Number.isInteger(zone.cost) || zone.cost < 0) throw new Error(`${where}: cost must be a whole number of KSh, 0 or more`);
   }
 }
+
+/* ---------- the shop's pages elsewhere ----------
+ *
+ * Checked at build time, the same way the zones above and the phone numbers
+ * below are, because the failure is invisible on the page: a link with
+ * ?fbclid= or ?utm_source= on the end looks and works exactly like one
+ * without, and it hands Facebook or whoever reads the analytics a record of
+ * which visit came from where. /privacy says this site carries no tracking,
+ * so a tracking parameter in the footer would make that page false. The build throws rather than stripping it, so the value in site.json
+ * is the value on the page, character for character.
+ */
+const SOCIAL = {
+  facebook: { host: "www.facebook.com", label: "MomentAura on Facebook" },
+  instagram: { host: "www.instagram.com", label: "MomentAura on Instagram" },
+} as const;
+
+const socialHref = (network: keyof typeof SOCIAL, value: string): string => {
+  const where = `site.json social.${network} "${value}"`;
+  const { host } = SOCIAL[network];
+  if (/fbclid|utm_/i.test(value)) throw new Error(`${where}: carries a tracking parameter (fbclid or utm_*). Remove it.`);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${where}: is not a URL`);
+  }
+  if (url.protocol !== "https:") throw new Error(`${where}: must be https:`);
+  if (url.hostname !== host) throw new Error(`${where}: host must be exactly ${host}`);
+  if (url.username || url.password || url.port || url.hash) {
+    throw new Error(`${where}: must not carry credentials, a port or a fragment`);
+  }
+  /* Facebook's profile.php addresses a page by ?id=, and that is the one query
+     either network is allowed. Anything else is somebody's tracking. */
+  const keys = [...url.searchParams.keys()];
+  const allowed = network === "facebook" && keys.length === 1 && keys[0] === "id" && /^\d+$/.test(url.searchParams.get("id") ?? "");
+  if (url.search !== "" && !allowed) {
+    throw new Error(`${where}: query "${url.search}" is not allowed — only Facebook's ?id=<digits>`);
+  }
+  /* A URL the parser would rewrite is one the page would not print as written. */
+  if (url.href !== value) throw new Error(`${where}: write it as ${url.href}`);
+  return value;
+};
+
+/* Validated once, at module load, whether or not a page asks for them. */
+const SOCIAL_LINKS: { label: string; href: string }[] = (Object.keys(SOCIAL) as (keyof typeof SOCIAL)[]).flatMap(
+  (network) => {
+    const value = site.social?.[network] ?? null;
+    if (value === null) return [];
+    if (!known(value)) throw new Error(`site.json social.${network}: use null, not an empty value`);
+    return [{ label: SOCIAL[network].label, href: socialHref(network, String(value)) }];
+  }
+);
+
+/** The shop's Facebook and Instagram pages that are set, in that order. Empty when neither is. */
+export const socialLinks = (): { label: string; href: string }[] => SOCIAL_LINKS.map((link) => ({ ...link }));
 
 /** A fee as a buyer reads it. 0 is "Free", never "KSh 0", in a table or a label. */
 export const feeText = (cost: number): string => (cost === 0 ? "Free" : `KSh ${cost.toLocaleString("en-KE")}`);

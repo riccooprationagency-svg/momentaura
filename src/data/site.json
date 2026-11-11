@@ -15,6 +15,10 @@
       "orders": "orders@momentaurastores.co.ke"
     }
   },
+  "social": {
+    "facebook": "https://www.facebook.com/profile.php?id=61583976851603",
+    "instagram": "https://www.instagram.com/momentaura.9/"
+  },
   "delivery": {
     "dispatchFrom": "Nairobi",
     "zones": [
