@@ -1789,8 +1789,12 @@ function socialViolations(pages, expected) {
       }
       if (attrOf(tag, "target") !== null) out.push(`${name}  ${href} carries target — a plain link opens in place`);
     }
-    if (/<footer\b/i.test(html)) {
-      const hrefs = [...html.matchAll(/<a\b[^>]*>/gi)].map(([tag]) => attrOf(tag, "href"));
+    /* Only what sits inside the footer counts as the footer linking it. A link
+       the page body happens to carry would otherwise hide a footer that lost
+       its social nav. */
+    const footer = html.match(/<footer\b[\s\S]*?<\/footer>/i);
+    if (footer) {
+      const hrefs = [...footer[0].matchAll(/<a\b[^>]*>/gi)].map(([tag]) => attrOf(tag, "href"));
       for (const want of expected) {
         if (!hrefs.includes(want)) out.push(`${name}  footer does not link ${want}`);
       }
@@ -1816,6 +1820,7 @@ function socialViolations(pages, expected) {
     ["noreferrer missing", page(link(FB), link(IG, ' rel="noopener"')), "needs rel"],
     ["target on the link", page(link(FB), link(IG, ' rel="noopener noreferrer" target="_blank"')), "carries target"],
     ["a footer missing one", page(link(FB)), "does not link"],
+    ["both links in the body, an empty footer", `<main>${link(FB)}${link(IG)}</main><footer></footer>`, "footer does not link"],
   ];
   let ok = 0;
   for (const [label, html, mustSay] of cases) {
