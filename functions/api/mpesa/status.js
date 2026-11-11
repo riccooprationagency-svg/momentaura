@@ -16,12 +16,21 @@
  *   - it never settles an order itself. It reads the same settle() the callback
  *     uses, so idempotency and the amount check exist once and cannot diverge
  *
- * WHAT IT RETURNS TO THE BROWSER IS THE STATUS AND OUR REFERENCE, and nothing
- * else. No amount, no phone number, no Daraja payload, no receipt.
+ * WHAT IT RETURNS TO THE BROWSER IS THE STATUS, OUR REFERENCE AND THE AMOUNTS
+ * AS RECORDED — subtotal, delivery fee and total, formatted by _amounts.js —
+ * and nothing else. No phone number, no county, area or landmark, no Daraja
+ * payload, no receipt, no amount a callback claimed.
+ *
+ * The amounts were added so /order-received shows the fee the order was
+ * actually charged rather than looking it up in today's fee table, which would
+ * put a changed fee on an old order. They are sent only once both the
+ * CheckoutRequestID and our reference match, and they are the figures the
+ * buyer already saw on the M-Pesa prompt.
  */
 
 import { DarajaError, queryStatus } from "../_daraja.js";
 import { CALLBACK_GRACE_MS, getPending, settle } from "../_pending.js";
+import { amounts } from "../_amounts.js";
 import { REACH } from "../_site.js";
 
 /* The browser does not show these — /order-received polls this endpoint and
@@ -71,21 +80,42 @@ export async function onRequest({ request, env }) {
      reference alongside it means guessing an id gets you nothing, because the
      reference is minted separately and never appears in Daraja's traffic.
      The same answer for "no such order" and "wrong reference", so neither
-     confirms the other. */
-  if (!record || typeof claimed !== "string" || claimed !== record.reference) {
+     confirms the other.
+
+     AND THE RECORD MUST BE THE ONE STORED UNDER THAT ID. The id is a KV key
+     taken from the request, and the same namespace holds the buyer's copy
+     under ref:<reference>. Sent "ref:MA-…" with its reference, the lookup
+     found that copy and the reference check passed — so the reference alone,
+     which is screenshotted and read aloud, returned the order's status and
+     amounts, and could steer a Daraja query and settle() at a key that is not
+     a CheckoutRequestID. Only the canonical record carries its own id equal
+     to the key it lives under; the ref: copy never does. A positive match
+     rather than a refused prefix, so a key shape added later is refused too. */
+  if (
+    !record ||
+    record.checkoutRequestId !== checkoutRequestId ||
+    typeof claimed !== "string" ||
+    claimed !== record.reference
+  ) {
     return json(404, { message: `No order was found for that reference. If you have paid, ${REACH} with the reference.` });
   }
 
+  /* Every answer from here on: the status, our reference, and what the order
+     cost as it was recorded. Through one helper, so no branch below can answer
+     without the amounts or with anything more. */
+  const answer = (status) =>
+    json(200, { status, reference: record.reference, breakdown: amounts(record) });
+
   /* Already terminal. No query, no write. */
   if (record.status !== "pending") {
-    return json(200, { status: record.status, reference: record.reference });
+    return answer(record.status);
   }
 
   /* Still inside the window where a callback is expected. The customer is
      probably still holding the phone. */
   const age = Date.now() - (record.pushedAt ?? record.createdAt ?? 0);
   if (age < CALLBACK_GRACE_MS) {
-    return json(200, { status: "pending", reference: record.reference });
+    return answer("pending");
   }
 
   /* ---------- past the grace period: ask Daraja ---------- */
@@ -101,11 +131,11 @@ export async function onRequest({ request, env }) {
        Daraja is the same false statement as calling a misconfiguration a
        declined payment — the buyer may well have paid. It stays pending and the
        browser tries again. */
-    return json(200, { status: "pending", reference: record.reference });
+    return answer("pending");
   }
 
   if (result.state === "pending") {
-    return json(200, { status: "pending", reference: record.reference });
+    return answer("pending");
   }
 
   /* Settle through the shared path, which re-checks the amount and is idempotent
@@ -124,7 +154,7 @@ export async function onRequest({ request, env }) {
     });
   } catch (error) {
     console.log(JSON.stringify({ at: "status", checkoutRequestId, code: "settle_failed", detail: String(error) }));
-    return json(200, { status: "pending", reference: record.reference });
+    return answer("pending");
   }
 
   console.log(
@@ -138,5 +168,5 @@ export async function onRequest({ request, env }) {
   );
 
   const settled = outcome.record ? outcome.record.status : result.state;
-  return json(200, { status: settled, reference: record.reference });
+  return answer(settled);
 }

@@ -121,6 +121,20 @@ function showStatus(outcome: string): void {
   for (const state of qa("[data-status]")) state.hidden = state.dataset.status !== outcome;
 }
 
+/* What an order cost (and on /track, where it is going), AS RECORDED, already
+ * formatted by the server. Shared by /track's lookup and /order-received's
+ * payment poll, which both answer with the same breakdown from _amounts.js.
+ * Each [data-fill] names its key; one the server did not send hides its line,
+ * which is how an order placed before delivery fees shows a total and nothing
+ * it does not have. textContent, so an area typed as markup arrives as text. */
+function fill(breakdown?: Record<string, string>): void {
+  for (const slot of qa("[data-fill]")) {
+    const value = breakdown?.[slot.dataset.fill!];
+    slot.textContent = value ?? "";
+    slot.parentElement!.hidden = !value;
+  }
+}
+
 /* ---------- the nav count ----------
  *
  * Present on every page, because a count that is live on two page types and
@@ -204,11 +218,10 @@ const totalValue = q("[data-order-total]");
 const blockedNote = q("[data-order-blocked]");
 const checkout = q("[data-checkout]");
 
-/* The county <select>: the live one on /checkout, and a hidden copy of the same
- * options on /order-received that the snapshot's county key is set into. Either
- * way, the fee is read off the chosen option's data-fee — rendered from
- * site.json at build time, the same way a line's price is — and never out of
- * storage. */
+/* The county <select> on /checkout. The fee preview is read off the chosen
+ * option's data-fee — rendered from site.json at build time, the same way a
+ * line's price is — and never out of storage. /order-received has no copy: it
+ * shows the fee the order recorded, from /api/mpesa/status. */
 const county = q<HTMLSelectElement>("[name=county]");
 
 /* Read once, before anything can strip it. A blocked checkout drops its href
@@ -580,9 +593,6 @@ if (form && submitButton) {
             reference: body.reference,
             checkoutRequestId: body.checkoutRequestId,
             items,
-            /* A key, like a slug — never the fee. The confirmation looks the
-             * fee up from the options rendered into its own page. */
-            county: data.get("county"),
             at: Date.now(),
           })
         );
@@ -706,16 +716,8 @@ if (trackForm && trackButton && trackResult) {
 
     paintLines(toOrder(body.items));
 
-    /* County, area, subtotal, delivery and total, as recorded and already
-     * formatted by the server. Each [data-fill] names its key; one the server
-     * did not send hides its line, which is how an order placed before
-     * delivery fees shows a total and nothing it does not have. textContent,
-     * so an area typed as markup arrives as the text it is. */
-    for (const slot of qa("[data-fill]")) {
-      const value = body.breakdown?.[slot.dataset.fill!];
-      slot.textContent = value ?? "";
-      slot.parentElement!.hidden = !value;
-    }
+    /* County, area, subtotal, delivery and total. */
+    fill(body.breakdown);
 
     trackResult.hidden = false;
   });
@@ -754,9 +756,12 @@ function pollPaymentStatus(checkoutRequestId: string, reference: string, started
     body: JSON.stringify({ checkoutRequestId, reference }),
   })
     .then((r) => r.json())
-    .then((b: { status?: string }) =>
-      b.status && b.status !== "pending" ? showStatus(b.status === "paid" ? "paid" : "failed") : retry()
-    )
+    .then((b: { status?: string; breakdown?: Record<string, string> }) => {
+      /* Only an answer that proved the order — a 404 carries no status and
+       * must not blank the Total line's fallback wording. */
+      if (b.status) fill(b.breakdown);
+      b.status && b.status !== "pending" ? showStatus(b.status === "paid" ? "paid" : "failed") : retry();
+    })
     .catch(retry);
 }
 
@@ -792,7 +797,6 @@ function paintReceived(): void {
     reference?: string;
     checkoutRequestId?: string;
     items?: { slug: string; qty: number }[];
-    county?: string;
   } | null = null;
   try {
     const raw = window.localStorage.getItem(PLACED);
@@ -817,11 +821,6 @@ function paintReceived(): void {
 
     const refSlot = q("[data-received-ref]");
     if (refSlot) refSlot.textContent = snapshot.reference ?? "";
-
-    /* A key that matches no option selects nothing, so a missing or edited
-     * one leaves the Delivery and Total lines on the page's own wording
-     * rather than showing a fee for somewhere else. */
-    if (county) county.value = snapshot.county!;
 
     let longest = 0;
     let everyLineHasLead = true;

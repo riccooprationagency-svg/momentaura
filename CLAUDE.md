@@ -499,10 +499,10 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
   server minted, so the confirmation screen can still say what was bought after the order
   itself has been cleared. Still no name, no price, no stock: the amounts on that screen
   are looked up from the catalogue rendered into the page, exactly as `/order` does.
-  Phase 3 added the delivery **county key** to it, under the same rule as a slug: a key,
-  never a fee. The confirmation looks the fee up from the county options rendered into
-  its own page, so an edited key shows a different county's published fee or none, and
-  never a figure the buyer typed.
+  It holds no delivery county and no fee. The confirmation's Subtotal, Delivery and
+  Total come from `/api/mpesa/status`, which returns them as the order recorded them —
+  not from today's fee table, which would put a changed fee on an old order — and only
+  once the CheckoutRequestID and the reference both match.
   The reference is the one value that crosses from storage into the DOM, so it is checked
   against the shape `stk.js` mints before it is written, and a snapshot that fails
   discards whole. It goes in through `textContent`, which cannot inject markup — the test

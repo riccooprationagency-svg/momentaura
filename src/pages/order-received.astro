@@ -29,7 +29,6 @@
 // appears the moment a real lead time exists. A date computed from a null would
 // be a made-up commitment on the one screen a buyer keeps.
 import Base from "../layouts/Base.astro";
-import CountyOptions from "../components/CountyOptions.astro";
 import { products, price } from "../lib/products";
 ---
 
@@ -111,33 +110,30 @@ import { products, price } from "../lib/products";
         </ul>
 
         <!--
-          Subtotal, Delivery, Total. The fee is looked up the way a line's price
-          is: the snapshot holds only the county KEY, and the cart sets it into
-          the hidden list of options below, which this page rendered from
-          site.json. Nothing about money is read out of storage. If the key is
-          missing or matches nothing, the two lines keep this wording, which is
-          true: the M-Pesa prompt on the phone shows the amount asked for.
+          Subtotal, Delivery, Total, AS THE ORDER RECORDED THEM. Each value is
+          one key of the breakdown /api/mpesa/status returns on every poll,
+          already formatted, and the cart fills it the way it fills /track. They
+          are never computed here: not from the catalogue and not from today's
+          fee table, so a fee changed after this order was placed cannot show
+          up on its confirmation. Nothing about money is read out of storage.
+
+          Until the first poll answers, Subtotal and Delivery stay hidden and
+          Total keeps this wording, which is true: the M-Pesa prompt on the
+          phone shows the amount asked for. A key the server does not send
+          hides its line, as on /track.
         -->
-        <p class="received__row">
+        <p class="received__row" hidden>
           <span class="received__total-label">Subtotal</span>
-          <span class="received__total-value" data-order-total>KSh 0</span>
+          <span class="received__total-value" data-fill="subtotal"></span>
         </p>
-        <p class="received__row">
+        <p class="received__row" hidden>
           <span class="received__total-label">Delivery</span>
-          <span class="received__total-value" data-order-fee>Shown on the M-Pesa prompt</span>
+          <span class="received__total-value" data-fill="fee"></span>
         </p>
         <p class="received__total">
           <span class="received__total-label">Total</span>
-          <span class="received__total-value" data-order-due>Shown on the M-Pesa prompt</span>
+          <span class="received__total-value" data-fill="total">Shown on the M-Pesa prompt</span>
         </p>
-
-        <!-- The fee lookup, never shown and never submitted: it is not inside
-             a form, and `hidden` takes it out of the page and the
-             accessibility tree. It is the same option list checkout renders, so
-             the fee on this screen is the fee checkout showed. -->
-        <select name="county" hidden aria-hidden="true" tabindex="-1">
-          <CountyOptions />
-        </select>
 
         <hr class="received__hair" />
 
