@@ -3,13 +3,14 @@
 // arriving, so this page drops the 100dvh reveal rhythm entirely: heading, one
 // line, then a straight grid the eye can scan in a single movement.
 //
-// Three pages, generated from the categories present in products.json. Not
-// scaffolded for six — watches and licensed panels left with the legal deletion,
-// and a page for a category holding nothing is a dead end with a nav link.
+// One page per category that has products, generated from products.json against
+// the declared list in src/lib/products.ts. A declared category with no products
+// gets no page — a page for a category holding nothing is a dead end with a link
+// to it. verify.mjs V16 asserts every built category page carries a card.
 //
-// No filter bar. Five products across three categories cannot be filtered into a
+// No filter bar. A handful of products per category cannot be filtered into a
 // smaller set that is any easier to read than the grid already is, and a filter
-// over a nine-item grid is furniture. See BUILD-ORDER section 6.
+// over a short grid is furniture. See BUILD-ORDER section 6.
 import Base from "../layouts/Base.astro";
 import ProductCard from "../components/ProductCard.astro";
 import { categories, productsIn, type Category, type Product } from "../lib/products";

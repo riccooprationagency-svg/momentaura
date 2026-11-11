@@ -28,6 +28,14 @@
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
 import { site, known } from "../lib/site";
+import { categories } from "../lib/products";
+
+/* What the shop sells, read from the categories that have products rather than
+   written out here, so this sentence cannot name a category that has no page or
+   miss one that does. Sentence case: the first name keeps its capital, the rest
+   are lowered, and the last two are joined with "and". */
+const sold = categories.map((c, i) => (i === 0 ? c.name : c.name.toLowerCase()));
+const sells = sold.length > 1 ? `${sold.slice(0, -1).join(", ")} and ${sold.at(-1)}` : (sold[0] ?? "");
 
 const { name, photo, area } = site.owner;
 const hasName = known(name);
@@ -78,8 +86,7 @@ const hasPhoto = known(photo);
 
       <h2 class="page__sub">What this shop sells</h2>
       <p class="page__body">
-        Apparel and accessories — hoodies, t-shirts, hats, pendants, and personalised
-        hoodies. Prices
+        {sells && `${sells}. `}Prices
         are in Kenyan shillings and are on the page, always. Payment is by M-Pesa.
       </p>
 

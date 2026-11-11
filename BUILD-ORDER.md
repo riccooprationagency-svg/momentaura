@@ -74,6 +74,15 @@ list instead of its own hardcoded copy.
 
 **Three category pages, not six.** Same reason as the three tiles in section 5.
 
+**Superseded by the `categories` branch.** `CATEGORY_COPY` now declares Ric's six in his
+order — hoodies, t-shirts, sweatshirts, tracksuits, bucket hats, watches — plus
+`accessories` last, kept only so the bullet pendant has a page until its category is
+settled. Membership is still derived: a declared category with no products gets no page,
+no tile and no footer link. `/apparel` and `/personalised` no longer exist, and no
+redirect was added for them. Categories are reached from the homepage tiles and a
+footer Shop group mapping the same list. `verify.mjs` V16 fails on a category in the data
+that is not declared and on a built category page with no product card.
+
 **No filter bar.** Five products across three categories cannot be filtered into a set that
 reads more easily than the grid already does. The largest category holds three items. A
 filter over a nine-item grid is furniture.

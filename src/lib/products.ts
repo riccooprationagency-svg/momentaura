@@ -181,10 +181,16 @@ export const price = (value: number): string => `KSh ${value.toLocaleString("en-
  * checkable fact, and calling it checkable is the kind of overstatement the
  * accent rule exists to prevent elsewhere.
  *
- * Declared order, derived membership. The order is the order of the keys below —
- * apparel first because it is the fullest category, which alphabetising would
- * bury behind a category holding one pendant. Membership comes from the data, so
- * a category that empties out loses its page and its tile together.
+ * Declared order, derived membership. The order is the order of the keys below,
+ * which is the order Ric gave the six categories in — not alphabetical. Membership
+ * comes from the data, so a category with no products has no page and no tile,
+ * and gets both the moment a product names it. Nothing is scaffolded for an
+ * empty category: a page holding nothing is a dead end with a link to it.
+ *
+ * `accessories` is not one of the six. It is kept, last, because the bullet
+ * pendant needs a home and Ric's list does not name one for it. It is an open
+ * question, not a decision: when the pendant's category is settled, move the
+ * product and delete this entry.
  */
 
 interface CategoryCopy {
@@ -193,8 +199,17 @@ interface CategoryCopy {
 }
 
 const CATEGORY_COPY: Record<string, CategoryCopy> = {
-  apparel: { name: "Apparel", line: "Hoodies, tees and hats." },
-  personalised: { name: "Personalised", line: "Your own text or artwork, on a hoodie." },
+  hoodies: { name: "Hoodies", line: "Hoodies." },
+  "t-shirts": { name: "T-shirts", line: "T-shirts." },
+  sweatshirts: { name: "Sweatshirts", line: "Sweatshirts." },
+  tracksuits: { name: "Tracksuits", line: "Tracksuits." },
+  "bucket-hats": { name: "Bucket hats", line: "Bucket hats." },
+  /* No watch may carry or allude to another company's name, logo or model —
+   * not on the dial, the strap, the box, in the product name or in the copy.
+   * The earlier catalogue was deleted partly for brand-name and brand-alluding
+   * watches. This entry declares the category; it does not put a watch on sale,
+   * and it renders nothing until a product names it. */
+  watches: { name: "Watches", line: "Watches." },
   accessories: { name: "Accessories", line: "Pendants." },
 };
 

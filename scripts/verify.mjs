@@ -17,6 +17,7 @@
  *   V13b a note while the built site carries a site-wide noindex
  *   V14 images: reserved space, resolvable URLs, and a 200KB ceiling
  *   V15 Facebook and Instagram links match site.json, no tracking parameters
+ *   V16 every category is declared, and every category page has a product card
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -542,8 +543,8 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
  * component rendered three times spends it three times and source containment
  * cannot see that.
  *
- * It is countable from dist/ and nowhere else. /apparel renders one component
- * nine times, a product page renders two dockets and a grid of cards, and no
+ * It is countable from dist/ and nowhere else. A category page renders one
+ * component once per product, a product page renders two dockets and a grid of cards, and no
  * amount of reading src/ tells you the totals. That is why this is measured, not
  * reasoned about — the same reason V4 weighs the built pages instead of
  * estimating them.
@@ -1839,6 +1840,92 @@ function socialViolations(pages, expected) {
     console.log(
       `  V15 social links      ${expected.length} in site.json, ${pages.length} page(s), ` +
         `${found.length === 0 ? "every link matches, no tracking parameters" : `${found.length} violation(s)`}`
+    );
+  }
+}
+
+/* ---------- V16 — every category is declared, and every category page sells something ----------
+ *
+ * Which categories exist is derived from products.json; their names, lines and
+ * order are declared in CATEGORY_COPY in src/lib/products.ts. products.ts already
+ * throws at build time on a category it has no entry for. This is the same rule
+ * read from the outside, plus the half the build cannot see: what was emitted.
+ *
+ *   every category in products.json is a key of CATEGORY_COPY
+ *   every category with products has a built page at dist/<slug>/index.html
+ *   every built category page carries at least one product card
+ *
+ * The last line is the one that matters. A declared category with no products
+ * must get no page — a heading, one line and an empty grid is a dead end on a
+ * site whose buyer arrives looking for signs the shop is abandoned — and nothing
+ * else in this file would notice one being built. V12 only asks whether a link
+ * resolves; an empty page resolves perfectly.
+ */
+
+/** Every way the categories depart from the rules above.
+ *  declared: CATEGORY_COPY keys. inData: categories products.json uses.
+ *  pages: [{ slug, html }] for every declared slug, html null when not built. */
+function categoryViolations(declared, inData, pages) {
+  const out = [];
+  for (const slug of inData) {
+    if (!declared.includes(slug)) out.push(`category "${slug}" is in products.json but not declared in CATEGORY_COPY`);
+  }
+  for (const { slug, html } of pages) {
+    if (html === null) {
+      if (inData.includes(slug)) out.push(`category "${slug}" has products but no built page`);
+      continue;
+    }
+    /* Built with nothing in the data behind it. A card on such a page would be
+       one the data does not account for, so a card does not excuse it. */
+    if (!inData.includes(slug)) {
+      out.push(`category "${slug}" has no products but has a built page`);
+      continue;
+    }
+    if (!/<article\b[^>]*\sclass\s*=\s*["'](?:[^"']*\s)?card(?:\s[^"']*)?["']/i.test(html)) {
+      out.push(`category "${slug}" page has no product card`);
+    }
+  }
+  return out;
+}
+
+{
+  const source = readFileSync(join(SRC, "lib", "products.ts"), "utf8");
+  const block = source.match(/const CATEGORY_COPY\b[^=]*=\s*\{([\s\S]*?)\n\};/);
+  const declared = block ? [...block[1].matchAll(/^\s*(?:"([^"]+)"|([A-Za-z0-9_-]+))\s*:\s*\{/gm)].map((m) => m[1] ?? m[2]) : [];
+  if (declared.length === 0) fail("V16", "no CATEGORY_COPY entries found in src/lib/products.ts — the block moved and this check is blind");
+
+  const data = JSON.parse(readFileSync(join(SRC, "data", "products.json"), "utf8"));
+  const inData = [...new Set(data.map((p) => p.category))];
+
+  /* Self-test. A check that has never been seen to fail is a comment. */
+  const card = `<article class="card" data-system="light"><a href="/products/x">x</a></article>`;
+  const cases = [
+    ["the shipped shape: one declared, one empty and unbuilt", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: null }], null],
+    ["a category nobody declared", ["hoodies"], ["hoodies", "scarves"], [{ slug: "hoodies", html: card }], `"scarves" is in products.json but not declared`],
+    ["an empty category given a page", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: "<main><div class=\"grid\"></div></main>" }], `"watches" has no products but has a built page`],
+    ["an empty category given a page that still carries a card", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: card }], `"watches" has no products but has a built page`],
+    ["a category with products and no page", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: null }], `"hoodies" has products but no built page`],
+    ["a card class that only contains the word", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: `<article class="card__meta">` }], `"hoodies" page has no product card`],
+  ];
+  let ok = 0;
+  for (const [label, d, i, p, mustSay] of cases) {
+    const found = categoryViolations(d, i, p);
+    if (mustSay === null ? found.length === 0 : found.some((m) => m.includes(mustSay))) ok++;
+    else fail("V16", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with ${mustSay}`}, got: ${found.join("; ") || "no violation"}`);
+  }
+  console.log(`  V16 category self-test ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+
+  if (existsSync(DIST)) {
+    const pages = declared.map((slug) => {
+      const file = join(DIST, slug, "index.html");
+      return { slug, html: existsSync(file) ? readFileSync(file, "utf8") : null };
+    });
+    const found = categoryViolations(declared, inData, pages);
+    for (const v of found) fail("V16", v);
+    const built = pages.filter((p) => p.html !== null).length;
+    console.log(
+      `  V16 categories        ${declared.length} declared, ${inData.length} in products.json, ${built} page(s) built, ` +
+        `${found.length === 0 ? "every page has a card" : `${found.length} violation(s)`}`
     );
   }
 }

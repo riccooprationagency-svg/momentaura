@@ -17,7 +17,7 @@ const { slug, name, line, photo = null } = Astro.props;
 const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "light";
 ---
 
-<!-- /apparel, not /shop/apparel. The category pages sit at the root, and this
+<!-- /hoodies, not /shop/hoodies. The category pages sit at the root, and this
      href pointed at a path step 6 does not build. -->
 <a class="tile" href={`/${slug}`} data-system={system}>
   {

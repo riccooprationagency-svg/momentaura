@@ -22,6 +22,7 @@ import {
   telHref,
   whatsappHref,
 } from "../lib/site";
+import { categories } from "../lib/products";
 
 interface Props {
   title: string;
@@ -78,7 +79,8 @@ const isCurrent = (href: string) =>
 // Shop is gone. It was a placeholder for a listing page that no longer exists in
 // the plan — every other dead link here is scheduled in BUILD-ORDER section 10,
 // and /shop was scheduled nowhere. Categories are reached from the homepage
-// tiles, which is what EXPERIENCE stage 3 specifies, and a nav link to a page
+// tiles, which is what EXPERIENCE stage 3 specifies, and from the footer's Shop
+// group, which maps the same derived list. A nav link to a page
 // nobody intends to build is worse than one fewer link.
 //
 // It also cost aria-current: with category pages at the root, isCurrent("/shop")
@@ -221,6 +223,21 @@ const ld = JSON.stringify(organizationLd()).replace(/</g, "\\u003c");
           <span class="foot__wordmark">MomentAura</span>
           <span class="foot__place">Nairobi, Kenya</span>
         </div>
+
+        {
+          /* The second way to a category, after the homepage tiles. The same
+             derived list the tiles map, so it holds only categories that have
+             products and renders nothing at all when none do. No /shop page, no
+             dropdown, no script. Sentence case at caption size, like every
+             other footer link. */
+          categories.length > 0 && (
+            <nav class="foot__links" aria-label="Shop">
+              {categories.map((c) => (
+                <a href={`/${c.slug}`}>{c.name}</a>
+              ))}
+            </nav>
+          )
+        }
 
         <nav class="foot__links" aria-label="Footer">
           {FOOTER.map((item) => <a href={item.href}>{item.label}</a>)}
