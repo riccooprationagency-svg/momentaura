@@ -1,5 +1,12 @@
 ---
-// Delivery and returns.
+// Delivery.
+//
+// TITLED "DELIVERY", NOT "DELIVERY AND RETURNS", while no returns terms exist.
+// A heading that promises returns on a page with none is the same broken promise
+// as a dead link. When delivery.returnsWindowDays and returnsCondition are both
+// set, the Returns section below renders and the title, the footer label in
+// Base.astro and the cross-references on the product, order and checkout pages
+// change back together.
 //
 // OMISSION, NOT A STATED ABSENCE. Where a fact does not exist the element is not
 // rendered at all — no zone table, no returns heading, no sentence explaining
@@ -16,6 +23,7 @@
 // describes what the code does rather than a fact only Ric holds.
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
+import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 import { site, known, feeText, phoneDisplay, telHref, whatsappHref, zonesByRegion } from "../lib/site";
 
 const hasZones = known(site.delivery.zones);
@@ -27,27 +35,33 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
 ---
 
 <Base
-  title="Delivery and returns — MomentAura"
-  description="How orders are paid for, where they are sent from, and how returns work."
+  title="Delivery — MomentAura"
+  description={`How orders are paid for by ${GATEWAY_NAME}, where they are sent from, and what delivery costs.`}
   system="light"
 >
   <section class="page">
     <div class="wrap page__inner">
-      <h1 class="page__heading">Delivery and returns</h1>
+      <h1 class="page__heading">Delivery</h1>
 
       <h2 class="page__sub">Paying</h2>
+      <!-- Written from checkout.astro, cart.ts and functions/api/mpesa/stk.js:
+           the form posts to /api/mpesa/stk, which re-prices the order and pushes
+           an STK prompt to the phone number given, and the cart then moves to
+           /order-received on this site, which polls /api/mpesa/status. There is
+           no redirect to a payment page at any point. -->
       <p class="page__body">
-        Payment is by M-Pesa. At checkout you give a name and the phone number the
-        payment should go through, and the payment itself is completed on the payment
-        provider's own secure page — you are told before you are taken there, and you come
-        back here when it is done.
+        Payment is by {GATEWAY_NAME}. At checkout you give a name and the phone number the
+        payment should go through. Pressing Pay sends a {GATEWAY_NAME} payment prompt to
+        that phone, and you enter your PIN on the phone to pay. You do not leave this
+        site: the next page shows your order reference and changes to paid once the
+        payment is confirmed.
       </p>
       <p class="page__body">
         <strong>No card details are ever entered on this site.</strong> There is no card
         form anywhere in it.
       </p>
       <p class="page__body">
-        Nothing is charged until you confirm the payment yourself, and nothing is
+        Nothing is charged until you enter your PIN on the prompt, and nothing is
         dispatched until that payment is confirmed. Prices are in Kenyan shillings and the
         price on the product page is the price of the item.
       </p>
