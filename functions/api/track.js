@@ -32,6 +32,7 @@
  */
 
 import catalogue from "../../src/data/products.json";
+import { amounts } from "./_amounts.js";
 import { msisdnFrom } from "./_order.js";
 import { ELSEWHERE, REACH } from "./_site.js";
 import { getPending, refKey } from "./_pending.js";
@@ -118,20 +119,10 @@ function dispatchDate(record) {
   return LONG_DATE.format(workingDaysFrom(from, longest));
 }
 
-/* Matches price() in src/lib/products.ts and money() in the cart: integer KSh,
- * en-KE grouping. A third copy, because this side of the wire cannot import
- * either; the format is one line and the comment is the link between them. */
-const money = (value) => `KSh ${value.toLocaleString("en-KE")}`;
-
-/* What the order cost and where it is going, AS IT WAS RECORDED — read off the
- * stored order, never recomputed from today's catalogue or fee table, because
- * the buyer is checking what they were charged, not what it would cost now.
- *
- * Already formatted, so the page can put each value straight into its slot
- * with textContent and the cart carries no formatting for it. Every key is a
- * slot on /track; a key that is absent hides its line, which is how an order
- * placed before delivery fees existed shows a total and nothing it does not
- * have.
+/* Where the order is going and what it cost, AS IT WAS RECORDED. The amounts
+ * come from _amounts.js, which /api/mpesa/status shares, so this lookup and the
+ * confirmation screen read one order's money the same way. Every key is a slot
+ * on /track; a key that is absent hides its line.
  *
  * THE LANDMARK IS NOT HERE, and must not be added. It is for the rider. A
  * reference read aloud or screenshotted, plus a phone number, should not be
@@ -143,11 +134,8 @@ function breakdown(record) {
   if (d && typeof d === "object") {
     if (typeof d.label === "string") out.county = d.label;
     if (typeof d.area === "string") out.area = d.area;
-    if (Number.isInteger(d.fee)) out.fee = d.fee === 0 ? "Free" : money(d.fee);
   }
-  if (Number.isInteger(record.subtotal)) out.subtotal = money(record.subtotal);
-  if (Number.isInteger(record.amount)) out.total = money(record.amount);
-  return out;
+  return { ...out, ...amounts(record) };
 }
 
 const json = (status, body, extra) =>

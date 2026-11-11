@@ -1051,20 +1051,77 @@ await check("a callback arriving after the query settled it changes nothing", as
   eq(second.via, "query", "and did not rewrite how it settled");
 });
 
-await check("the status response carries no amount, phone number or receipt", async () => {
+/* The status response grew the amounts in a follow-up to phase 3, so
+   /order-received can show what the order was charged rather than looking the
+   fee up in today's table. What it must still never carry is everything else:
+   the phone number, the receipt, where the order is going, or a claimed amount. */
+await check("the status response carries the recorded amounts and nothing else", async () => {
   const body = await pushThenAge(120_000);
   await hit(callbackBody());
   const text = await (await askStatus(body)).text();
-  eq(Object.keys(JSON.parse(text)).sort(), ["reference", "status"], "keys");
-  lacks(text, "1300", "the amount");
+  const parsed = JSON.parse(text);
+  eq(Object.keys(parsed).sort(), ["breakdown", "reference", "status"], "keys");
+  eq(Object.keys(parsed.breakdown).sort(), ["fee", "subtotal", "total"], "breakdown keys");
+  eq(parsed.breakdown.subtotal, "KSh 1,300", "subtotal");
+  eq(parsed.breakdown.fee, "Free", "a zero fee is written as Free");
+  eq(parsed.breakdown.total, "KSh 1,300", "total");
   lacks(text, "254712345678", "the phone number");
+  lacks(text, "0712345678", "the phone number as typed");
   lacks(text, "RGX1A2B3C4", "the receipt");
+  lacks(text, "Kilimani", "the area");
+  lacks(text, "Blue gate", "the landmark");
+  lacks(text, "Nairobi CBD", "the county");
+});
+
+await check("a county with a fee reports that fee and the total it was charged", async () => {
+  await push({ ...ORDER, county: "kirinyaga" });
+  const stored = await record();
+  stored.pushedAt = Date.now() - 10_000;
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  const res = await askStatus({ checkoutRequestId: "ws_CO_TEST_1", reference: stored.reference });
+  const { breakdown } = await res.json();
+  eq(breakdown.fee, "KSh 250", "fee");
+  eq(breakdown.total, "KSh 1,550", "total");
+});
+
+/* The Greptile P1 on #16. A fee changed in site.json after an order was placed
+   must not reach the screen describing that order. The stored record is edited
+   to a fee the current table does not have for its county; the response has to
+   follow the record, because the record is what the buyer was charged. */
+await check("THE AMOUNTS ARE THE ONES RECORDED, NOT TODAY'S FEE TABLE", async () => {
+  const body = await pushThenAge(10_000);
+  const stored = await record();
+  stored.delivery = { ...stored.delivery, fee: 450 };
+  stored.amount = 1750;
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  const { breakdown } = await (await askStatus(body)).json();
+  eq(breakdown.fee, "KSh 450", "the fee on the record, though nairobi-cbd is free today");
+  eq(breakdown.total, "KSh 1,750", "the total on the record");
+});
+
+await check("an order from before delivery fees reports its total and nothing it lacks", async () => {
+  const body = await pushThenAge(10_000);
+  const stored = await record();
+  delete stored.delivery;
+  delete stored.subtotal;
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  const { breakdown } = await (await askStatus(body)).json();
+  eq(breakdown, { total: "KSh 1,300" }, "breakdown");
+});
+
+await check("a wrong reference gets no amounts", async () => {
+  const body = await pushThenAge(10_000);
+  const res = await askStatus({ checkoutRequestId: body.checkoutRequestId, reference: "MA-WRON-GREF" });
+  const text = await res.text();
+  eq(res.status, 404, "status");
+  lacks(text, "breakdown", "the breakdown key");
+  lacks(text, "1,300", "the total");
 });
 
 /* ================= no secret in the source ================= */
 
 await check("no key, passkey or shortcode is written into the source", async () => {
-  for (const file of ["_daraja.js", "_order.js", "_site.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
+  for (const file of ["_daraja.js", "_order.js", "_site.js", "_amounts.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
     const src = readFileSync(join(API, file), "utf8");
     for (const pattern of [/passkey\s*=\s*["'][A-Za-z0-9]{8,}/i, /["'][A-Za-z0-9]{40,}["']/]) {
       const hitMatch = src.match(pattern);
