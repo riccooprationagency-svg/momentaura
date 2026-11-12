@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import data from "../data/site.json";
+import { timingProblem } from "./timing.js";
 
 /* The facts about the shop itself, as opposed to the things it sells.
  *
@@ -26,9 +27,8 @@ import data from "../data/site.json";
  * server prices an order from. The form and the server speak in `key` and never
  * in `name`: a label is copy and can be reworded, a key is a contract.
  *
- * There is no working-day count on a zone. The step 10 shape carried one, and
- * no delivery duration has been supplied for any area, so a field that could
- * only ever hold a guess was removed rather than left waiting for one. */
+ * There is no arrival time on a zone. Ric states it per region, so it lives
+ * in delivery.timings keyed by region, and a county takes its region's. */
 export interface Zone {
   /** Stable machine key, e.g. "nairobi-cbd". The form posts it; the server prices by it. */
   key: string;
@@ -108,9 +108,24 @@ export interface Site {
       /** How soon after payment the first message comes, in Ric's words, or null for not stated. */
       within: string | null;
     };
+    /* When an order goes out. Ric's words; the build throws if the rule does
+     * not mention the cut-off. Optional as a block, both-or-neither with
+     * `timings`. */
+    dispatch?: Dispatch;
+    /** Arrival after dispatch per region, as the phrase after "Delivered": "1 to 2 working days after dispatch". */
+    timings?: Record<string, string>;
     returnsWindowDays: number | null;
     returnsCondition: string | null;
   };
+}
+
+export interface Dispatch {
+  /** "Monday to Saturday". */
+  workingDays: string;
+  /** 24-hour clock, "12:00". */
+  cutOff: string;
+  /** The whole rule as a buyer reads it. Must contain the cut-off. */
+  rule: string;
 }
 
 export const site = data as Site;
@@ -142,18 +157,18 @@ export const known = (value: unknown): boolean =>
 
 /* ---------- what a buyer is sent after paying ----------
  *
- * WhatsApp or SMS, and nothing else. Both go to the one number every order
- * carries, the phone the M-Pesa prompt went to. Email is refused because it is
- * optional at checkout: "an email is sent when the order is paid" would be a
- * promise to every buyer that the shop can only keep for some of them.
+ * WhatsApp, and nothing else. It goes to the one number every order carries,
+ * the phone the M-Pesa prompt went to. Email is refused because it is optional
+ * at checkout: "an email is sent when the order is paid" would be a promise to
+ * every buyer that the shop can only keep for some of them. SMS was allowed
+ * once and removed: nobody said one is sent, and a channel the validator
+ * accepts is a sentence the site is one edit away from printing.
  *
- * `within` is Ric's own wording and is held to the same standard as the rest
- * of the copy: no banned word, and no bare "2-5" with no unit, which is a
- * figure a buyer cannot hold anyone to.
+ * `within` is Ric's own wording and goes through timingProblem() like every
+ * delivery timing below.
  */
-export type Channel = "WhatsApp" | "SMS";
-const CHANNELS: readonly Channel[] = ["WhatsApp", "SMS"];
-const VAGUE = /\b(fast|quick|quickly|express|asap|soon|shortly|seamless|effortless|premium)\b/i;
+export type Channel = "WhatsApp";
+const CHANNELS: readonly Channel[] = ["WhatsApp"];
 
 {
   const after = site.delivery.afterPayment;
@@ -166,15 +181,12 @@ const VAGUE = /\b(fast|quick|quickly|express|asap|soon|shortly|seamless|effortle
     }
     if (after.within !== null) {
       const where = `site.json delivery.afterPayment.within "${after.within}"`;
-      if (!known(after.within)) throw new Error(`${where}: use null, not an empty value`);
-      if (VAGUE.test(after.within)) throw new Error(`${where}: states no figure a buyer can check`);
-      if (/\d\s*[-–]\s*\d+(?!\s*[a-z])/i.test(after.within)) throw new Error(`${where}: a range needs its unit`);
+      const problem = timingProblem(after.within);
+      if (problem !== null) throw new Error(`${where}: ${problem}`);
       if (after.paid === null) throw new Error(`${where}: times a message that is not sent`);
     }
   }
 }
-
-const withArticle = (channel: Channel): string => (channel === "SMS" ? `an ${channel}` : `a ${channel}`);
 
 /* The sentences, built once so /delivery, the confirmation and /privacy say the
    same thing in the same words. Empty when no message is sent. */
@@ -184,22 +196,75 @@ export const afterPaymentLines = (): string[] => {
   const lines: string[] = [];
   if (after.paid !== null) {
     const when = known(after.within) ? `, within ${String(after.within).trim()} of the payment` : "";
-    const first = withArticle(after.paid).replace(/^a/, "A");
-    lines.push(`${first} message is sent to the phone number given at checkout when the payment is confirmed${when}.`);
+    lines.push(`A WhatsApp message is sent to the phone number given at checkout when the payment is confirmed${when}.`);
   }
   if (after.leftNairobi !== null) {
-    const which = after.paid === after.leftNairobi ? `a second ${after.leftNairobi}` : withArticle(after.leftNairobi);
-    lines.push(`For an order going outside Nairobi, ${which} message is sent when it leaves Nairobi.`);
+    /* "a second" only when there is a first. */
+    const which = after.paid !== null ? "a second" : "a";
+    lines.push(`For an order going outside Nairobi, ${which} WhatsApp message is sent when it leaves Nairobi.`);
   }
   return lines;
 };
 
-/** The channels the after-payment messages use, once each, for /privacy. */
-export const afterPaymentChannels = (): Channel[] => {
-  const after = site.delivery.afterPayment;
-  if (after === undefined) return [];
-  return [...new Set([after.paid, after.leftNairobi].filter((c): c is Channel => c !== null))];
+/* ---------- when an order goes out, and when it arrives ----------
+ *
+ * Every word here is Ric's. The site states a RULE, not a date: a date depends
+ * on the day the order is placed, so it cannot be written at build time, and
+ * computing it in the browser or for the confirmation needs the cart script or
+ * functions/, which this step does not touch.
+ *
+ * Timings are keyed by region, the same `region` every zone carries, and the
+ * build throws on a region with no timing or a timing with no region. A fee
+ * table that shows a county with no arrival time is exactly the gap this block
+ * exists to close, and V18 checks the built pages for the same thing from the
+ * outside. Nairobi CBD and Nairobi outside the CBD share the "Nairobi" entry
+ * because Ric gave them the same answer; if they ever differ, the key moves to
+ * the zone.
+ */
+{
+  const d = site.delivery.dispatch;
+  const t = site.delivery.timings;
+  if ((d === undefined) !== (t === undefined)) {
+    throw new Error(
+      "site.json delivery.dispatch and delivery.timings: both or neither. A rule with no arrival times, " +
+        "or arrival times with no rule, is half a promise"
+    );
+  }
+  if (d !== undefined && t !== undefined) {
+    for (const key of ["workingDays", "cutOff", "rule"] as const) {
+      if (!known(d[key])) throw new Error(`site.json delivery.dispatch.${key}: required`);
+      if (d[key].includes("!")) throw new Error(`site.json delivery.dispatch.${key}: carries an exclamation mark`);
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(d.cutOff)) {
+      throw new Error(`site.json delivery.dispatch.cutOff "${d.cutOff}": a 24-hour time like 12:00`);
+    }
+    /* The cut-off is stated twice, once as a figure and once inside the rule.
+       They are not allowed to disagree. */
+    if (!d.rule.includes(d.cutOff)) throw new Error(`site.json delivery.dispatch.rule: does not mention the cut-off ${d.cutOff}`);
+    const regions = new Set(site.delivery.zones.map((z) => z.region));
+    for (const region of regions) {
+      if (!(region in t)) throw new Error(`site.json delivery.timings: no timing for region "${region}"`);
+    }
+    for (const [region, text] of Object.entries(t)) {
+      if (!regions.has(region)) throw new Error(`site.json delivery.timings "${region}": no zone is in this region`);
+      const problem = timingProblem(text);
+      if (problem !== null) throw new Error(`site.json delivery.timings "${region}" "${text}": ${problem}`);
+    }
+  }
+}
+
+/** The dispatch rule, or null while none is stated. */
+export const dispatchRule = (): Dispatch | null => site.delivery.dispatch ?? null;
+
+/** A region's arrival time as a sentence: "Delivered 1 to 2 working days after dispatch." */
+export const timingFor = (region: string): string | null => {
+  const text = site.delivery.timings?.[region];
+  return known(text) ? `Delivered ${String(text).trim()}.` : null;
 };
+
+/** "A", "A and B", "A, B and C". */
+export const listJoin = (items: string[]): string =>
+  items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 
 /* ---------- the shop's pages elsewhere ----------
  *
@@ -266,6 +331,19 @@ export const zonesByRegion = (): { region: string; zones: Zone[] }[] => {
     groups.set(zone.region, [...(groups.get(zone.region) ?? []), zone]);
   }
   return [...groups].map(([region, zones]) => ({ region, zones }));
+};
+
+/* Regions that share a timing, in the order site.json first lists them. The
+   checkout paragraph is built from this rather than from "Nairobi" and "other
+   counties", so a region with a different answer gets its own sentence and no
+   county is covered by a promise it was not given. */
+export const timingGroups = (): { regions: string[]; sentence: string }[] => {
+  const groups = new Map<string, string[]>();
+  for (const { region } of zonesByRegion()) {
+    const sentence = timingFor(region);
+    if (sentence !== null) groups.set(sentence, [...(groups.get(sentence) ?? []), region]);
+  }
+  return [...groups].map(([sentence, regions]) => ({ regions, sentence }));
 };
 
 /** The cheapest zone, for "Delivery from KSh 0 in Nairobi CBD", or null with no zones. */

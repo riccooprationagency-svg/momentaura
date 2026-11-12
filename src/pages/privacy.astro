@@ -17,13 +17,12 @@
 // is the first thing to rot; the file's history in the repo is the real record.
 import Base from "../layouts/Base.astro";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
-import { known, site, afterPaymentLines, afterPaymentChannels } from "../lib/site";
+import { known, site, afterPaymentLines } from "../lib/site";
 
 /* The order messages, in the same words /delivery and the confirmation use.
    A promise to message a phone number that this page did not mention would
    make this page false, so the two read from one place and disappear together. */
 const afterPaid = afterPaymentLines();
-const viaWhatsapp = afterPaymentChannels().includes("WhatsApp");
 
 /* The networks the footer actually links to, so the sentence below names only
    those and disappears with them. Validated in lib/site.ts before this runs. */
@@ -145,7 +144,7 @@ const networks = [known(site.social?.facebook) && "Facebook", known(site.social?
         The person who runs MomentAura. {GATEWAY_NAME}, which sees the payment details
         listed above because it is taking the payment. The company hosting this site, because the pages and the order have
         to pass through it. Your delivery details are used to get the order to you.
-        {viaWhatsapp && " WhatsApp, which carries the order messages described above, and so sees your phone number and those messages. "}
+        {afterPaid.length > 0 && " WhatsApp, which carries the order messages described above, and so sees your phone number and those messages. "}
         Nothing is sold, shared for advertising, or handed to a data broker.
       </p>
 
@@ -154,7 +153,7 @@ const networks = [known(site.social?.facebook) && "Facebook", known(site.social?
         Tapping a WhatsApp link on this site opens WhatsApp. That conversation is handled
         by WhatsApp, which is owned by Meta, under WhatsApp's own privacy policy rather
         than this one. This site sends nothing to WhatsApp until you tap a link.
-        {viaWhatsapp && " The order messages described above are sent from MomentAura's own WhatsApp, and are handled by WhatsApp under the same policy. "}
+        {afterPaid.length > 0 && " The order messages described above are sent from MomentAura's own WhatsApp, and are handled by WhatsApp under the same policy. "}
         The
         message it starts with carries a short code naming the page you tapped it on, such
         as WEB-CONTACT, and you can see and change it before you send.

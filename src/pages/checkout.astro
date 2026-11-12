@@ -26,6 +26,16 @@ import CountyOptions from "../components/CountyOptions.astro";
 import { products, price } from "../lib/products";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
+import { dispatchRule, timingGroups, listJoin } from "../lib/site";
+
+/* The dispatch rule and arrival times, stated once under the county field.
+   STATIC: it does not change when a county is chosen, because a per-county line
+   would have to listen to the <select>, and that is the cart script's job and
+   the cart script has no room. Grouped by identical timing rather than as
+   "Nairobi" and "other counties", so a region with a different answer gets its
+   own sentence. V18 fails the build if this paragraph is missing. */
+const rule = dispatchRule();
+const groups = timingGroups();
 
 // Light, following the products it lists, exactly as /order does.
 ---
@@ -93,6 +103,15 @@ import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
           >
             <CountyOptions />
           </Field>
+
+          {
+            rule !== null && groups.length > 0 && (
+              <p class="checkout__timing" data-timing-summary>
+                {rule.rule} Working days are {rule.workingDays}.{" "}
+                {groups.map(({ regions, sentence }) => `${listJoin(regions)}: ${sentence[0].toLowerCase()}${sentence.slice(1)}`).join(" ")}
+              </p>
+            )
+          }
 
           <Field
             name="area"
@@ -227,6 +246,13 @@ import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
   .checkout__heading {
     font-size: var(--t-heading);
     margin-block-end: var(--s-40);
+  }
+
+  /* Prose, not data: Archivo at body-sm, muted, like a field hint. */
+  .checkout__timing {
+    color: var(--fg-muted);
+    font-size: var(--t-body-sm);
+    max-width: var(--measure);
   }
 
   .checkout__help {

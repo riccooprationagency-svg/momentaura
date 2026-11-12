@@ -19,6 +19,7 @@
  *   V15 Facebook and Instagram links match site.json, no tracking parameters
  *   V16 every category is declared, and every category page has a product card
  *   V17 a product page's thumbnail strip switches with no script
+ *   V18 every delivery region states an arrival time, and /checkout names them all
  *
  * V2 and V3 guard the constraint CLAUDE.md calls the single most important in
  * the file, and the one most likely to erode silently: the accent means "you
@@ -35,6 +36,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, extname, basename } from "node:path";
+import { timingProblem } from "../src/lib/timing.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
@@ -2053,6 +2055,130 @@ function stripViolations(pages) {
     console.log(
       `  V17 thumbnail strips  ${withStrip} of ${pages.length} product page(s) carry one` +
         (withStrip === 0 ? " — no product has two photographs yet" : found.length === 0 ? ", every one matches and loads only the cart" : `, ${found.length} violation(s)`)
+    );
+  }
+}
+
+/* ---------- V18 — every region states when an order arrives, and checkout says so ----------
+ *
+ * Exists because a fee table that lists a county with no arrival time sends a
+ * suspicious buyer to the M-Pesa prompt without a timing, which is the gap
+ * Prompt 11 closed, and nothing else in this file would notice it reopening.
+ *
+ * lib/site.ts already throws on a region in site.json with no timing. This is
+ * the same rule read from the outside, on what was emitted:
+ *
+ *   every region in site.json has a <details class="fees__region"> on /delivery
+ *   every one of those carries a non-empty data-timing in its summary
+ *   every timing passes timingProblem() — the build-time rule, imported, not copied
+ *   /checkout carries a non-empty data-timing-summary paragraph
+ *   that paragraph names every region, so none is left to "other counties"
+ *
+ * The wording self-test runs timingProblem() itself over fixtures, including
+ * the "10-30 minutes" case an unanchored range check once rejected.
+ */
+
+/** Every way the built timing pages depart from the rules above.
+ *  regions: region names from site.json. delivery, checkout: html, or null when not built. */
+function timingViolations(regions, delivery, checkout) {
+  const out = [];
+  if (delivery === null) out.push("/delivery was not built");
+  else {
+    const found = new Map();
+    for (const block of delivery.matchAll(/<details\b[^>]*\sclass\s*=\s*["'](?:[^"']*\s)?fees__region(?:\s[^"']*)?["'][^>]*>([\s\S]*?)<\/details>/gi)) {
+      const summary = block[1].match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i);
+      if (!summary) continue;
+      const name = summary[1].replace(/<span\b[\s\S]*$/i, "").replace(/<[^>]*>/g, "").trim();
+      const timing = summary[1].match(/<span\b[^>]*\sdata-timing\b[^>]*>([^<]*)<\/span>/i);
+      found.set(name, timing ? timing[1].trim() : null);
+    }
+    for (const region of regions) {
+      if (!found.has(region)) {
+        out.push(`region "${region}" is not on /delivery`);
+        continue;
+      }
+      const timing = found.get(region);
+      if (timing === null || timing === "") {
+        out.push(`region "${region}" on /delivery has no timing`);
+        continue;
+      }
+      const problem = timingProblem(timing);
+      if (problem !== null) out.push(`region "${region}" timing "${timing}": ${problem}`);
+    }
+  }
+  if (checkout === null) out.push("/checkout was not built");
+  else {
+    const p = checkout.match(/<p\b[^>]*\sdata-timing-summary\b[^>]*>([\s\S]*?)<\/p>/i);
+    const text = p ? p[1].replace(/<[^>]*>/g, "").trim() : "";
+    if (text === "") out.push("/checkout carries no timing paragraph");
+    else {
+      for (const region of regions) {
+        if (!text.includes(region)) out.push(`/checkout timing paragraph does not name region "${region}"`);
+      }
+    }
+  }
+  return out;
+}
+
+{
+  /* Wording self-test: the function lib/site.ts throws with at build time. */
+  const words = [
+    ["10-30 minutes", null],
+    ["2-5 days", null],
+    ["5 minutes", null],
+    ["2-5", "a range needs its unit"],
+    ["1-2", "a range needs its unit"],
+    ["10-30", "a range needs its unit"],
+    ["fast delivery", "states no figure"],
+    ["1 to 2 working days!", "exclamation mark"],
+  ];
+  let wordsOk = 0;
+  for (const [text, mustSay] of words) {
+    const problem = timingProblem(text);
+    if (mustSay === null ? problem === null : problem !== null && problem.includes(mustSay)) wordsOk++;
+    else fail("V18", `wording self-test: "${text}" should ${mustSay === null ? "pass" : `fail with "${mustSay}"`}, got: ${problem ?? "no problem"}`);
+  }
+  const wordsPass = words.filter(([, m]) => m === null).length;
+  console.log(`  V18 wording self-test  ${wordsOk}/${words.length} fixtures behave (${wordsPass} pass, ${words.length - wordsPass} fail by name)`);
+
+  /* Page self-test. */
+  const region = (name, timing) =>
+    `<details class="fees__region" data-astro-cid-x><summary class="fees__summary" data-astro-cid-x>${name}` +
+    (timing === undefined ? "" : `<span class="fees__timing" data-timing data-astro-cid-x>${timing}</span>`) +
+    `</summary><table class="zones"></table></details>`;
+  const good = region("Nairobi", "Delivered the same working day it is dispatched.") + region("Coast", "Delivered 1 to 2 working days after dispatch.");
+  const summary = (text) => `<p class="checkout__timing" data-timing-summary data-astro-cid-y>${text}</p>`;
+  const goodCheckout = summary("Nairobi: delivered the same working day. Coast: delivered 1 to 2 working days after dispatch.");
+  const both = ["Nairobi", "Coast"];
+  const cases = [
+    ["the shipped shape", both, good, goodCheckout, null],
+    ["a region with no timing", both, region("Nairobi", "Delivered today.") + region("Coast"), goodCheckout, `"Coast" on /delivery has no timing`],
+    ["a region with an empty timing", both, region("Nairobi", "Delivered today.") + region("Coast", " "), goodCheckout, `"Coast" on /delivery has no timing`],
+    ["a region missing from /delivery", both, region("Nairobi", "Delivered today."), goodCheckout, `"Coast" is not on /delivery`],
+    ["a bare range on the page", both, region("Nairobi", "Delivered today.") + region("Coast", "Delivered 1-2."), goodCheckout, "a range needs its unit"],
+    ["checkout with no timing paragraph", both, good, `<p class="checkout__timing">Nairobi and Coast.</p>`, "/checkout carries no timing paragraph"],
+    ["checkout leaving a region to \"other counties\"", both, good, summary("Nairobi: same day. Other counties: 1 to 2 working days."), `does not name region "Coast"`],
+    ["/delivery not built", both, null, goodCheckout, "/delivery was not built"],
+  ];
+  let ok = 0;
+  for (const [label, r, d, c, mustSay] of cases) {
+    const found = timingViolations(r, d, c);
+    if (mustSay === null ? found.length === 0 : found.some((m) => m.includes(mustSay))) ok++;
+    else fail("V18", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with ${mustSay}`}, got: ${found.join("; ") || "no violation"}`);
+  }
+  console.log(`  V18 timing self-test   ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+
+  const siteData = JSON.parse(readFileSync(join(SRC, "data", "site.json"), "utf8"));
+  if (siteData.delivery.timings === undefined) {
+    console.log("  V18 timings           none declared in site.json — nothing on /delivery or /checkout to check");
+  } else if (existsSync(DIST)) {
+    const regions = [...new Set(siteData.delivery.zones.map((z) => z.region))];
+    const read = (path) => (existsSync(join(DIST, path)) ? readFileSync(join(DIST, path), "utf8") : null);
+    const found = timingViolations(regions, read("delivery/index.html"), read("checkout/index.html"));
+    for (const v of found) fail("V18", v);
+    console.log(
+      `  V18 timings           ${regions.length} region(s), ` +
+        (found.length === 0 ? "every one timed on /delivery and named on /checkout" : `${found.length} violation(s)`)
     );
   }
 }

@@ -24,9 +24,21 @@
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
-import { site, known, feeText, phoneDisplay, telHref, whatsappHref, zonesByRegion, afterPaymentLines } from "../lib/site";
+import {
+  site,
+  known,
+  feeText,
+  phoneDisplay,
+  telHref,
+  whatsappHref,
+  zonesByRegion,
+  afterPaymentLines,
+  dispatchRule,
+  timingFor,
+} from "../lib/site";
 
 const afterPaid = afterPaymentLines();
+const rule = dispatchRule();
 
 const hasZones = known(site.delivery.zones);
 const regions = zonesByRegion();
@@ -87,16 +99,22 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
         hasDispatch && (
           <>
             <hr class="page__hair" />
-            <h2 class="page__sub">Dispatch</h2>
+            <h2 class="page__sub">{rule === null ? "Dispatch" : "Dispatch and arrival"}</h2>
             <p class="page__body">
               Every order is packed and sent from {site.delivery.dispatchFrom}.
             </p>
-            <p class="page__body">
-              Where a delivery date is given it is given as a date, not a number of days —
-              at checkout, on your confirmation, and when you look an order up. A duration
-              asks you to do the arithmetic yourself at the moment you are deciding
-              whether to trust a commitment.
-            </p>
+            {/* Ric's rule, stated once. A rule rather than a date: see lib/site.ts. */}
+            {rule !== null && (
+              <>
+                <p class="page__body">
+                  Working days are {rule.workingDays}. {rule.rule}
+                </p>
+                <p class="page__body">
+                  The time to arrive is counted from dispatch and is shown under each region
+                  below.
+                </p>
+              </>
+            )}
           </>
         )
       }
@@ -112,9 +130,9 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
           disclosure, so every fee is readable with JavaScript off, and a
           browser's find-in-page opens a closed region to a match.
 
-          No delivery time is stated, here or anywhere. None has been supplied
-          for any county, and a duration nobody can hold the shop to is the
-          kind of claim this page exists not to make.
+          Each region's arrival time sits in its <summary>, so it reads with
+          the region closed. data-timing is what V18 looks for: a region on
+          this page with no timing fails the build.
         */
         hasZones && (
           <section id="fees" class="fees" aria-labelledby="fees-heading">
@@ -127,7 +145,12 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
             </p>
             {regions.map(({ region, zones }, i) => (
               <details class="fees__region" open={i === 0}>
-                <summary class="fees__summary">{region}</summary>
+                <summary class="fees__summary">
+                  {region}
+                  {timingFor(region) !== null && (
+                    <span class="fees__timing" data-timing>{timingFor(region)}</span>
+                  )}
+                </summary>
                 <table class="zones">
                   <thead>
                     <tr>
@@ -274,6 +297,13 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
     padding-block: var(--s-12);
     font-size: var(--t-body-sm);
     cursor: pointer;
+  }
+
+  /* Under the region name, in the prose voice: a sentence, not a figure. */
+  .fees__timing {
+    display: block;
+    color: var(--fg-muted);
+    font-size: var(--t-caption);
   }
 
   .fees__region .zones {
