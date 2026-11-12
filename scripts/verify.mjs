@@ -2068,14 +2068,25 @@ function stripViolations(pages) {
  * lib/site.ts already throws on a region in site.json with no timing. This is
  * the same rule read from the outside, on what was emitted:
  *
- *   every region in site.json has a <details class="fees__region"> on /delivery
- *   every one of those carries a non-empty data-timing in its summary
+ *   every region in site.json has at least one box on /delivery — an <li>
+ *     carrying data-region="<region>"
+ *   every box of that region carries a non-empty data-timing
  *   every timing passes timingProblem() — the build-time rule, imported, not copied
  *   /checkout carries a non-empty data-timing-summary paragraph
  *   that paragraph names every region, so none is left to "other counties"
  *
  * The wording self-test runs timingProblem() itself over fixtures, including
  * the "10-30 minutes" case an unanchored range check once rejected.
+ *
+ * READ BY ATTRIBUTE, NOT BY SHAPE. Until the boxed-items step this parsed one
+ * <details> per region and took the name from the text of its <summary>. Then
+ * the first region's zones became their own always-open boxes, with no
+ * <details> and no summary, and a shape parser would have reported Nairobi
+ * missing from a page that shows it twice. The region is now named by the
+ * data-region attribute on the box, so the page can change its markup without
+ * this check having to learn it again; what is asserted has not moved. A
+ * region split across several boxes is held to the rule in every one of them,
+ * so one timed box cannot stand in for an untimed sibling.
  */
 
 /** Every way the built timing pages depart from the rules above.
@@ -2084,26 +2095,28 @@ function timingViolations(regions, delivery, checkout) {
   const out = [];
   if (delivery === null) out.push("/delivery was not built");
   else {
+    /* region -> the timing in each of its boxes, null where a box has none. */
     const found = new Map();
-    for (const block of delivery.matchAll(/<details\b[^>]*\sclass\s*=\s*["'](?:[^"']*\s)?fees__region(?:\s[^"']*)?["'][^>]*>([\s\S]*?)<\/details>/gi)) {
-      const summary = block[1].match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i);
-      if (!summary) continue;
-      const name = summary[1].replace(/<span\b[\s\S]*$/i, "").replace(/<[^>]*>/g, "").trim();
-      const timing = summary[1].match(/<span\b[^>]*\sdata-timing\b[^>]*>([^<]*)<\/span>/i);
-      found.set(name, timing ? timing[1].trim() : null);
+    for (const block of delivery.matchAll(/<li\b([^>]*)>([\s\S]*?)<\/li>/gi)) {
+      const region = block[1].match(/\sdata-region\s*=\s*"([^"]*)"/i);
+      if (!region) continue;
+      const timing = block[2].match(/<span\b[^>]*\sdata-timing\b[^>]*>([^<]*)<\/span>/i);
+      const name = region[1].replace(/&amp;/g, "&").trim();
+      found.set(name, [...(found.get(name) ?? []), timing ? timing[1].trim() : null]);
     }
     for (const region of regions) {
       if (!found.has(region)) {
         out.push(`region "${region}" is not on /delivery`);
         continue;
       }
-      const timing = found.get(region);
-      if (timing === null || timing === "") {
-        out.push(`region "${region}" on /delivery has no timing`);
-        continue;
+      for (const timing of found.get(region)) {
+        if (timing === null || timing === "") {
+          out.push(`region "${region}" on /delivery has no timing`);
+          continue;
+        }
+        const problem = timingProblem(timing);
+        if (problem !== null) out.push(`region "${region}" timing "${timing}": ${problem}`);
       }
-      const problem = timingProblem(timing);
-      if (problem !== null) out.push(`region "${region}" timing "${timing}": ${problem}`);
     }
   }
   if (checkout === null) out.push("/checkout was not built");
@@ -2143,9 +2156,17 @@ function timingViolations(regions, delivery, checkout) {
 
   /* Page self-test. */
   const region = (name, timing) =>
-    `<details class="fees__region" data-astro-cid-x><summary class="fees__summary" data-astro-cid-x>${name}` +
-    (timing === undefined ? "" : `<span class="fees__timing" data-timing data-astro-cid-x>${timing}</span>`) +
-    `</summary><table class="zones"></table></details>`;
+    `<li class="fees__region box" data-region="${name}" data-astro-cid-x><details data-astro-cid-x>` +
+    `<summary class="fees__summary" data-astro-cid-x><span class="fees__name">${name}</span><span class="fees__facts">` +
+    (timing === undefined ? "" : `<span class="docket__label">Arrives</span><span class="fees__value" data-timing data-astro-cid-x>${timing}</span>`) +
+    `</span></summary><table class="zones"></table></details></li>`;
+  /* A zone shown as its own open box: no <details>, no summary. */
+  const zone = (name, label, timing) =>
+    `<li class="fees__region fees__region--open box" data-region="${name}" data-astro-cid-x><p class="fees__name">${label}</p>` +
+    `<p class="fees__facts">` +
+    (timing === undefined ? "" : `<span class="fees__value" data-timing data-astro-cid-x>${timing}</span>`) +
+    `</p></li>`;
+  const coast = region("Coast", "Delivered 1 to 2 working days after dispatch.");
   const good = region("Nairobi", "Delivered the same working day it is dispatched.") + region("Coast", "Delivered 1 to 2 working days after dispatch.");
   const summary = (text) => `<p class="checkout__timing" data-timing-summary data-astro-cid-y>${text}</p>`;
   const goodCheckout = summary("Nairobi: delivered the same working day. Coast: delivered 1 to 2 working days after dispatch.");
@@ -2159,6 +2180,9 @@ function timingViolations(regions, delivery, checkout) {
     ["checkout with no timing paragraph", both, good, `<p class="checkout__timing">Nairobi and Coast.</p>`, "/checkout carries no timing paragraph"],
     ["checkout leaving a region to \"other counties\"", both, good, summary("Nairobi: same day. Other counties: 1 to 2 working days."), `does not name region "Coast"`],
     ["/delivery not built", both, null, goodCheckout, "/delivery was not built"],
+    ["a region as two open zone boxes", both, zone("Nairobi", "Nairobi CBD", "The same working day") + zone("Nairobi", "Nairobi (outside the CBD)", "The same working day") + coast, goodCheckout, null],
+    ["one open zone box with no timing", both, zone("Nairobi", "Nairobi CBD", "The same working day") + zone("Nairobi", "Nairobi (outside the CBD)") + coast, goodCheckout, `"Nairobi" on /delivery has no timing`],
+    ["a <li> with no data-region", both, `<li class="fees__region box">Nairobi<span data-timing>Today.</span></li>` + coast, goodCheckout, `"Nairobi" is not on /delivery`],
   ];
   let ok = 0;
   for (const [label, r, d, c, mustSay] of cases) {
@@ -2166,7 +2190,8 @@ function timingViolations(regions, delivery, checkout) {
     if (mustSay === null ? found.length === 0 : found.some((m) => m.includes(mustSay))) ok++;
     else fail("V18", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with ${mustSay}`}, got: ${found.join("; ") || "no violation"}`);
   }
-  console.log(`  V18 timing self-test   ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+  const casesPass = cases.filter((c) => c[4] === null).length;
+  console.log(`  V18 timing self-test   ${ok}/${cases.length} fixtures behave (${casesPass} pass, ${cases.length - casesPass} fail by name)`);
 
   const siteData = JSON.parse(readFileSync(join(SRC, "data", "site.json"), "utf8"));
   if (siteData.delivery.timings === undefined) {

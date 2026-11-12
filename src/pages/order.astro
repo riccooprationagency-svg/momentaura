@@ -64,7 +64,7 @@ import { products, price } from "../lib/products";
           {
             products.map((product) => (
               <li
-                class="line"
+                class="line box"
                 data-line
                 data-slug={product.slug}
                 data-name={product.name}
@@ -122,13 +122,18 @@ import { products, price } from "../lib/products";
           }
         </ul>
 
-        <hr class="order__hair" />
-
         <!--
+          One box around the figure and the action it leads to, with the page
+          ground inside it: Kraft Board is the docket's, the capacity notice's
+          and the filled button's, and this is none of them. A wrapper only —
+          every hook the cart reads below is where it was, and the cart finds
+          each one from the document, not by position.
+
           Subtotal, not Total: the delivery fee depends on the county, which is
           chosen at checkout, so the figure here is the items alone and says so
           beside itself rather than in a footnote.
         -->
+        <div class="order__summary box">
         <p class="order__total">
           <span class="order__total-label">Subtotal</span>
           <span class="order__total-value" data-order-total>KSh 0</span>
@@ -155,8 +160,7 @@ import { products, price } from "../lib/products";
 
           <button type="button" class="order__clear" data-clear>Clear the order</button>
         </div>
-
-        <hr class="order__hair" />
+        </div>
 
         <!--
           Delivery terms restated. Dispatch point is a fact and it is stated as
@@ -213,18 +217,20 @@ import { products, price } from "../lib/products";
   .order__lines {
     list-style: none;
     display: grid;
-    gap: var(--s-28);
+    gap: var(--s-16);
   }
 
   /* One column on a phone; the quantity and the totals sit under the name
      rather than crushing four columns into 335px. */
+  /* Each line is its own box (.box, global.css), on the <li> the cart
+     reveals. A wrapper around it would stay drawn when the cart hides the
+     line, leaving an empty box for every product not in the order. */
   .line {
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--s-12);
     align-items: center;
-    padding-block-end: var(--s-28);
-    border-block-end: 1px dashed var(--border);
+    padding: var(--s-20);
   }
 
   .line__id {
@@ -327,10 +333,8 @@ import { products, price } from "../lib/products";
 
   /* ---------- totals and actions ---------- */
 
-  .order__hair {
-    border: 0;
-    border-block-start: 1px solid var(--border);
-    width: 100%;
+  .order__summary {
+    padding: var(--s-20);
     margin-block: var(--s-28);
   }
 

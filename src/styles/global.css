@@ -322,6 +322,24 @@ a {
   text-transform: uppercase;
 }
 
+/* One item, one box. The docket's shape without the docket's fill: a product
+   card, an order line, a delivery region. A 1px edge, the surface radius, and
+   the page ground showing through — Kraft Board stays the docket's, the
+   capacity notice's and the filled button's, and nothing here is any of them.
+
+   The edge is --fg-muted, not --border, in both systems, because a box with
+   no fill is drawn by its edge alone. --border is --rule on paper at 1.23:1 and
+   --twine on canvas at 1.94:1: the first is invisible and the second fails the
+   3:1 a component boundary needs. The docket gets away with --border because
+   its kraft fill carries the edge. --fg-muted is 6.78:1 on paper and 7.27:1
+   on canvas, both asserted at 3:1 in contrast.mjs as box edges.
+
+   Hover, where a box is a link, is the border going to --fg. Colour only. */
+.box {
+  border: 1px solid var(--fg-muted);
+  border-radius: var(--radius-surface);
+}
+
 /* Honest placeholder for a product with no real photograph.
 
    Reads as a blank dispatch label, not a broken image: kraft ground, the product

@@ -85,6 +85,13 @@ const PAIRINGS = [
   ["dispatch", "kraft", "checkable facts on docket ground, light system"],
   ["tissue-cream", "kraft-board", "filled button label, dark system"],
   ["ink", "kraft", "filled button label, light system"],
+  /* Box edges: .box in global.css. A 1px border with no fill behind it is the
+     only thing that draws the box, so it is held to the 3:1 WCAG asks of a
+     component boundary rather than to the text threshold. --border was the
+     obvious choice and fails in both systems — rule on paper is 1.23:1 and
+     twine on canvas 1.94:1 — which is why .box uses --fg-muted instead. */
+  ["muted", "paper", "box edge, light system — 1px border, no fill", 3],
+  ["sisal", "packing-dark", "box edge, dark system — 1px border, no fill", 3],
 ];
 
 const AA_NORMAL = 4.5;
