@@ -24,7 +24,9 @@
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
-import { site, known, feeText, phoneDisplay, telHref, whatsappHref, zonesByRegion } from "../lib/site";
+import { site, known, feeText, phoneDisplay, telHref, whatsappHref, zonesByRegion, afterPaymentLines } from "../lib/site";
+
+const afterPaid = afterPaymentLines();
 
 const hasZones = known(site.delivery.zones);
 const regions = zonesByRegion();
@@ -65,6 +67,21 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
         dispatched until that payment is confirmed. Prices are in Kenyan shillings and the
         price on the product page is the price of the item.
       </p>
+
+      {
+        /* From site.json delivery.afterPayment, through the same helper the
+           confirmation and /privacy use. Only the messages Ric said are sent;
+           no timing, because none was stated. */
+        afterPaid.length > 0 && (
+          <>
+            <hr class="page__hair" />
+            <h2 class="page__sub">After you pay</h2>
+            {afterPaid.map((line) => (
+              <p class="page__body">{line}</p>
+            ))}
+          </>
+        )
+      }
 
       {
         hasDispatch && (

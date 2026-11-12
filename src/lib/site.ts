@@ -95,6 +95,19 @@ export interface Site {
   delivery: {
     dispatchFrom: string | null;
     zones: Zone[];
+    /* The messages a buyer is sent after paying, each by the channel Ric
+     * named, or null for a message that is not sent. A null renders nothing:
+     * no sentence on /delivery, none on the confirmation, and no line on
+     * /privacy, which is where a promise to message a phone number has to be
+     * matched by a statement that the number is used for it. */
+    afterPayment?: {
+      /** Sent when the payment is confirmed. */
+      paid: Channel | null;
+      /** Sent when an order going outside Nairobi leaves Nairobi. */
+      leftNairobi: Channel | null;
+      /** How soon after payment the first message comes, in Ric's words, or null for not stated. */
+      within: string | null;
+    };
     returnsWindowDays: number | null;
     returnsCondition: string | null;
   };
@@ -126,6 +139,67 @@ export const known = (value: unknown): boolean =>
     if (!Number.isInteger(zone.cost) || zone.cost < 0) throw new Error(`${where}: cost must be a whole number of KSh, 0 or more`);
   }
 }
+
+/* ---------- what a buyer is sent after paying ----------
+ *
+ * WhatsApp or SMS, and nothing else. Both go to the one number every order
+ * carries, the phone the M-Pesa prompt went to. Email is refused because it is
+ * optional at checkout: "an email is sent when the order is paid" would be a
+ * promise to every buyer that the shop can only keep for some of them.
+ *
+ * `within` is Ric's own wording and is held to the same standard as the rest
+ * of the copy: no banned word, and no bare "2-5" with no unit, which is a
+ * figure a buyer cannot hold anyone to.
+ */
+export type Channel = "WhatsApp" | "SMS";
+const CHANNELS: readonly Channel[] = ["WhatsApp", "SMS"];
+const VAGUE = /\b(fast|quick|quickly|express|asap|soon|shortly|seamless|effortless|premium)\b/i;
+
+{
+  const after = site.delivery.afterPayment;
+  if (after !== undefined) {
+    for (const key of ["paid", "leftNairobi"] as const) {
+      const value = after[key];
+      if (value !== null && !CHANNELS.includes(value)) {
+        throw new Error(`site.json delivery.afterPayment.${key} "${value}": must be ${CHANNELS.join(" or ")}, or null`);
+      }
+    }
+    if (after.within !== null) {
+      const where = `site.json delivery.afterPayment.within "${after.within}"`;
+      if (!known(after.within)) throw new Error(`${where}: use null, not an empty value`);
+      if (VAGUE.test(after.within)) throw new Error(`${where}: states no figure a buyer can check`);
+      if (/\d\s*[-–]\s*\d+(?!\s*[a-z])/i.test(after.within)) throw new Error(`${where}: a range needs its unit`);
+      if (after.paid === null) throw new Error(`${where}: times a message that is not sent`);
+    }
+  }
+}
+
+const withArticle = (channel: Channel): string => (channel === "SMS" ? `an ${channel}` : `a ${channel}`);
+
+/* The sentences, built once so /delivery, the confirmation and /privacy say the
+   same thing in the same words. Empty when no message is sent. */
+export const afterPaymentLines = (): string[] => {
+  const after = site.delivery.afterPayment;
+  if (after === undefined) return [];
+  const lines: string[] = [];
+  if (after.paid !== null) {
+    const when = known(after.within) ? `, within ${String(after.within).trim()} of the payment` : "";
+    const first = withArticle(after.paid).replace(/^a/, "A");
+    lines.push(`${first} message is sent to the phone number given at checkout when the payment is confirmed${when}.`);
+  }
+  if (after.leftNairobi !== null) {
+    const which = after.paid === after.leftNairobi ? `a second ${after.leftNairobi}` : withArticle(after.leftNairobi);
+    lines.push(`For an order going outside Nairobi, ${which} message is sent when it leaves Nairobi.`);
+  }
+  return lines;
+};
+
+/** The channels the after-payment messages use, once each, for /privacy. */
+export const afterPaymentChannels = (): Channel[] => {
+  const after = site.delivery.afterPayment;
+  if (after === undefined) return [];
+  return [...new Set([after.paid, after.leftNairobi].filter((c): c is Channel => c !== null))];
+};
 
 /* ---------- the shop's pages elsewhere ----------
  *

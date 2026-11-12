@@ -71,6 +71,11 @@
       { "key": "kakamega", "region": "Western", "name": "Kakamega", "cost": 600 },
       { "key": "vihiga", "region": "Western", "name": "Vihiga", "cost": 600 }
     ],
+    "afterPayment": {
+      "paid": "WhatsApp",
+      "leftNairobi": "WhatsApp",
+      "within": null
+    },
     "returnsWindowDays": null,
     "returnsCondition": null
   }
