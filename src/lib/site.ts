@@ -365,7 +365,7 @@ export const timingGroups = (): { regions: string[]; sentence: string }[] => {
   return [...groups].map(([sentence, regions]) => ({ regions, sentence }));
 };
 
-/** The cheapest zone, for "Delivery from KSh 0 in Nairobi CBD", or null with no zones. */
+/** The cheapest zone, for DeliveryFrom's "Delivery is free in Nairobi CBD", or null with no zones. */
 export const cheapestZone = (): Zone | null =>
   site.delivery.zones.reduce<Zone | null>((low, zone) => (low === null || zone.cost < low.cost ? zone : low), null);
 

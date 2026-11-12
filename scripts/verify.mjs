@@ -2070,6 +2070,7 @@ function stripViolations(pages) {
  *
  *   every region in site.json has at least one box on /delivery — an <li>
  *     carrying data-region="<region>"
+ *   every element classed fees__region carries a data-region
  *   every box of that region carries a non-empty data-timing
  *   every timing passes timingProblem() — the build-time rule, imported, not copied
  *   /checkout carries a non-empty data-timing-summary paragraph
@@ -2095,6 +2096,16 @@ function timingViolations(regions, delivery, checkout) {
   const out = [];
   if (delivery === null) out.push("/delivery was not built");
   else {
+    /* A region box that names no region is invisible to the map below, so an
+       untimed box beside a timed sibling would pass. Any element of any tag
+       carrying the fees__region class must say which region it is. */
+    for (const tag of delivery.matchAll(/<([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
+      const cls = tag[2].match(/\sclass\s*=\s*["']([^"']*)["']/i);
+      if (!cls || !cls[1].split(/\s+/).includes("fees__region")) continue;
+      if (!/\sdata-region\s*=\s*"[^"]+"/i.test(tag[2])) {
+        out.push(`a fees__region box with no data-region: <${tag[1]}${tag[2]}>`);
+      }
+    }
     /* region -> the timing in each of its boxes, null where a box has none. */
     const found = new Map();
     for (const block of delivery.matchAll(/<li\b([^>]*)>([\s\S]*?)<\/li>/gi)) {
@@ -2182,6 +2193,7 @@ function timingViolations(regions, delivery, checkout) {
     ["/delivery not built", both, null, goodCheckout, "/delivery was not built"],
     ["a region as two open zone boxes", both, zone("Nairobi", "Nairobi CBD", "The same working day") + zone("Nairobi", "Nairobi (outside the CBD)", "The same working day") + coast, goodCheckout, null],
     ["one open zone box with no timing", both, zone("Nairobi", "Nairobi CBD", "The same working day") + zone("Nairobi", "Nairobi (outside the CBD)") + coast, goodCheckout, `"Nairobi" on /delivery has no timing`],
+    ["an untagged box beside a timed sibling", both, zone("Nairobi", "Nairobi CBD", "The same working day") + `<li class="fees__region fees__region--open box"><p class="fees__name">Nairobi (outside the CBD)</p></li>` + coast, goodCheckout, "a fees__region box with no data-region"],
     ["a <li> with no data-region", both, `<li class="fees__region box">Nairobi<span data-timing>Today.</span></li>` + coast, goodCheckout, `"Nairobi" is not on /delivery`],
   ];
   let ok = 0;

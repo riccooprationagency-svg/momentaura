@@ -1,5 +1,12 @@
 ---
-// "Delivery from KSh 0 in Nairobi CBD. See delivery fees."
+// "Delivery is free in Nairobi CBD. See delivery fees." while the cheapest zone
+// costs nothing; "Delivery from KSh 200. See delivery fees." once none is free.
+//
+// 0 is "Free", never "KSh 0" — the rule feeText() in lib/site.ts states for
+// every fee on the site. "From KSh 0" is a price of nothing written as though it
+// were a price, and a buyer reading it has to work out that it means free. The
+// free form names the zone because free is only true there; the priced form
+// does not, because it is a floor across the whole table.
 //
 // The figure and the place are read off the cheapest row of the fee table, not
 // written here, so the sentence cannot go on naming a free zone after the table
@@ -8,8 +15,7 @@
 //
 // Prose in Archivo, muted, like the delivery-terms line it sits beside on /order
 // and on the product page.
-import { cheapestZone } from "../lib/site";
-import { price } from "../lib/products";
+import { cheapestZone, feeText } from "../lib/site";
 
 const zone = cheapestZone();
 ---
@@ -17,7 +23,8 @@ const zone = cheapestZone();
 {
   zone && (
     <p class="delivery-from">
-      Delivery from {price(zone.cost)} in {zone.name}. <a href="/delivery#fees">See delivery fees</a>.
+      {zone.cost === 0 ? `Delivery is free in ${zone.name}.` : `Delivery from ${feeText(zone.cost)}.`}{" "}
+      <a href="/delivery#fees">See delivery fees</a>.
     </p>
   )
 }
