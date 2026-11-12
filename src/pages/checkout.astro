@@ -157,7 +157,7 @@ const groups = timingGroups();
           </div>
         </form>
 
-        <aside class="checkout__summary" aria-labelledby="summary-heading">
+        <aside class="checkout__summary box" aria-labelledby="summary-heading">
           <h2 class="checkout__sub" id="summary-heading">Your order</h2>
 
           <ul class="summary__lines" role="list">
@@ -317,10 +317,12 @@ const groups = timingGroups();
 
   /* ---------- summary ---------- */
 
+  /* The same box as an order line on /order: the .box edge and the page
+     ground. It sat on kraft until the order page's summary was boxed, and a
+     kraft summary beside a ground-only one would be two treatments for one
+     thing. Kraft Board is the docket's, the capacity notice's and the filled
+     button's. Read-only; nothing the cart reads moved. */
   .checkout__summary {
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-surface);
     padding: var(--s-20);
   }
 

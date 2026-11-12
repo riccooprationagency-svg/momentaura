@@ -262,6 +262,16 @@ export const timingFor = (region: string): string | null => {
   return known(text) ? `Delivered ${String(text).trim()}.` : null;
 };
 
+/** A region's arrival time as a docket value: the site.json phrase, capitalised,
+ *  for the mono Arrives row on /delivery. timingFor() is the same fact as a
+ *  sentence; both read the one key, so the row and the sentence cannot differ. */
+export const arrivalFor = (region: string): string | null => {
+  const text = site.delivery.timings?.[region];
+  if (!known(text)) return null;
+  const trimmed = String(text).trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};
+
 /** "A", "A and B", "A, B and C". */
 export const listJoin = (items: string[]): string =>
   items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
@@ -324,6 +334,15 @@ export const socialLinks = (): { label: string; href: string }[] => SOCIAL_LINKS
 /** A fee as a buyer reads it. 0 is "Free", never "KSh 0", in a table or a label. */
 export const feeText = (cost: number): string => (cost === 0 ? "Free" : `KSh ${cost.toLocaleString("en-KE")}`);
 
+/** The fee span of a set of zones, from the figures feeText() prints:
+ *  "KSh 250 to KSh 300", or one figure when every zone costs the same. */
+export const feeRange = (zones: Zone[]): string => {
+  const costs = zones.map((zone) => zone.cost);
+  const low = Math.min(...costs);
+  const high = Math.max(...costs);
+  return low === high ? feeText(low) : `${feeText(low)} to ${feeText(high)}`;
+};
+
 /** The zones grouped by region, in the order site.json lists them. */
 export const zonesByRegion = (): { region: string; zones: Zone[] }[] => {
   const groups = new Map<string, Zone[]>();
@@ -346,7 +365,7 @@ export const timingGroups = (): { regions: string[]; sentence: string }[] => {
   return [...groups].map(([sentence, regions]) => ({ regions, sentence }));
 };
 
-/** The cheapest zone, for "Delivery from KSh 0 in Nairobi CBD", or null with no zones. */
+/** The cheapest zone, for DeliveryFrom's "Delivery is free in Nairobi CBD", or null with no zones. */
 export const cheapestZone = (): Zone | null =>
   site.delivery.zones.reduce<Zone | null>((low, zone) => (low === null || zone.cost < low.cost ? zone : low), null);
 

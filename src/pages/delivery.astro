@@ -34,7 +34,8 @@ import {
   zonesByRegion,
   afterPaymentLines,
   dispatchRule,
-  timingFor,
+  arrivalFor,
+  feeRange,
 } from "../lib/site";
 
 const afterPaid = afterPaymentLines();
@@ -125,14 +126,22 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
           checkout select is built from and the server prices by, so the figure
           read here is the figure charged.
 
-          One <details> per region, Nairobi first and open: it is where most
-          orders go, and 48 rows in one table is a wall on a phone. Native
-          disclosure, so every fee is readable with JavaScript off, and a
-          browser's find-in-page opens a closed region to a match.
+          ONE REGION, ONE BOX, except the first. The first region in site.json
+          (Nairobi) is where most orders go, so each of its zones is its own
+          box, always open: a buyer in the CBD should not have to open anything
+          to read "Free". Every other region is one box on a native <details>,
+          closed, its summary carrying the region's fee range, its county count
+          and its arrival time — enough to decide whether to open it. Open, it
+          is the county table as before. Native disclosure, so every fee is
+          readable with JavaScript off, and a browser's find-in-page opens a
+          closed region to a match.
 
-          Each region's arrival time sits in its <summary>, so it reads with
-          the region closed. data-timing is what V18 looks for: a region on
-          this page with no timing fails the build.
+          The fee range and the count are computed here from the same zones the
+          table lists; nothing in this block is typed by hand.
+
+          data-region names the region a box belongs to, and data-timing marks
+          its arrival time. V18 reads both: a region with no box, or a box with
+          no timing, fails the build.
         */
         hasZones && (
           <section id="fees" class="fees" aria-labelledby="fees-heading">
@@ -143,32 +152,64 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
               Choose the county at checkout and the fee is added to the total before the
               M-Pesa prompt is sent.
             </p>
-            {regions.map(({ region, zones }, i) => (
-              <details class="fees__region" open={i === 0}>
-                <summary class="fees__summary">
-                  {region}
-                  {timingFor(region) !== null && (
-                    <span class="fees__timing" data-timing>{timingFor(region)}</span>
-                  )}
-                </summary>
-                <table class="zones">
-                  <thead>
-                    <tr>
-                      <th scope="col">County</th>
-                      <th scope="col">Fee per order</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {zones.map((zone) => (
-                      <tr>
-                        <td>{zone.name}</td>
-                        <td class="zones__figure">{feeText(zone.cost)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </details>
-            ))}
+            <ul class="fees__grid" role="list">
+              {regions.map(({ region, zones }, i) => {
+                const arrives = arrivalFor(region);
+                return i === 0 ? (
+                  zones.map((zone) => (
+                    <li class="fees__region fees__region--open box" data-region={region}>
+                      <p class="fees__name">{zone.name}</p>
+                      <p class="fees__facts">
+                        <span class="docket__label">Fee</span>
+                        <span class="fees__value">{feeText(zone.cost)}</span>
+                        {arrives !== null && (
+                          <>
+                            <span class="docket__label">Arrives</span>
+                            <span class="fees__value" data-timing>{arrives}</span>
+                          </>
+                        )}
+                      </p>
+                    </li>
+                  ))
+                ) : (
+                  <li class="fees__region box" data-region={region}>
+                    <details>
+                      <summary class="fees__summary">
+                        <span class="fees__name">{region}</span>
+                        <span class="fees__facts">
+                          <span class="docket__label">Fee</span>
+                          <span class="fees__value">{feeRange(zones)}</span>
+                          <span class="docket__label">Counties</span>
+                          <span class="fees__value">{zones.length}</span>
+                          {arrives !== null && (
+                            <>
+                              <span class="docket__label">Arrives</span>
+                              <span class="fees__value" data-timing>{arrives}</span>
+                            </>
+                          )}
+                        </span>
+                      </summary>
+                      <table class="zones">
+                        <thead>
+                          <tr>
+                            <th scope="col">County</th>
+                            <th scope="col">Fee per order</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {zones.map((zone) => (
+                            <tr>
+                              <td>{zone.name}</td>
+                              <td class="zones__figure">{feeText(zone.cost)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  </li>
+                );
+              })}
+            </ul>
             <p class="page__body fees__note">
               Towns outside Nairobi County, such as Ruiru, Kitengela, Rongai or Ngong, take
               the fee of the county they are in.
@@ -285,28 +326,68 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
     border-block-end: 1px dashed var(--border);
   }
 
-  .fees__region {
-    border-block-end: 1px solid var(--border);
+  /* One column, two from 640px. align-items: start, so opening one region
+     does not stretch the closed box beside it to the same height. */
+  .fees__grid {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-16);
+    align-items: start;
   }
 
-  /* The whole row is the control, at a full thumb-sized height. The platform's
-     disclosure marker stays: it is the only thing that says the row opens. */
+  @media (min-width: 640px) {
+    .fees__grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .fees__region {
+    padding-inline: var(--s-20);
+  }
+
+  .fees__region--open {
+    padding-block: var(--s-16);
+  }
+
+  /* The whole summary is the control, at a full thumb-sized height. The
+     platform's disclosure marker stays: it is the only thing that says the box
+     opens. */
   .fees__summary {
     display: list-item;
     min-height: var(--tap-target);
-    padding-block: var(--s-12);
-    font-size: var(--t-body-sm);
+    padding-block: var(--s-16);
     cursor: pointer;
   }
 
-  /* Under the region name, in the prose voice: a sentence, not a figure. */
-  .fees__timing {
+  /* Region and zone names in Archivo; what they cost and when they arrive in
+     mono, under the docket's labels. The typeface switch is the signal. */
+  .fees__name {
+    display: inline;
+    font-size: var(--t-body-sm);
+  }
+
+  .fees__region--open .fees__name {
     display: block;
-    color: var(--fg-muted);
-    font-size: var(--t-caption);
+  }
+
+  .fees__facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 var(--s-20);
+    margin-block-start: var(--s-8);
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    line-height: var(--lh-docket);
+  }
+
+  .fees__value {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
   }
 
   .fees__region .zones {
+    max-width: none;
     margin-block-end: var(--s-20);
   }
 

@@ -1,8 +1,24 @@
 ---
-// A product in a grid. Category pages and the homepage tiles compose it.
+// A product in a grid. Category pages and the "More in" row on a product page
+// compose it.
 //
 // The system is derived from the photograph every time it renders. There is no
 // stored flag to fall out of step with what is actually on disk.
+//
+// ONE BOX, ONE LINK. The whole card is the link to the product page — one tab
+// stop, no "Add to order" beside it. Choosing happens on the page that shows
+// the docket; a grid is for scanning.
+//
+// Dispatch and Stock are the docket's own rows, from the same fields the docket
+// reads, in the docket's own classes. The green on a fact comes from
+// .docket__value--fact, the sanctioned site V3 pins, not from a selector of
+// this card's. Sold out is the docket's muted state: no fill, because the Seal
+// stamp belongs to the docket's Stock row on a product's own page. A null
+// dispatch omits the row, exactly as the docket does.
+//
+// No dashed hairline between the name and the facts. CLAUDE.md: a divider with
+// nothing to say is vertical space instead, and the facts below it are the
+// fact a dispatch rule would carry, said once.
 import Gallery from "./Gallery.astro";
 import { systemFor, price, type Product } from "../lib/products";
 
@@ -15,7 +31,7 @@ const system = systemFor(product);
 const soldOut = product.stock === 0;
 ---
 
-<article class="card" data-system={system}>
+<article class="card box" data-system={system}>
   <a class="card__link" href={`/products/${product.slug}`}>
     <!-- No `detail`. A card shows the first photograph, lazily; the gallery
          belongs to the product page. Nine cards opting in would be nine eager
@@ -25,31 +41,53 @@ const soldOut = product.stock === 0;
     <div class="card__meta">
       <h3 class="card__name">{product.name}</h3>
       <p class="card__price">{price(product.price)}</p>
-      {soldOut && <p class="card__status">Sold out</p>}
     </div>
+
+    <dl class="card__facts">
+      {
+        product.dispatch !== null && (
+          <>
+            <dt class="docket__label">Dispatch</dt>
+            <dd class="docket__value">
+              <span class="docket__value--fact">{product.dispatch}</span>
+            </dd>
+          </>
+        )
+      }
+      <dt class="docket__label">Stock</dt>
+      <dd class="docket__value">
+        {
+          soldOut ? (
+            <span class="docket__value--closed">Sold out</span>
+          ) : (
+            <span class="docket__value--fact">{`${product.stock} in stock`}</span>
+          )
+        }
+      </dd>
+    </dl>
   </a>
 </article>
 
 <style>
-  /* No hover zoom, no overlay, no "shop now". The photograph and the name are
-     sufficient. Every card identical in treatment — variation between cards
-     reads as instability, which is what a suspicious buyer is scanning for. */
+  /* No hover zoom, no overlay, no "shop now". Every card identical in
+     treatment — variation between cards reads as instability, which is what a
+     suspicious buyer is scanning for. The edge is .box, in global.css. */
   .card {
     background-color: var(--bg);
     color: var(--fg);
-    border-radius: var(--radius-surface);
     /* Border colour is the only hover signal. No fade, no zoom, no overlay. */
-    border: 1px solid transparent;
     transition: border-color var(--dur) var(--ease);
   }
 
   .card:hover {
-    border-color: var(--border);
+    border-color: var(--fg);
   }
 
   .card__link {
     display: grid;
-    gap: var(--s-12);
+    gap: var(--s-16);
+    height: 100%;
+    align-content: start;
     text-decoration: none;
     color: inherit;
     padding: var(--s-12);
@@ -74,17 +112,14 @@ const soldOut = product.stock === 0;
     letter-spacing: var(--tr-docket);
   }
 
-  /* Muted mono, no fill. The Seal stamp belongs to the docket and nowhere else.
-     On a grid of three or nine sold-out cards the fills stop reading as
-     exceptional and start reading as the page's colour scheme, which is the
-     whole failure the once-per-page cap exists to prevent. Mono still marks it
-     as status rather than prose, so the register is intact without the fill. */
-  .card__status {
-    margin-block-start: var(--s-8);
+  /* The docket's grid and type, without its kraft ground: the card is already
+     the box. */
+  .card__facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 var(--s-20);
     font-family: var(--font-mono);
     font-size: var(--t-docket);
-    letter-spacing: var(--tr-docket);
-    text-transform: uppercase;
-    color: var(--fg-muted);
+    line-height: var(--lh-docket);
   }
 </style>
