@@ -71,6 +71,26 @@
       { "key": "kakamega", "region": "Western", "name": "Kakamega", "cost": 600 },
       { "key": "vihiga", "region": "Western", "name": "Vihiga", "cost": 600 }
     ],
+    "dispatch": {
+      "workingDays": "Monday to Saturday",
+      "cutOff": "12:00",
+      "rule": "Paid before 12:00 on a working day is dispatched the same working day. Paid at or after 12:00 is dispatched the next working day."
+    },
+    "timings": {
+      "Nairobi": "the same working day it is dispatched",
+      "Central": "1 to 2 working days after dispatch",
+      "Coast": "1 to 2 working days after dispatch",
+      "Eastern": "1 to 2 working days after dispatch",
+      "North Eastern": "4 to 5 days after dispatch",
+      "Nyanza": "1 to 2 working days after dispatch",
+      "Rift Valley": "1 to 2 working days after dispatch",
+      "Western": "1 to 2 working days after dispatch"
+    },
+    "afterPayment": {
+      "paid": "WhatsApp",
+      "leftNairobi": "WhatsApp",
+      "within": null
+    },
     "returnsWindowDays": null,
     "returnsCondition": null
   }

@@ -30,6 +30,9 @@
 // be a made-up commitment on the one screen a buyer keeps.
 import Base from "../layouts/Base.astro";
 import { products, price } from "../lib/products";
+import { afterPaymentLines } from "../lib/site";
+
+const afterPaid = afterPaymentLines();
 ---
 
 <Base
@@ -146,6 +149,11 @@ import { products, price } from "../lib/products";
         </p>
 
         <p class="received__dispatch">Dispatched from Nairobi.</p>
+
+        <!-- Static, from site.json delivery.afterPayment. Each line is
+             conditional on the message being sent, not on this order's state, so
+             it is true whether the page is showing pending, paid or failed. -->
+        {afterPaid.map((line) => <p class="received__dispatch">{line}</p>)}
 
         <!--
           There is no "the date comes later" line here. Step 10 settled the rule
