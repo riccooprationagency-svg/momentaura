@@ -1,0 +1,106 @@
+---
+// One audience, its products grouped by category. Men and women are who a
+// product is for, not what it is, so this is not a category page: a product can
+// sit under both, and CATEGORY_COPY is untouched. The data says who each
+// product is for, explicitly (products.json "audience"), and a page for an
+// audience with nothing in it is not built — the same rule categories follow.
+//
+// Under /for/ rather than at the root: a second root-level dynamic route beside
+// [category].astro would leave Astro choosing between them by guesswork.
+//
+// Layout is the category listing's, rhythm included: no 100dvh reveal, a
+// heading, then grids. No intro paragraph; there is nothing true to say about
+// an audience that the grid does not already show.
+import Base from "../../layouts/Base.astro";
+import ProductCard from "../../components/ProductCard.astro";
+import { audiencesWithPages, categories, productsFor, type Audience, type Product } from "../../lib/products";
+
+export function getStaticPaths() {
+  return audiencesWithPages().map((audience) => ({
+    params: { audience },
+    props: { audience },
+  }));
+}
+
+interface Props {
+  audience: Audience;
+}
+
+const { audience } = Astro.props as Props;
+const name = audience === "men" ? "Men" : "Women";
+const items = productsFor(audience);
+
+/* One group per category that has at least one product for this audience, in
+   CATEGORY_COPY's declared order. */
+const groups: { slug: string; name: string; items: Product[] }[] = categories
+  .map((c) => ({ slug: c.slug, name: c.name, items: items.filter((p) => p.category === c.slug) }))
+  .filter((g) => g.items.length > 0);
+---
+
+<Base title={`${name} — MomentAura`} description={`${name}: products listed for ${audience}.`}>
+  <div class="wrap page">
+    <header class="page__head">
+      <h1 class="page__heading">{name}</h1>
+    </header>
+
+    {
+      groups.map((group) => (
+        <section class="group" aria-labelledby={`group-${group.slug}`}>
+          <h2 class="group__heading" id={`group-${group.slug}`}>{group.name}</h2>
+          <div class="grid">
+            {group.items.map((product) => <ProductCard product={product} />)}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__head {
+    margin-block-end: var(--s-56);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+  }
+
+  .group + .group {
+    margin-block-start: var(--s-80);
+  }
+
+  .group__heading {
+    font-size: var(--t-label);
+    line-height: 1.4;
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-20);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-40) var(--s-20);
+  }
+
+  @media (min-width: 640px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

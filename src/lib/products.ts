@@ -47,10 +47,16 @@ export interface Size {
   lengthCm: number | null;
 }
 
+export const AUDIENCES = ["men", "women"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
 export interface Product {
   slug: string;
   name: string;
   category: string;
+  /** Who a listing page may say a product is for. Explicit, never inferred from
+   *  a name; [] means it appears on neither audience page. */
+  audience: Audience[];
   price: number;
   material: string | null;
   fabricWeight: string | null;
@@ -130,6 +136,21 @@ for (const product of products) {
       );
     }
   });
+
+  /* Audience is explicit like sizes: an absent key is an error, [] is a valid
+     answer, and anything but a de-duplicated list of the two known strings
+     fails by slug. */
+  if (!Array.isArray(product.audience)) {
+    throw new Error(`products.json: "${product.slug}" has no audience array. Use [] for none.`);
+  }
+  const seen = new Set<string>();
+  for (const a of product.audience) {
+    if (!(AUDIENCES as readonly unknown[]).includes(a)) {
+      throw new Error(`products.json: "${product.slug}" audience holds ${JSON.stringify(a)} — only "men" and "women" are allowed.`);
+    }
+    if (seen.has(a)) throw new Error(`products.json: "${product.slug}" audience repeats "${a}".`);
+    seen.add(a);
+  }
 
   /* Material is explicit like fabricWeight: null, or a non-empty string. An absent
      key is an error, so a product added by hand cannot silently skip the row. */
@@ -247,6 +268,23 @@ for (const slug of present) {
 export const categories: Category[] = Object.entries(CATEGORY_COPY)
   .filter(([slug]) => present.has(slug))
   .map(([slug, copy]) => ({ slug, ...copy }));
+
+/* The two vocabularies share a URL space only if they never collide: /men is a
+ * category page, /for/men an audience page, and a category called "men" would
+ * make the name mean two things. */
+for (const slug of Object.keys(CATEGORY_COPY)) {
+  if ((AUDIENCES as readonly string[]).includes(slug)) {
+    throw new Error(`CATEGORY_COPY key "${slug}" is also an audience. The two vocabularies must never collide.`);
+  }
+}
+
+/** Products listed for an audience, in catalogue order. */
+export const productsFor = (audience: Audience): Product[] =>
+  products.filter((p) => p.audience.includes(audience));
+
+/** Audiences that have a page: only those with at least one product. */
+export const audiencesWithPages = (): Audience[] =>
+  AUDIENCES.filter((a) => productsFor(a).length > 0);
 
 export const productsIn = (category: string): Product[] =>
   products.filter((p) => p.category === category);

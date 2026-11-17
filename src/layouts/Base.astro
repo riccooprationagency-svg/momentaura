@@ -22,7 +22,7 @@ import {
   telHref,
   whatsappHref,
 } from "../lib/site";
-import { categories } from "../lib/products";
+import { audiencesWithPages, categories } from "../lib/products";
 
 interface Props {
   title: string;
@@ -92,6 +92,13 @@ const NAV = [
   { href: "/delivery", label: "Delivery" },
   { href: "/contact", label: "Contact" },
 ];
+
+/* Men and women, only for an audience that has a page. The same helper the
+   route's getStaticPaths reads, so a link here cannot outlive its page. */
+const AUDIENCE_LINKS = audiencesWithPages().map((a) => ({
+  href: `/for/${a}`,
+  label: a === "men" ? "Men" : "Women",
+}));
 
 const FOOTER = [
   { href: "/delivery", label: "Delivery" },
@@ -230,8 +237,11 @@ const ld = JSON.stringify(organizationLd()).replace(/</g, "\\u003c");
              products and renders nothing at all when none do. No /shop page, no
              dropdown, no script. Sentence case at caption size, like every
              other footer link. */
-          categories.length > 0 && (
+          (categories.length > 0 || AUDIENCE_LINKS.length > 0) && (
             <nav class="foot__links" aria-label="Shop">
+              {AUDIENCE_LINKS.map((a) => (
+                <a href={a.href}>{a.label}</a>
+              ))}
               {categories.map((c) => (
                 <a href={`/${c.slug}`}>{c.name}</a>
               ))}

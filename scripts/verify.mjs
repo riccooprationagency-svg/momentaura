@@ -1933,6 +1933,98 @@ function categoryViolations(declared, inData, pages) {
   }
 }
 
+/* ---------- V16 (audience half) — /for/<audience> says only what the data says ----------
+ *
+ * A listing for an audience is a claim to a buyer: these are for you. The data
+ * is explicit (products.json "audience"), and the page is built from it, so this
+ * reads the emitted HTML back against the data:
+ *
+ *   every audience that any product lists has a built page at dist/for/<a>/
+ *   an audience nobody lists has no page
+ *   a page lists only products whose audience includes it
+ *   a product with an empty audience appears on neither page
+ *   a page lists every product that includes it
+ *
+ * The third and fourth are the point. Nothing else in this file would notice a
+ * product on a page it should not be on: the page builds, every link resolves,
+ * and the card renders perfectly.
+ */
+
+/** pages: { men: html|null, women: html|null } for every declared audience. */
+function audienceViolations(declared, data, pages) {
+  const out = [];
+  for (const a of declared) {
+    const html = pages[a] ?? null;
+    const wanted = data.filter((p) => p.audience.includes(a)).map((p) => p.slug);
+    if (html === null) {
+      if (wanted.length > 0) out.push(`audience "${a}" has products but no built page`);
+      continue;
+    }
+    if (wanted.length === 0) {
+      out.push(`audience "${a}" has no products but has a built page`);
+      continue;
+    }
+    const listed = [...html.matchAll(/<article\b[^>]*\sclass\s*=\s*["'](?:[^"']*\s)?card(?:\s[^"']*)?["'][\s\S]*?<a\b[^>]*\shref\s*=\s*["']\/products\/([^"'/?#]+)/gi)].map((m) => m[1]);
+    for (const slug of listed) {
+      const product = data.find((p) => p.slug === slug);
+      if (!product) out.push(`/for/${a} lists "${slug}", which is not in products.json`);
+      else if (product.audience.length === 0) out.push(`/for/${a} lists "${slug}", whose audience is empty`);
+      else if (!product.audience.includes(a)) out.push(`/for/${a} lists "${slug}", whose audience does not include "${a}"`);
+    }
+    for (const slug of wanted) {
+      if (!listed.includes(slug)) out.push(`/for/${a} does not list "${slug}", whose audience includes "${a}"`);
+    }
+  }
+  return out;
+}
+
+{
+  const source = readFileSync(join(SRC, "lib", "products.ts"), "utf8");
+  const m = source.match(/export const AUDIENCES\s*=\s*\[([^\]]*)\]/);
+  const declared = m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : [];
+  if (declared.length === 0) fail("V16", "no AUDIENCES found in src/lib/products.ts — the export moved and this check is blind");
+
+  const data = JSON.parse(readFileSync(join(SRC, "data", "products.json"), "utf8"));
+
+  const cardFor = (slug) => `<article class="card box"><a class="card__link" href="/products/${slug}">${slug}</a></article>`;
+  const fx = [
+    { slug: "tee", audience: ["men", "women"] },
+    { slug: "cropped", audience: ["women"] },
+    { slug: "hat", audience: [] },
+  ];
+  const good = { men: cardFor("tee"), women: cardFor("tee") + cardFor("cropped") };
+  const cases = [
+    ["the shipped shape", declared.length === 2 ? good : { men: null, women: null }, null],
+    ["a women-only product on the men page", { ...good, men: cardFor("tee") + cardFor("cropped") }, `/for/men lists "cropped"`],
+    ["an empty-audience product on a page", { ...good, women: good.women + cardFor("hat") }, `"hat", whose audience is empty`],
+    ["a product the data does not have", { ...good, men: good.men + cardFor("ghost") }, `"ghost", which is not in products.json`],
+    ["a listed product missing from its page", { ...good, women: cardFor("tee") }, `/for/women does not list "cropped"`],
+    ["an audience with products and no page", { ...good, women: null }, `audience "women" has products but no built page`],
+  ];
+  let ok = 0;
+  for (const [label, pages, mustSay] of cases) {
+    const found = audienceViolations(["men", "women"], fx, pages);
+    if (mustSay === null ? found.length === 0 : found.some((x) => x.includes(mustSay))) ok++;
+    else fail("V16", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with ${mustSay}`}, got: ${found.join("; ") || "no violation"}`);
+  }
+  console.log(`  V16 audience self-test ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+
+  if (existsSync(DIST)) {
+    const pages = {};
+    for (const a of declared) {
+      const file = join(DIST, "for", a, "index.html");
+      pages[a] = existsSync(file) ? readFileSync(file, "utf8") : null;
+    }
+    const found = audienceViolations(declared, data, pages);
+    for (const v of found) fail("V16", v);
+    const built = Object.values(pages).filter((h) => h !== null).length;
+    console.log(
+      `  V16 audiences         ${declared.length} declared, ${built} page(s) built, ` +
+        `${found.length === 0 ? "every card is for its audience, none from an empty audience" : `${found.length} violation(s)`}`
+    );
+  }
+}
+
 /* ---------- V17 — a product page's thumbnail strip switches with no script ----------
  *
  * Gallery.astro switches a product page's photographs with a radio group: one
