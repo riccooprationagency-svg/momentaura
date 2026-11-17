@@ -23,6 +23,7 @@ import {
   whatsappHref,
 } from "../lib/site";
 import { audiencesWithPages, categories } from "../lib/products";
+import { campaign, campaignLive } from "../lib/campaign";
 
 interface Props {
   title: string;
@@ -116,6 +117,10 @@ const FOOTER = [
 const SOCIAL = socialLinks();
 
 const year = new Date().getFullYear();
+
+/* The campaign link exists only while the campaign does, decided once at build.
+   After endsOn the page still builds and says it ended; nothing links to it. */
+const live = campaignLive();
 
 /* Data, not code: a browser does not execute application/ld+json. "<" is
    escaped so no value can close the tag early. verify.mjs V4 allows exactly
@@ -239,6 +244,7 @@ const ld = JSON.stringify(organizationLd()).replace(/</g, "\\u003c");
              other footer link. */
           (categories.length > 0 || AUDIENCE_LINKS.length > 0) && (
             <nav class="foot__links" aria-label="Shop">
+              {live && <a href="/black-november">{campaign.name}</a>}
               {AUDIENCE_LINKS.map((a) => (
                 <a href={a.href}>{a.label}</a>
               ))}
