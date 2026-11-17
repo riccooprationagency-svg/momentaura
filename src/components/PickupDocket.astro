@@ -1,0 +1,57 @@
+---
+// The pick-up and drop-off point, as a docket. Built once, used on /delivery
+// and /contact, so the two cannot differ. Reads PICKUP in lib/site.ts and
+// nothing else; no address is typed in a page.
+//
+// No accent colour: it is confined to the sites V3 names, and an address is a
+// place, not a figure to check. No prose about returns or how drop-off works:
+// the returns policy is undecided and this component promises nothing about it.
+import { PICKUP, pickupRows, telHref } from "../lib/site";
+
+const rows = pickupRows();
+---
+
+<h2 class="pickup__sub">{PICKUP.label}</h2>
+<dl class="docket pickup">
+  {
+    rows.map((row) => (
+      <>
+        <dt class="docket__label">{row.label}</dt>
+        <dd class="docket__value">
+          {row.label === "Phone" ? <a href={telHref()}>{row.value}</a> : row.value}
+        </dd>
+      </>
+    ))
+  }
+  {
+    PICKUP.mapUrl !== null && (
+      <>
+        <dt class="docket__label">Map</dt>
+        <dd class="docket__value">
+          <a href={PICKUP.mapUrl} rel="noopener noreferrer">Open map</a>
+        </dd>
+      </>
+    )
+  }
+</dl>
+
+<style>
+  .pickup__sub {
+    font-size: var(--t-label);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-16);
+  }
+
+  .pickup {
+    max-width: var(--measure);
+    margin-block-end: var(--s-20);
+  }
+
+  .pickup a {
+    display: inline-block;
+    min-height: var(--tap-target);
+    line-height: var(--tap-target);
+  }
+</style>

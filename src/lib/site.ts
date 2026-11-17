@@ -595,3 +595,62 @@ export const organizationLd = () => ({
 export const GAPS: Gap[] =CANDIDATES.filter((c) => !known(c.value)).map(
   ({ key, what, blocks }) => ({ key, what, blocks })
 );
+
+/* ---------- the pick-up and drop-off point ----------
+ *
+ * ONE COPY OF THE ADDRESS. /delivery and /contact both render PickupDocket,
+ * which reads this and nothing else, so the two pages cannot differ. Every
+ * value is Ric's and nothing is derived: no street, estate, landmark, map or
+ * time exists here that he did not give. null is an omission on the page.
+ *
+ * The phone number is not repeated here. It is phoneDisplay(), the one that
+ * rings, so the docket cannot carry a second number that drifts.
+ *
+ * `hours` is a string and is never parsed. It is null until someone is
+ * actually there at stated times; a page that states the address and no hours
+ * claims nothing about when anyone is in.
+ */
+export interface Pickup {
+  label: string;
+  building: string;
+  floor: string;
+  room: string;
+  landmark: string;
+  area: string | null;
+  hours: string | null;
+  mapUrl: string | null;
+}
+
+export const PICKUP: Pickup = {
+  label: "Pick-up and drop-off",
+  building: "Agro House",
+  floor: "First floor",
+  room: "Room 20",
+  landmark: "Opposite Afya Centre",
+  area: null,
+  hours: null,
+  mapUrl: null,
+};
+
+{
+  for (const [field, value] of Object.entries(PICKUP)) {
+    const where = `PICKUP.${field}`;
+    if (value === null) continue;
+    if (typeof value !== "string" || value.trim() === "" || value !== value.trim()) {
+      throw new Error(`${where}: must be a non-empty trimmed string, or null`);
+    }
+    if (value.includes("!")) throw new Error(`${where}: carries an exclamation mark`);
+  }
+  if (PICKUP.mapUrl !== null && !PICKUP.mapUrl.startsWith("https://")) {
+    throw new Error("PICKUP.mapUrl: must start with https://");
+  }
+}
+
+/** The docket rows, in order, with absent fields left out. Phone is last. */
+export const pickupRows = (): { label: string; value: string }[] => [
+  { label: "Where", value: `${PICKUP.building}, ${PICKUP.floor}, ${PICKUP.room}` },
+  { label: "Landmark", value: PICKUP.landmark },
+  ...(PICKUP.area === null ? [] : [{ label: "Area", value: PICKUP.area }]),
+  ...(PICKUP.hours === null ? [] : [{ label: "Hours", value: PICKUP.hours }]),
+  { label: "Phone", value: phoneDisplay() },
+];
