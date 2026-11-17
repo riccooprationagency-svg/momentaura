@@ -146,9 +146,6 @@ for (const product of products) {
         `Set it to "photograph" or "render".`
     );
   }
-  if (product.photoKind !== undefined && !KINDS.includes(product.photoKind)) {
-    throw new Error(`products.json: "${product.slug}" photoKind ${JSON.stringify(product.photoKind)} is not "photograph" or "render".`);
-  }
 
   product.photos.forEach((photo, i) => {
     const where = `products.json: "${product.slug}" photos[${i}]`;
