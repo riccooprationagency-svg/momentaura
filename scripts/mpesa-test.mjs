@@ -211,6 +211,14 @@ function makeKv() {
     /* Every prefix a list() was asked for, so a case can assert what was NOT
        listed as well as what failed. */
     listed: [],
+    /* Every operation the code under test asked of KV. Reads include
+       getWithMetadata(). The cost table in the PR is read off these. */
+    ops: { list: 0, get: 0, put: 0 },
+    /* The first list() of a prefix answers with an empty page that still carries a
+       cursor, which a real list may do. */
+    emptyFirstPage: false,
+    /* list() answers incomplete and gives no cursor to continue from. */
+    noCursor: false,
     failWrites: false,
     failReads: false,
     /* A predicate on the key, so ONE of an order's two writes can be failed
@@ -233,15 +241,26 @@ function makeKv() {
     async list({ prefix = "", cursor } = {}) {
       await this.turn();
       this.listed.push(prefix);
+      this.ops.list++;
       if (this.failLists) throw new Error("KV list failed");
+      if (this.noCursor) return { keys: [], list_complete: false };
+      if (this.emptyFirstPage && !cursor) return { keys: [], list_complete: false, cursor: "0" };
       const names = [...store.keys()].filter((k) => k.startsWith(prefix)).sort();
       const from = cursor ? Number(cursor) : 0;
       const page = names.slice(from, from + this.pageSize);
       const done = from + this.pageSize >= names.length;
       return { keys: page.map((name) => (meta.has(name) ? { name, metadata: meta.get(name) } : { name })), list_complete: done, ...(done ? {} : { cursor: String(from + this.pageSize) }) };
     },
+    async getWithMetadata(key) {
+      await this.turn();
+      this.ops.get++;
+      if (this.failReads) throw new Error("KV read failed");
+      const raw = store.get(key);
+      return { value: raw === undefined ? null : raw, metadata: meta.has(key) ? meta.get(key) : null };
+    },
     async get(key, type) {
       await this.turn();
+      this.ops.get++;
       if (this.failReads) throw new Error("KV read failed");
       const raw = store.get(key);
       if (raw === undefined) return null;
@@ -249,6 +268,7 @@ function makeKv() {
     },
     async put(key, value, options = {}) {
       await this.turn();
+      this.ops.put++;
       if (this.failWrites) throw new Error("KV write failed");
       if (this.failWritesTo && this.failWritesTo(key)) throw new Error("KV write failed");
       store.set(key, value);
@@ -2232,6 +2252,108 @@ await check("S15. an uncapped promo code never lists its own prefix; the only li
   await push(stockOrder([{ slug: "tee-1", qty: 1 }], { promo: "ALEX10" }));
   eq(kv.listed.filter((p) => p.startsWith("promo-use:")), [], "no promo-use list");
   eq(kv.listed.filter((p) => p.startsWith("sold:")), ["sold:tee-1:"], "the stock list");
+});
+
+const EXPECT_OPS = { accepted: { list: 1, get: 2, put: 5 }, refused: { list: 1, get: 0, put: 0 }, promo: { list: 1, get: 3, put: 6 } };
+
+await check("S20. a sale keeps its first time: markers land, the paid write fails, the count is moved later, the retry succeeds, and the sale is NOT subtracted from the new count", async () => {
+  const { reference } = await (await push(stockOrder([{ slug: "tee-1", qty: 2 }]))).json();
+  kv.failWritesTo = (key) => key === "ws_CO_TEST_1";
+  eq((await hit(callbackBody({ amount: 2000 }))).status, 500, "the paid write failed after the marker landed");
+  kv.failWritesTo = null;
+  const first = kv.meta.get(`sold:tee-1:${reference}`).at;
+  const entry = catalogueEntry("tee-1");
+  const was = { ...entry };
+  try {
+    /* A recount, taken after the sale and before the retry. */
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    entry.stockCountedAt = new Date().toISOString().replace("Z", "+00:00");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    eq((await hit(callbackBody({ amount: 2000 }))).status, 200, "the retry");
+    eq((await record()).status, "paid", "paid by the retry");
+    eq(kv.meta.get(`sold:tee-1:${reference}`).at, first, "the time is the first write's");
+    eq((await push(stockOrder([{ slug: "tee-1", qty: 20 }], { phone: "0722345678" }))).status, 200, "the sale predates the recount, so all 20 are still there");
+  } finally {
+    Object.assign(entry, was);
+  }
+});
+
+await check("S20b. a marker whose stored time is unusable is overwritten with a new one", async () => {
+  const { reference } = await (await push(stockOrder([{ slug: "tee-1", qty: 1 }]))).json();
+  await kv.put(`sold:tee-1:${reference}`, "1", { metadata: { qty: 1, at: "yesterday" } });
+  await hit(callbackBody({ amount: 1000 }));
+  if (!Number.isFinite(kv.meta.get(`sold:tee-1:${reference}`).at)) throw new Error("the bad time was kept");
+});
+
+await check("S21a. an order is refused only because of sales on page 2 and later (pages of 2)", async () => {
+  kv.pageSize = 2;
+  const entry = catalogueEntry("tee-1");
+  const was = { ...entry };
+  try {
+    entry.stock = 5;
+    /* Page 1 holds two sales from before the count, which do not count. The five
+       that do are on pages 2 and 3. */
+    await sold("tee-1", "MA-A1", 1, COUNTED - 1);
+    await sold("tee-1", "MA-A2", 1, COUNTED - 1);
+    for (let i = 1; i <= 5; i++) await sold("tee-1", `MA-B${i}`, 1, COUNTED + 1000);
+    const res = await push(stockOrder([{ slug: "tee-1", qty: 1 }]));
+    eq(res.status, 409, "5 of 5 sold, all of them past page 1");
+    has((await res.json()).message, "sold out", "refused");
+    kv.store.delete("sold:tee-1:MA-B5");
+    kv.meta.delete("sold:tee-1:MA-B5");
+    eq((await push(stockOrder([{ slug: "tee-1", qty: 1 }]))).status, 200, "4 of 5 sold leaves 1");
+  } finally {
+    Object.assign(entry, was);
+  }
+});
+
+await check("S21b. an empty page that carries a cursor, then a page with sales, is followed to the sales", async () => {
+  await seedSold("tee-1", 20);
+  kv.emptyFirstPage = true;
+  eq((await push(stockOrder([{ slug: "tee-1", qty: 1 }]))).status, 409, "20 of 20 sold, behind an empty page");
+});
+
+await check("S21c. an incomplete page with no cursor is a 503 and pushes nothing", async () => {
+  await seedSold("tee-1", 3);
+  kv.noCursor = true;
+  const res = await push(stockOrder([{ slug: "tee-1", qty: 1 }]));
+  eq(res.status, 503, "status");
+  has((await res.json()).message, "not responding right now", "says it is us");
+  eq(pushes.length, 0, "nothing was pushed");
+});
+
+/* The cost of an order in KV operations, read off the harness's own counters.
+   Pinned, so a change to how often the code touches KV fails here rather than on
+   the Cloudflare invoice. Seeding is not counted; each figure starts from a
+   reset. */
+const opsSince = () => ({ ...kv.ops });
+const zeroOps = () => {
+  kv.ops = { list: 0, get: 0, put: 0 };
+};
+
+await check("S22. KV operations: one accepted order for one line, push through paid settlement; one refused for stock; one with a promo code", async () => {
+  const one = stockOrder([{ slug: "tee-1", qty: 1 }]);
+  await push(one);
+  await hit(callbackBody({ amount: 1000 }));
+  const accepted = opsSince();
+
+  resetAll();
+  await seedSold("tee-1", 20);
+  zeroOps();
+  await push(one);
+  const refused = opsSince();
+
+  resetAll();
+  await seedPromo("ALEX10");
+  zeroOps();
+  await push({ ...one, promo: "ALEX10" });
+  await hit(callbackBody({ amount: 900 }));
+  const promo = opsSince();
+
+  console.log(`        ops (list/get/put): accepted ${JSON.stringify(accepted)}  refused ${JSON.stringify(refused)}  promo ${JSON.stringify(promo)}`);
+  eq(accepted, EXPECT_OPS.accepted, "one accepted order, one line");
+  eq(refused, EXPECT_OPS.refused, "one order refused for stock");
+  eq(promo, EXPECT_OPS.promo, "one order with a promo code");
 });
 
 /* ================= the build-time guard on stockCountedAt =================

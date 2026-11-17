@@ -142,8 +142,16 @@ async function markPromoUse(env, record) {
  * What it costs: an order whose paid write then never succeeds holds units it did
  * not complete. That is the safe direction for stock: it sells less, never more.
  *
- * IDEMPOTENT BY KEY. Rewriting a key rewrites its time, which moves it later and
- * never earlier, so a retry cannot move a sale to before the count.
+ * THE SALE KEEPS ITS FIRST TIME. A retry finds the marker already there and
+ * writes it again with the `at` it already has: first write wins. Without that, a
+ * retry landing after a recount (stock and stockCountedAt edited together) would
+ * stamp the sale with a time past the new count and subtract it from a figure it
+ * was never part of. The marker is read before it is written, one read per line.
+ *
+ * THE ONE GAP THAT REMAINS, stated rather than hidden: KV reads can be stale for
+ * up to about a minute. A retry that lands on a stale read of this key sees no
+ * marker, and writes a new time. It needs a recount AND a retry inside the same
+ * minute as the first write; it is not closed by anything in this code.
  *
  * Every line is written, or this throws: an unusable reference or quantity is a
  * record this code did not write, and it throws rather than skipping, because a
@@ -162,7 +170,10 @@ async function markSold(env, record) {
     if (typeof slug !== "string" || !slug || !Number.isInteger(qty) || qty < 1) {
       throw new Error("a paid order line with no slug or quantity cannot be counted");
     }
-    await kv.put(soldKey(slug, record.reference), String(qty), { metadata: { qty, at } });
+    const key = soldKey(slug, record.reference);
+    const { value, metadata } = await kv.getWithMetadata(key);
+    const kept = value !== null && Number.isFinite(metadata?.at) ? metadata.at : at;
+    await kv.put(key, String(qty), { metadata: { qty, at: kept } });
   }
 }
 
