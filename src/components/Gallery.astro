@@ -193,24 +193,25 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
 
       <div class="gallery__main">
         {photos.map((photo, i) => (
-          <picture class="gallery__slide">
-            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
-            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
-            <img
-              class="gallery__img"
-              src={photo.src}
-              alt={photo.alt}
-              width={photo.width}
-              height={photo.height}
-              loading={i === 0 ? "eager" : "lazy"}
-              fetchpriority={i === 0 ? "high" : undefined}
-              decoding="async"
-            />
-          </picture>
+          <div class="gallery__frame">
+            <picture class="gallery__slide">
+              <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
+              <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
+              <img
+                class="gallery__img"
+                src={photo.src}
+                alt={photo.alt}
+                width={photo.width}
+                height={photo.height}
+                loading={i === 0 ? "eager" : "lazy"}
+                fetchpriority={i === 0 ? "high" : undefined}
+                decoding="async"
+              />
+            </picture>
+            {render && <p class="gallery__caption">{CAPTION}</p>}
+          </div>
         ))}
       </div>
-
-      {render && <p class="gallery__caption">{CAPTION}</p>}
 
       <div class="gallery__thumbs" role="group" aria-label="Photographs">
         {photos.map((photo, i) => (
@@ -242,23 +243,25 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
         const lead = detail && !last && i === 0;
 
         return (
-          <picture>
-            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
-            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
-            <img
-              class="gallery__img"
-              src={photo.src}
-              alt={photo.alt}
-              width={photo.width}
-              height={photo.height}
-              loading={lead ? "eager" : "lazy"}
-              fetchpriority={lead ? "high" : undefined}
-              decoding="async"
-            />
-          </picture>
+          <>
+            <picture>
+              <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
+              <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
+              <img
+                class="gallery__img"
+                src={photo.src}
+                alt={photo.alt}
+                width={photo.width}
+                height={photo.height}
+                loading={lead ? "eager" : "lazy"}
+                fetchpriority={lead ? "high" : undefined}
+                decoding="async"
+              />
+            </picture>
+            {render && <p class="gallery__caption">{CAPTION}</p>}
+          </>
         );
       })}
-      {render && <p class="gallery__caption">{CAPTION}</p>}
     </div>
   )
 }
@@ -301,8 +304,11 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     position: relative;
   }
 
-  .gallery__slide {
+  /* The frame is what the radios show and hide: the photograph and its own
+     caption travel together, so each render is labelled when seen alone. */
+  .gallery__frame {
     display: none;
+    gap: var(--s-12);
   }
 
   /* Below 900px the strip is a row under the photograph that wraps onto a
@@ -337,7 +343,7 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
   .gallery__radio:nth-of-type(4):checked ~ .gallery__main > :nth-child(4),
   .gallery__radio:nth-of-type(5):checked ~ .gallery__main > :nth-child(5),
   .gallery__radio:nth-of-type(6):checked ~ .gallery__main > :nth-child(6) {
-    display: block;
+    display: grid;
   }
 
   .gallery__radio:nth-of-type(1):checked ~ .gallery__thumbs > :nth-child(1),
@@ -375,11 +381,6 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     .gallery__main {
       grid-column: 2;
       grid-row: 1;
-    }
-
-    .gallery--switch .gallery__caption {
-      grid-column: 2;
-      grid-row: 2;
     }
 
     .gallery__thumbs {

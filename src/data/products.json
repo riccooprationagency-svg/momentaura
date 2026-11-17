@@ -101,7 +101,27 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-chest-logo-1-800.57273b6c.webp",
+        "alt": "Render of the front of a black t-shirt with a MOMENTAURA chest print on a white backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-chest-logo-2-800.05aa073f.webp",
+        "alt": "Render of the back of a plain black t-shirt on a white backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-chest-logo-3-800.ce053ac0.webp",
+        "alt": "Render of a man in a black t-shirt with a MOMENTAURA chest print, hands in pockets, concrete wall backdrop",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -148,6 +168,18 @@
         "alt": "Render of a man from behind in a black tee with a yellow cat and the words Do I look like I care on the back",
         "width": 800,
         "height": 1067
+      },
+      {
+        "src": "/img/tee-do-i-look-like-i-care-2-800.b85df4e5.webp",
+        "alt": "Render of the back of a black t-shirt printed with a yellow cat and the words Do I look like I care",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-do-i-look-like-i-care-3-800.223d5075.webp",
+        "alt": "Render of a man from behind, cropped at the waist, in a black t-shirt printed with a yellow cat and the words Do I look like I care, concrete wall backdrop",
+        "width": 800,
+        "height": 1067
       }
     ],
     "photoKind": "render",
@@ -191,7 +223,15 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-trust-no-one-1-800.1bd83849.webp",
+        "alt": "Render of the back of a black t-shirt printed with a green bird and the words Trust no one",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -232,7 +272,15 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-kwani-mi-hudo-1-800.abf6b2e8.webp",
+        "alt": "Render of the back of a black t-shirt printed with the words Kwani mi hudo in yellow",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -273,7 +321,27 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-lion-back-print-1-800.e902ecf3.webp",
+        "alt": "Render of the back of a black t-shirt printed with a lion in sunglasses and a gold chain",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-lion-back-print-2-800.9f8a623c.webp",
+        "alt": "Render of a man from behind in a black t-shirt printed with a lion in sunglasses and a gold chain, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-lion-back-print-3-800.c040a9d0.webp",
+        "alt": "Render of the front and back of a man in a black t-shirt, the back printed with a lion in sunglasses and a gold chain, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -314,7 +382,15 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-trust-gods-plan-1-800.4e1700db.webp",
+        "alt": "Render of the back of a black t-shirt printed with the words Trust God's plan in tan lettering",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -359,6 +435,18 @@
       {
         "src": "/img/hoodie-chest-logo-1-800.e671071c.webp",
         "alt": "Render of a man in a black hoodie with a MOMENTAURA chest print, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/hoodie-chest-logo-2-800.535f33ae.webp",
+        "alt": "Render of a man in side profile in a black hoodie with a MOMENTAURA chest print, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/hoodie-chest-logo-3-800.8d6cf569.webp",
+        "alt": "Render of a man from behind in a plain black hoodie and dark trousers, grey studio backdrop",
         "width": 800,
         "height": 1067
       }
@@ -410,6 +498,18 @@
         "alt": "Render of the front of a black hoodie with a MOMENTAURA chest print and M marks on both sleeves",
         "width": 800,
         "height": 1067
+      },
+      {
+        "src": "/img/hoodie-sleeve-stripes-2-800.8813cee4.webp",
+        "alt": "Render of a black hoodie from the side showing the M mark with white and yellow stripes on the sleeve",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/hoodie-sleeve-stripes-3-800.2606efca.webp",
+        "alt": "Render of the back of a plain black hoodie on a light backdrop",
+        "width": 800,
+        "height": 1067
       }
     ],
     "photoKind": "render",
@@ -453,7 +553,21 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/sweatshirt-chest-logo-1-800.4f62b426.webp",
+        "alt": "Render of the front of a black sweatshirt with a MOMENTAURA chest print on a white backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/sweatshirt-chest-logo-2-800.df9f2fb3.webp",
+        "alt": "Render of the back of a plain black sweatshirt on a light grey backdrop",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -494,7 +608,21 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/sweatshirt-sleeve-stripes-1-800.147ce0b9.webp",
+        "alt": "Render of a man in a black sweatshirt with a MOMENTAURA chest print and M stripes on both sleeves, full length, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/sweatshirt-sleeve-stripes-2-800.3178a6f1.webp",
+        "alt": "Render of a man in side profile in a black sweatshirt with the M stripe mark on the sleeve, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -539,6 +667,18 @@
       {
         "src": "/img/tracksuit-m-logo-1-800.f5e83414.webp",
         "alt": "Render of a man in a black MOMENTAURA hoodie and joggers with a white M on the leg, full length",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tracksuit-m-logo-2-800.e68bc5fd.webp",
+        "alt": "Render of a man from behind in a black hoodie and joggers, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tracksuit-m-logo-3-800.a49cc48c.webp",
+        "alt": "Render of a man in side profile in a black hoodie and joggers with a white M on the thigh, grey studio backdrop",
         "width": 800,
         "height": 1067
       }
