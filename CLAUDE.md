@@ -367,7 +367,7 @@ used. The placeholder rule above still applies to any product without one.
 
 - **Disclosed, always.** A product that uses a render carries `photoKind: "render"` in
   `products.json`, and `Gallery.astro` prints the line "Studio render. Not a photograph
-  of the garment." beneath the image on every surface that shows it, including the
+  of the garment." beneath every render, on every surface that shows it, including the
   homepage reveal and the hero. Archivo at `--t-caption` in `--fg-muted`. Never mono,
   never hidden, never shortened. A render without the line is a banned dishonest
   photograph under the rule above.
@@ -376,8 +376,10 @@ used. The placeholder rule above still applies to any product without one.
   different colour, is not used. The owner confirms this per image before it is added.
 - **No invented people as evidence.** A person in a render is never described as a
   customer, never named, never quoted, never used as a testimonial or "worn by" claim.
-- **One look.** Only renders on the same studio-style backdrop are used together. A
-  render in a different setting is left out.
+- **Each image stands alone.** The disclosure line prints under every render, never once
+  per gallery, so an image seen without its neighbours is still labelled. Renders of one
+  product may differ in backdrop or setting. The lead image (`-1`) is a studio-backdrop or
+  flat-on-white render, never a setting with a visible wall or floor.
 - **It expires per product.** The day a real photograph of that product goes through
   `scripts/images.mjs`, its render is removed and `photoKind` becomes `"photograph"`.
   This exception never covers a new product and is never extended by default.
