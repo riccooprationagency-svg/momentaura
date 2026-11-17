@@ -17,6 +17,7 @@
  */
 
 import catalogue from "../../src/data/products.json";
+import { remaining } from "./_stock.js";
 import { REACH, ZONES } from "./_site.js";
 
 /* Same ceiling the cart applies on read. A request is not the cart, so it is
@@ -114,6 +115,41 @@ export function msisdnFrom(value) {
 const no = (status, message, field) => ({ ok: false, status, message, field });
 
 /**
+ * Refuses an order that asks for more than is left to sell.
+ *
+ * "Left" is the catalogue's stock minus the paid sales recorded since it was
+ * counted (_stock.js), so this is async and READS KV. It is called after
+ * readOrder() has accepted the shape of the request, and before anything is
+ * priced for a promo, recorded or pushed.
+ *
+ * Same refusals, same words, same 409 as readOrder() carried before stock became
+ * a count; a figure printed in a message is what REMAINS, never the catalogue's.
+ * A line is refused rather than dropped, for the reason given in readOrder().
+ *
+ * A KV list that fails THROWS. The caller answers 503 and pushes nothing: an
+ * order cannot be accepted against a count nobody could take.
+ *
+ * @param kv     the ORDERS binding
+ * @param lines  readOrder()'s accepted lines
+ * @returns {Promise<null | {ok: false, status: number, message: string, field: string}>}
+ */
+export async function checkStock(kv, lines) {
+  for (const { slug, qty } of lines) {
+    const product = BY_SLUG.get(slug);
+    const left = await remaining(kv, product);
+
+    if (left === 0) {
+      return no(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it, or ${REACH}.`, "items");
+    }
+
+    if (qty > left) {
+      return no(409, `There are only ${left} of the ${product.name} left. Lower the quantity in your order and try again, or ${REACH}.`, "items");
+    }
+  }
+  return null;
+}
+
+/**
  * Reads and re-prices an order request.
  *
  * DELIVERY IS PRICED HERE TOO, by county key, from the fee table in site.json
@@ -200,14 +236,9 @@ export function readOrder(payload) {
       return no(400, MESSAGES.bad_request, "items");
     }
 
-    /* Named, and blocking. Never silently dropped. */
-    if (product.stock === 0) {
-      return no(409, `${product.name} is sold out, so this order cannot be sent. Go back to your order and remove it, or ${REACH}.`, "items");
-    }
-
-    if (qty > product.stock) {
-      return no(409, `There are only ${product.stock} of the ${product.name} left. Lower the quantity in your order and try again, or ${REACH}.`, "items");
-    }
+    /* STOCK IS NOT JUDGED HERE. This function is synchronous and pure, and what is
+       left to sell depends on sales recorded in KV: see checkStock() below, which
+       the push calls straight after this and which says the same things. */
 
     /* THE SIZE, for a product that is made in sizes, and only for one. The
        checkout form posts it as its own field, size-<slug>, from a native

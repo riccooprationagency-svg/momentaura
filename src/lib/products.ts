@@ -65,6 +65,12 @@ export interface Product {
   leadTimeDays: number | null;
   dispatch: string | null;
   stock: number;
+  /** The moment `stock` was counted, ISO 8601 with an explicit offset. Paid sales
+   *  recorded at or after it are subtracted from `stock` when an order is checked
+   *  (functions/api/_stock.js); earlier sales are already inside the figure.
+   *  Required while stock > 0, null when stock is 0. After a recount or a restock,
+   *  edit `stock` and this together. */
+  stockCountedAt: string | null;
   photos: Photo[];
   sizes: Size[];
   runSize?: number;
@@ -136,6 +142,36 @@ for (const product of products) {
       );
     }
   });
+
+  /* stockCountedAt. A sales count only means something relative to a stock count,
+     so a product that can be sold says when its figure was true. The offset is
+     required: a timestamp without one means a different instant in every zone
+     that parses it, and a count whose moment moves is not a count. It cannot be
+     in the future, because a sale recorded "after" a count that has not happened
+     yet would never be subtracted. A product at 0 has no count to date. */
+  if (!Number.isInteger(product.stock) || product.stock < 0) {
+    throw new Error(`products.json: "${product.slug}" stock is ${JSON.stringify(product.stock)} — a whole number, 0 or more.`);
+  }
+  if (product.stock === 0) {
+    if (product.stockCountedAt !== null) {
+      throw new Error(`products.json: "${product.slug}" has stock 0, so "stockCountedAt" must be null, not ${JSON.stringify(product.stockCountedAt)}.`);
+    }
+  } else {
+    const at = product.stockCountedAt;
+    if (typeof at !== "string") {
+      throw new Error(`products.json: "${product.slug}" has stock ${product.stock} and needs "stockCountedAt": an ISO 8601 timestamp with an offset, like 2026-11-17T19:42:00+03:00.`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(at)) {
+      throw new Error(`products.json: "${product.slug}" stockCountedAt is ${JSON.stringify(at)} — it needs a date, a time and an explicit offset (offset missing or malformed), like 2026-11-17T19:42:00+03:00.`);
+    }
+    const instant = Date.parse(at);
+    if (Number.isNaN(instant)) {
+      throw new Error(`products.json: "${product.slug}" stockCountedAt is ${JSON.stringify(at)}, which is not a real moment.`);
+    }
+    if (instant > Date.now()) {
+      throw new Error(`products.json: "${product.slug}" stockCountedAt is ${JSON.stringify(at)}, which is in the future.`);
+    }
+  }
 
   /* Audience is explicit like sizes: an absent key is an error, [] is a valid
      answer, and anything but a de-duplicated list of the two known strings

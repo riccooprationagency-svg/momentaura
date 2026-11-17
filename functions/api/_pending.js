@@ -32,6 +32,7 @@
  */
 
 import { phoneKey, promoPhoneKey, promoUseKey } from "./_promo.js";
+import { soldKey } from "./_stock.js";
 
 /** How long a pending order stays readable. */
 const TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -127,6 +128,56 @@ async function markPromoUse(env, record) {
 }
 
 /**
+ * Records that this order's items were sold: one marker per line, sold:<slug>:<reference>
+ * (_stock.js). Called on the same ONE branch as markPromoUse(): about to write
+ * `paid`, the amount having matched. Never on a mismatch, never on a failure or a
+ * cancellation, never on a replay of a terminal order.
+ *
+ * THE SAME ORDERING ARGUMENT AS THE PROMO MARKER, and it is why a paid order can
+ * never be uncounted. This runs BEFORE the paid write:
+ *   - a marker write fails: it throws, the order is still `pending`, the callback
+ *     answers 500, Safaricom retries, and the retry writes the same keys
+ *   - the paid write fails after these landed: still `pending`, the retry writes
+ *     the same keys again and then the paid record. One marker per line
+ * What it costs: an order whose paid write then never succeeds holds units it did
+ * not complete. That is the safe direction for stock: it sells less, never more.
+ *
+ * THE SALE KEEPS ITS FIRST TIME. A retry finds the marker already there and
+ * writes it again with the `at` it already has: first write wins. Without that, a
+ * retry landing after a recount (stock and stockCountedAt edited together) would
+ * stamp the sale with a time past the new count and subtract it from a figure it
+ * was never part of. The marker is read before it is written, one read per line.
+ *
+ * THE ONE GAP THAT REMAINS, stated rather than hidden: KV reads can be stale for
+ * up to about a minute. A retry that lands on a stale read of this key sees no
+ * marker, and writes a new time. It needs a recount AND a retry inside the same
+ * minute as the first write; it is not closed by anything in this code.
+ *
+ * Every line is written, or this throws: an unusable reference or quantity is a
+ * record this code did not write, and it throws rather than skipping, because a
+ * skipped line is a paid order that stock never hears about. No expirationTtl:
+ * a sale must last as long as the count it is subtracted from.
+ */
+async function markSold(env, record) {
+  if (typeof record.reference !== "string" || !record.reference) {
+    throw new Error("a paid order with no reference cannot be counted");
+  }
+  if (!Array.isArray(record.items)) throw new Error("a paid order with no items cannot be counted");
+
+  const kv = binding(env);
+  const at = Date.now();
+  for (const { slug, qty } of record.items) {
+    if (typeof slug !== "string" || !slug || !Number.isInteger(qty) || qty < 1) {
+      throw new Error("a paid order line with no slug or quantity cannot be counted");
+    }
+    const key = soldKey(slug, record.reference);
+    const { value, metadata } = await kv.getWithMetadata(key);
+    const kept = value !== null && Number.isFinite(metadata?.at) ? metadata.at : at;
+    await kv.put(key, String(qty), { metadata: { qty, at: kept } });
+  }
+}
+
+/**
  * Settles a pending order, once.
  *
  * IDEMPOTENT ON CheckoutRequestID. Safaricom retries callbacks — a delivery it
@@ -148,8 +199,10 @@ async function markPromoUse(env, record) {
  * both would write the same terminal state from the same stored amount, so the
  * record converges rather than double-crediting — but it is not true mutual
  * exclusion. A Durable Object is the primitive that would give that, and it is
- * the right answer if this ever drives stock decrement or a payout. Recorded in
- * BUILD-ORDER section 9.
+ * the right answer if this ever drives a payout. Stock does not need it: a sale
+ * is one key per paid order (markSold), which two settlements cannot lose each
+ * other on. What stock still lacks is a reservation at push time, which is a
+ * separate decision. Recorded in BUILD-ORDER section 9.
  *
  * @returns {Promise<{outcome: "settled"|"already"|"unknown"|"mismatch", record?: object}>}
  */
@@ -179,7 +232,9 @@ export async function settle(env, checkoutRequestId, result) {
       return { outcome: "mismatch", record: flagged };
     }
 
-    /* The use of a promo code, BEFORE the paid write. See markPromoUse(). */
+    /* The sale, then the use of a promo code, both BEFORE the paid write. See
+       markSold() and markPromoUse(). */
+    await markSold(env, record);
     await markPromoUse(env, record);
 
     const paid = {
