@@ -12,7 +12,6 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
-
     "stockCountedAt": null,
     "photos": [],
     "sizes": []
@@ -30,7 +29,6 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
-
     "stockCountedAt": null,
     "photos": [],
     "sizes": []
@@ -48,7 +46,6 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
-
     "stockCountedAt": null,
     "photos": [],
     "sizes": []
@@ -66,7 +63,6 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
-
     "stockCountedAt": null,
     "photos": [],
     "sizes": []
@@ -84,7 +80,6 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 5,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": []
@@ -93,7 +88,10 @@
     "slug": "tee-chest-logo",
     "name": "Black t-shirt, MOMENTAURA chest logo",
     "category": "t-shirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -102,21 +100,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "tee-do-i-look-like-i-care",
     "name": "Black t-shirt, \"Do I look like I care?\" back print",
     "category": "t-shirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -125,21 +141,47 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-do-i-look-like-i-care-1-800.e31a8167.webp",
+        "alt": "Render of a man from behind in a black tee with a yellow cat and the words Do I look like I care on the back",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "tee-trust-no-one",
     "name": "Black t-shirt, \"Trust no one\" back print",
     "category": "t-shirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -148,21 +190,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "tee-kwani-mi-hudo",
     "name": "Black t-shirt, \"Kwani mi hudo\" back print",
     "category": "t-shirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -171,21 +231,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "tee-lion-back-print",
     "name": "Black t-shirt, lion in sunglasses back print",
     "category": "t-shirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -194,21 +272,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "tee-trust-gods-plan",
     "name": "Black t-shirt, \"Trust God's plan\" back print",
     "category": "t-shirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -217,21 +313,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "hoodie-chest-logo",
     "name": "Black hoodie, MOMENTAURA chest logo",
     "category": "hoodies",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 3500,
     "material": "Cotton",
     "fabricWeight": null,
@@ -240,21 +354,47 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/hoodie-chest-logo-1-800.e671071c.webp",
+        "alt": "Render of a man in a black hoodie with a MOMENTAURA chest print, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "hoodie-sleeve-stripes",
     "name": "Black hoodie, MOMENTAURA chest logo and M sleeve stripes",
     "category": "hoodies",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 3500,
     "material": "Cotton",
     "fabricWeight": null,
@@ -263,21 +403,47 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/hoodie-sleeve-stripes-1-800.1ea4e7c3.webp",
+        "alt": "Render of the front of a black hoodie with a MOMENTAURA chest print and M marks on both sleeves",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "sweatshirt-chest-logo",
     "name": "Black sweatshirt, MOMENTAURA chest logo",
     "category": "sweatshirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1500,
     "material": "Cotton",
     "fabricWeight": null,
@@ -286,21 +452,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "sweatshirt-sleeve-stripes",
     "name": "Black sweatshirt, MOMENTAURA chest logo and M sleeve stripes",
     "category": "sweatshirts",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 1500,
     "material": "Cotton",
     "fabricWeight": null,
@@ -309,21 +493,39 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   },
   {
     "slug": "tracksuit-m-logo",
     "name": "Black tracksuit, hoodie and joggers, M logo on thigh",
     "category": "tracksuits",
-    "audience": ["men", "women"],
+    "audience": [
+      "men",
+      "women"
+    ],
     "price": 6200,
     "material": "Cotton",
     "fabricWeight": null,
@@ -332,14 +534,37 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
-
     "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tracksuit-m-logo-1-800.f5e83414.webp",
+        "alt": "Render of a man in a black MOMENTAURA hoodie and joggers with a white M on the leg, full length",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
-      { "label": "S", "chestCm": null, "lengthCm": null },
-      { "label": "M", "chestCm": null, "lengthCm": null },
-      { "label": "L", "chestCm": null, "lengthCm": null },
-      { "label": "XL", "chestCm": null, "lengthCm": null }
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
     ]
   }
 ]
