@@ -72,6 +72,11 @@ export interface Product {
    *  edit `stock` and this together. */
   stockCountedAt: string | null;
   photos: Photo[];
+  /** What the entries in `photos` are. Required whenever `photos` is not empty:
+   *  a "render" is shown with a disclosure line by Gallery.astro (CLAUDE.md,
+   *  Rendered imagery). Sits beside `photos`, never inside it, and
+   *  scripts/images.mjs never writes it. */
+  photoKind?: "photograph" | "render";
   sizes: Size[];
   runSize?: number;
   runRemaining?: number;
@@ -118,6 +123,31 @@ export const systemFor = (product: Product): "dark" | "light" =>
 for (const product of products) {
   if (!Array.isArray(product.photos)) {
     throw new Error(`products.json: "${product.slug}" has no photos array. Use [] for none.`);
+  }
+
+  const kinds = ["photograph", "render"];
+  if (product.photos.length > 0 && !kinds.includes(product.photoKind as string)) {
+    throw new Error(
+      `products.json: "${product.slug}" has photos but photoKind is ${JSON.stringify(product.photoKind)}. ` +
+        `Set it to "photograph" or "render" — a render is disclosed as one, and the build will not guess.`
+    );
+  }
+  if (product.photoKind !== undefined && !kinds.includes(product.photoKind)) {
+    throw new Error(`products.json: "${product.slug}" photoKind ${JSON.stringify(product.photoKind)} is not "photograph" or "render".`);
+  }
+
+  /* photoKind. A render shown without its disclosure is a banned dishonest
+     photograph, so a product with photos must say which kind they are, and the
+     build will not guess. */
+  const KINDS = ["photograph", "render"];
+  if (product.photos.length > 0 && !KINDS.includes(product.photoKind as string)) {
+    throw new Error(
+      `products.json: "${product.slug}" has photos but photoKind is ${JSON.stringify(product.photoKind)}. ` +
+        `Set it to "photograph" or "render".`
+    );
+  }
+  if (product.photoKind !== undefined && !KINDS.includes(product.photoKind)) {
+    throw new Error(`products.json: "${product.slug}" photoKind ${JSON.stringify(product.photoKind)} is not "photograph" or "render".`);
   }
 
   product.photos.forEach((photo, i) => {
