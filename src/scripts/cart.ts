@@ -61,17 +61,11 @@ const units = (order: Order): number =>
  * the same key, and a person with devtools open. Anything that is not an integer
  * quantity of at least one is dropped rather than repaired. */
 function read(): Order {
-  let raw: string | null = null;
-  try {
-    raw = window.localStorage.getItem(KEY);
-  } catch {
-    return {};
-  }
-  if (!raw) return {};
-
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    /* Blocked storage throws here, an absent key reads as "" and JSON.parse("")
+       throws: one catch, one answer, an empty order. */
+    parsed = JSON.parse(localStorage.getItem(KEY) ?? "");
   } catch {
     return {};
   }
@@ -79,8 +73,8 @@ function read(): Order {
 
   const order: Order = {};
   for (const [slug, qty] of Object.entries(parsed as Record<string, unknown>)) {
-    if (typeof qty !== "number" || !Number.isInteger(qty) || qty < 1) continue;
-    order[slug] = Math.min(qty, MAX_QTY);
+    if (!Number.isInteger(qty) || (qty as number) < 1) continue;
+    order[slug] = Math.min(qty as number, MAX_QTY);
   }
   return order;
 }
@@ -91,7 +85,7 @@ function read(): Order {
  * exception taking the quantity steppers down with it. */
 function write(order: Order): void {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(order));
+    localStorage.setItem(KEY, JSON.stringify(order));
   } catch {
     /* Intentionally empty. See above. */
   }
@@ -108,9 +102,24 @@ const q = <T extends HTMLElement = HTMLElement>(selector: string, root: ParentNo
   root.querySelector<T>(selector);
 
 const qa = (selector: string): HTMLElement[] =>
-  Array.from(document.querySelectorAll<HTMLElement>(selector));
+  [...document.querySelectorAll<HTMLElement>(selector)];
 
 const OFF = "aria-disabled";
+
+/* Eleven listeners, each of which was `if (el) el.addEventListener(...)`. A page
+ * that lacks the element simply has nothing to listen on. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const on = (el: EventTarget | null, type: string, handler: (event: any) => unknown) =>
+  el?.addEventListener(type, handler);
+
+/* Sets an attribute, or removes it for null: the pair every enable/disable below
+ * was writing out by hand. */
+const attr = (el: HTMLElement, name: string, value: string | null | undefined) =>
+  value == null ? el.removeAttribute(name) : el.setAttribute(name, value);
+
+/* Whether a control is in its disabled state. aria-disabled is a label and not a
+ * behaviour, so every handler asks this before it acts. */
+const isOff = (el: HTMLElement) => el.getAttribute(OFF) === "true";
 
 /* Reveals the one [data-status] block named `outcome`, hides the rest. Shared
  * by /track's lookup result and /order-received's payment poll — both render
@@ -127,11 +136,17 @@ function showStatus(outcome: string): void {
  * Each [data-fill] names its key; one the server did not send hides its line,
  * which is how an order placed before delivery fees shows a total and nothing
  * it does not have. textContent, so an area typed as markup arrives as text. */
-function fill(breakdown?: Record<string, string>): void {
+function fill(breakdown?: Record<string, string | number>): void {
   for (const slot of qa("[data-fill]")) {
     const value = breakdown?.[slot.dataset.fill!];
-    slot.textContent = value ?? "";
-    slot.parentElement!.hidden = !value;
+    const { pre = "", post = "" } = slot.dataset;
+    /* A number is one of the promo figures, which the server sends raw. The
+     * markup says how each is dressed (data-pre="KSh ", data-post="%"), so no
+     * formatting rule about a particular key lives in here. */
+    slot.textContent = typeof value === "number" ? pre + value.toLocaleString("en-KE") + post : (value ?? "");
+    /* Missing hides the row; zero does not. A recorded discount of 0 is a fact
+     * the order has, and an order that lacks the key is one that never had it. */
+    slot.parentElement!.hidden = value == null;
   }
 }
 
@@ -150,8 +165,8 @@ const countValue = q("[data-order-units]");
 function paintCount(): void {
   if (!countLink || !countValue) return;
   const total = units(order);
-  countValue.textContent = String(total);
-  countLink.hidden = total === 0;
+  countValue.textContent = `${total}`;
+  countLink.hidden = !total;
 }
 
 /* ---------- the product page ---------- */
@@ -162,23 +177,22 @@ const addedCount = q("[data-added-count]");
 
 function paintAdded(): void {
   if (!addButton || !addedNote || !addedCount) return;
-  const slug = addButton.dataset.slug;
-  const qty = slug ? (order[slug] ?? 0) : 0;
-  addedNote.hidden = qty === 0;
-  addedCount.textContent = String(qty);
+  const qty = order[addButton.dataset.slug ?? ""] ?? 0;
+  addedNote.hidden = !qty;
+  addedCount.textContent = `${qty}`;
   /* The verb is kept through the flow. CLAUDE.md: "Add to order" becomes
    * "Added to order" — never "In cart", never a tick. */
-  addButton.textContent = qty === 0 ? "Add to order" : "Added to order";
+  addButton.textContent = qty ? "Added to order" : "Add to order";
 }
 
 if (addButton) {
-  addButton.addEventListener("click", (event) => {
+  on(addButton, "click", (event) => {
     /* THE CHECK. aria-disabled does not prevent activation — it is a label for
      * assistive technology, not a behaviour — and pointer-events: none is gone
      * from this codebase deliberately, because it suppressed the not-allowed
      * cursor while leaving the keyboard path wide open. Without this branch a
      * disabled "Add to order" adds to the order, on click and on Enter. */
-    if (addButton.getAttribute(OFF) === "true") {
+    if (isOff(addButton)) {
       event.preventDefault();
       return;
     }
@@ -224,12 +238,28 @@ const checkout = q("[data-checkout]");
  * shows the fee the order recorded, from /api/mpesa/status. */
 const county = q<HTMLSelectElement>("[name=county]");
 
+/* A promo code the server has just priced for THIS order, held for the life of
+ * the page and never written anywhere: not to the order key, not to the placed
+ * snapshot. Every number in it came back from /api/promo/check, and the code is
+ * the text in the field. `itemsSubtotal` is the server's own, so the figures on
+ * screen are the ones it computed even if this page's catalogue has aged.
+ * Cleared on any edit to the field (below), and by a refusal from the push. */
+let promo: { code: string; percent: number; itemsSubtotal: number; discountKsh: number } | null = null;
+const promoRow = q("[data-promo]");
+
+/* Which answer may still be applied. Bumped when Apply starts, on every edit to
+ * the field, and when the push refuses the code; a response applies only if it
+ * still holds the value it was sent with. One number covers the answer that
+ * arrives after the field changed and the answer that arrives after the push
+ * has already said the code is no good. */
+let seq = 0;
+
 /* Read once, before anything can strip it. A blocked checkout drops its href
  * rather than leaning on aria-disabled to stop navigation — the rule
  * Button.astro already encodes for the build-time case, applied at runtime. */
-const checkoutHref = checkout ? checkout.getAttribute("href") : null;
+const checkoutHref = checkout?.getAttribute("href");
 
-const text = (root: ParentNode, selector: string, value: string): void => {
+const text = (selector: string, value: string, root: ParentNode = document): void => {
   const node = q(selector, root);
   if (node) node.textContent = value;
 };
@@ -262,22 +292,28 @@ function paintLines(quantities: Order): HTMLElement[] {
    * Only this function formats money, so it lives here. */
   const money = (value: number): string => `KSh ${value.toLocaleString("en-KE")}`;
 
-  const shown: HTMLElement[] = [];
   let total = 0;
 
   for (const line of lines) {
     const qty = quantities[line.dataset.slug ?? ""] ?? 0;
-    line.hidden = qty === 0;
-    if (qty === 0) continue;
+    line.hidden = !qty;
+    if (!qty) continue;
 
     const sum = Number(line.dataset.price) * qty;
     total += sum;
-    text(line, "[data-qty]", String(qty));
-    text(line, "[data-line-total]", money(sum));
-    shown.push(line);
+    text("[data-qty]", `${qty}`, line);
+    text("[data-line-total]", money(sum), line);
   }
 
+  if (promo) total = promo.itemsSubtotal;
   if (totalValue) totalValue.textContent = money(total);
+  if (promoRow) {
+    promoRow.hidden = !promo;
+    if (promo) {
+      text("[data-promo-label]", `${promo.code} — ${promo.percent}% off`, promoRow);
+      text("[data-promo-off]", money(promo.discountKsh), promoRow);
+    }
+  }
 
   /* DELIVERY, AS A PREVIEW. Only once a county is chosen — the placeholder
    * option carries no data-fee — so the page never shows a total that is
@@ -286,19 +322,21 @@ function paintLines(quantities: Order): HTMLElement[] {
    * the county key, never read from here. Free is written as Free. */
   const fee = county?.selectedOptions[0]?.dataset.fee;
   if (fee) {
-    const due = money(total + +fee);
-    text(document, "[data-order-fee]", +fee ? money(+fee) : "Free");
-    text(document, "[data-order-due]", due);
+    /* Delivery is added AFTER the discount and never discounted, the same order
+     * the push computes it in. */
+    const due = money(total - (promo?.discountKsh ?? 0) + +fee);
+    text("[data-order-fee]", +fee ? money(+fee) : "Free");
+    text("[data-order-due]", due);
     /* Not while a submit is in flight: the button is saying "Sending the
      * payment prompt" then, and send() restores the label it captured, so the
      * submit handler repaints after every restore instead (below). Without
      * both halves, a county changed mid-request left the button promising the
      * old total next to a summary showing the new one. */
-    if (submitButton && submitButton.getAttribute(OFF) !== "true") {
+    if (submitButton && !isOff(submitButton)) {
       submitButton.textContent = `${submitButton.dataset.pay} — ${due}`;
     }
   }
-  return shown;
+  return lines.filter((line) => !line.hidden);
 }
 
 function paintOrder(): void {
@@ -319,14 +357,10 @@ function paintOrder(): void {
 
   /* The first sold-out line only. Naming one product is a specific
    * instruction; listing three is a wall to parse before they can act. */
-  let blocked: string | null = null;
-  for (const line of paintLines(order)) {
-    if (Number(line.dataset.stock) === 0 && blocked === null) {
-      blocked = line.dataset.name ?? line.dataset.slug ?? "";
-    }
-  }
+  const soldOut = paintLines(order).find((line) => Number(line.dataset.stock) === 0);
+  const blocked = soldOut ? (soldOut.dataset.name ?? soldOut.dataset.slug ?? "") : null;
 
-  const empty = units(order) === 0;
+  const empty = !units(order);
   if (emptyState) emptyState.hidden = !empty;
   if (liveState) liveState.hidden = empty;
 
@@ -339,15 +373,9 @@ function paintOrder(): void {
   }
 
   if (checkout) {
-    if (blocked === null) {
-      checkout.removeAttribute(OFF);
-      checkout.removeAttribute("aria-describedby");
-      if (checkoutHref !== null) checkout.setAttribute("href", checkoutHref);
-    } else {
-      checkout.setAttribute(OFF, "true");
-      checkout.setAttribute("aria-describedby", "order-blocked");
-      checkout.removeAttribute("href");
-    }
+    attr(checkout, OFF, blocked === null ? null : "true");
+    attr(checkout, "aria-describedby", blocked === null ? null : "order-blocked");
+    attr(checkout, "href", blocked === null ? checkoutHref : null);
   }
 }
 
@@ -357,14 +385,12 @@ function paintOrder(): void {
  * which is the count quietly lying. */
 if (lines.length) {
   const known = new Set(lines.map((line) => line.dataset.slug));
-  let dropped = false;
   for (const slug of Object.keys(order)) {
     if (!known.has(slug)) {
       delete order[slug];
-      dropped = true;
+      write(order);
     }
   }
-  if (dropped) write(order);
 
   for (const line of lines) {
     const slug = line.dataset.slug ?? "";
@@ -393,29 +419,23 @@ if (lines.length) {
     const up = q("[data-qty-up]", line);
     const remove = q("[data-remove]", line);
 
-    if (down) down.addEventListener("click", () => step(-1));
-    if (up) up.addEventListener("click", () => step(1));
-    if (remove) {
-      remove.addEventListener("click", () => {
-        delete order[slug];
-        write(order);
-        paintCount();
-        paintOrder();
-      });
-    }
-  }
-
-  county?.addEventListener("change", paintOrder);
-
-  const clear = document.querySelector("[data-clear]");
-  if (clear) {
-    clear.addEventListener("click", () => {
-      order = {};
+    on(down, "click", () => step(-1));
+    on(up, "click", () => step(1));
+    on(remove, "click", () => {
+      delete order[slug];
       write(order);
       paintCount();
       paintOrder();
     });
   }
+
+  on(county, "change", paintOrder);
+  on(q("[data-clear]"), "click", () => {
+    order = {};
+    write(order);
+    paintCount();
+    paintOrder();
+  });
 }
 
 /* ---------- checkout ----------
@@ -428,6 +448,10 @@ if (lines.length) {
  * The summary on this page is painted by paintOrder() above, because /checkout
  * carries the same [data-line] rows as /order. One painter, both pages.
  */
+
+/* What the buyer has ordered, as the list of slug and quantity every endpoint here
+ * is sent. Nothing else about an item is ever on this side of the wire. */
+const basket = () => Object.entries(order).map(([slug, qty]) => ({ slug, qty }));
 
 const form = q<HTMLFormElement>("[data-checkout-form]");
 const submitButton = q("[data-checkout-submit]");
@@ -489,15 +513,14 @@ const setFieldError = (field: string, message: string | null) => {
   }
 };
 
-/* Both forms clear the same way: every field message off, then the one above
- * the button. Every field on the page rather than a list per form — each page
- * carries one form, and a list is a second place to forget a new field. */
-const clearErrors = (slot: HTMLElement | null) => {
+/* Both forms clear the same way: every field message off, then every message
+ * the page marks data-msg (the line above the button and the dropped-connection
+ * notes). Every one on the page rather than a list per form — each page carries
+ * its own, and a list is a second place to forget a new one. Hidden only, never
+ * blanked: a slot's own wording lives in its markup. */
+const clearErrors = () => {
   for (const field of qa("[data-field-error]")) setFieldError(field.dataset.fieldError!, null);
-  if (slot) {
-    slot.textContent = "";
-    slot.hidden = true;
-  }
+  for (const note of qa("[data-msg]")) note.hidden = true;
 };
 
 /* The two forms on this site do the same five things around one fetch: refuse a
@@ -511,49 +534,54 @@ const clearErrors = (slot: HTMLElement | null) => {
  * checkout one impatient tap later. The caller restores when it stays put. */
 type Sent = { status: number; body: Record<string, unknown>; restore: () => void };
 
+/* The one way this script posts: JSON out, and the caller reads JSON back. */
+const post = (url: string, payload: unknown) =>
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
 async function send(
   button: HTMLElement,
   busy: string,
   url: string,
   payload: unknown,
-  slot: HTMLElement | null,
-  dropped: string
+  slot: HTMLElement | null
 ): Promise<Sent | null> {
   const label = button.textContent;
-  button.setAttribute(OFF, "true");
+  attr(button, OFF, "true");
   button.textContent = busy;
 
   const restore = () => {
-    button.removeAttribute(OFF);
+    attr(button, OFF, null);
     button.textContent = label;
   };
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const response = await post(url, payload);
     return { status: response.status, body: await response.json(), restore };
   } catch {
     /* The connection, not the far end. Which one it was matters: "the payment
      * failed" would be a claim about the buyer's money we are not in a position
      * to make. */
     restore();
-    say(slot, dropped);
+    /* The sentence is the page's: data-dropped on the slot, written in the
+     * template with the shop number, the way every other message here carries
+     * one. This only reveals it. */
+    say(slot, slot?.dataset.dropped ?? "");
     return null;
   }
 }
 
 if (form && submitButton) {
-  form.addEventListener("submit", async (event) => {
+  on(form, "submit", async (event) => {
     event.preventDefault();
-    if (submitButton.getAttribute(OFF) === "true") return;
+    if (isOff(submitButton)) return;
 
-    clearErrors(formError);
+    clearErrors();
 
-    const data = new FormData(form);
-    const items = Object.entries(order).map(([slug, qty]) => ({ slug, qty }));
+    const items = basket();
     if (!items.length) return;
 
     const sent = await send(
@@ -563,10 +591,8 @@ if (form && submitButton) {
       /* Every field the form has — name, phone, email, county, area, landmark
        * — by name, plus the items. No price and no fee: the server reads neither
        * and the form has no field for either. */
-      { items, ...Object.fromEntries(data) },
-      formError,
-      "The connection dropped before the payment prompt could be sent. " +
-        "Nothing has been charged. Check your connection and try again."
+      { items, ...Object.fromEntries(new FormData(form)) },
+      formError
     );
     /* send() has already restored the label it captured; repaint so the
      * button states the total for the county chosen now. */
@@ -587,7 +613,7 @@ if (form && submitButton) {
        * part-way the buyer keeps their order rather than losing it to a
        * confirmation screen that never rendered. */
       try {
-        window.localStorage.setItem(
+        localStorage.setItem(
           PLACED,
           JSON.stringify({
             reference: body.reference,
@@ -602,17 +628,80 @@ if (form && submitButton) {
       }
       order = {};
       write(order);
-      window.location.href = `/order-received/?ref=${encodeURIComponent(body.reference)}`;
+      location.href = `/order-received/?ref=${encodeURIComponent(body.reference)}`;
       return;
     }
 
+    if (body.field === "promo") {
+      promo = null;
+      seq++;
+    }
     sent.restore();
     paintOrder();
 
-    const message = body.message ?? "That did not go through. Nothing has been charged.";
+    const message = body.message ?? formError!.dataset.fallback!;
     if (body.field && body.field !== "items") {
       setFieldError(body.field, message);
     } else say(formError, message);
+  });
+}
+
+/* ---------- the promo field ----------
+ *
+ * ADVISORY. /api/promo/check says what the code would take off; the push judges
+ * it again and its answer is final. This paints what the check returned and
+ * computes nothing of its own beyond the subtraction in paintLines().
+ *
+ * ENTER APPLIES. Left alone, Enter in this field would submit the whole form,
+ * and that sends the M-Pesa prompt: someone typing a code and pressing Go would
+ * be asking for a payment they had not yet seen the total of. */
+const promoField = q<HTMLInputElement>("[name=promo]");
+const promoApply = q("[data-promo-apply]");
+const promoNote = q("[data-promo-note]");
+
+if (promoField && promoApply) {
+  const apply = async () => {
+    const code = promoField.value.trim();
+    if (!code || isOff(promoApply)) return;
+
+    clearErrors();
+    const mine = ++seq;
+    const sent = await send(
+      promoApply,
+      "Checking the code",
+      "/api/promo/check",
+      { promo: code, lines: basket() },
+      promoNote
+    );
+    if (!sent) return;
+    sent.restore();
+
+    /* Superseded: the field changed, or the push refused the code, while this
+     * was on its way. */
+    if (mine !== seq) return;
+
+    /* A refusal removes whatever was previewed BEFORE the message goes up: a
+     * code that has just been refused must not leave its discount on screen. */
+    const body = sent.body as NonNullable<typeof promo> & { ok?: boolean; message?: string };
+    promo = body.ok ? { ...body, code } : null;
+    paintOrder();
+    if (!body.ok) setFieldError("promo", body.message ?? null);
+  };
+
+  on(promoApply, "click", apply);
+  on(promoField, "keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      apply();
+    }
+  });
+  /* Any edit makes the preview stale, and so does the message about the last
+   * answer. */
+  on(promoField, "input", () => {
+    promo = null;
+    seq++;
+    setFieldError("promo", null);
+    paintOrder();
   });
 }
 
@@ -635,19 +724,17 @@ const trackError = q("[data-track-error]");
 const trackResult = q("[data-track-result]");
 
 if (trackForm && trackButton && trackResult) {
-  trackForm.addEventListener("submit", async (event) => {
+  on(trackForm, "submit", async (event) => {
     event.preventDefault();
-    if (trackButton.getAttribute(OFF) === "true") return;
+    if (isOff(trackButton)) return;
 
     /* Every outcome goes, not just the result block. Not found sits outside it,
      * so hiding only the result leaves the last answer on screen underneath a
      * connection error — a buyer reading "that order cannot be found" about an
      * attempt that never reached the server. */
-    clearErrors(trackError);
+    clearErrors();
     trackResult.hidden = true;
-    for (const state of qa("[data-status]")) state.hidden = true;
-
-    const data = new FormData(trackForm);
+    showStatus("");
 
     const sent = await send(
       trackButton,
@@ -655,9 +742,8 @@ if (trackForm && trackButton && trackResult) {
       "/api/track",
       /* The form's own fields by name — reference and phone, which are the
        * two names the endpoint reads. */
-      Object.fromEntries(data),
-      trackError,
-      "The connection dropped before the order could be looked up. Check your connection and try again."
+      Object.fromEntries(new FormData(trackForm)),
+      trackError
     );
     if (!sent) return;
 
@@ -689,7 +775,7 @@ if (trackForm && trackButton && trackResult) {
       /* A 400 the buyer can fix, or a 503 they cannot. Both belong above the
        * button, except the two fields they typed themselves — which the server
        * names by the same names the form uses, so no translation is needed. */
-      const message = body.message ?? "That order could not be looked up.";
+      const message = body.message ?? trackError!.dataset.fallback!;
       if (body.field) setFieldError(body.field, message);
       else say(trackError, message);
       return;
@@ -702,16 +788,14 @@ if (trackForm && trackButton && trackResult) {
 
     if (outcome === "notfound") return;
 
-    const ref = q("[data-track-ref]");
-    if (ref) ref.textContent = body.reference ?? "";
+    text("[data-track-ref]", body.reference ?? "");
 
     /* Absent unless the server sent one, and it arrives already formatted —
      * a date is a commitment and the server is what knows the lead times. */
     const dateLine = q("[data-track-date]");
-    const dateValue = q("[data-track-date-value]");
-    if (dateLine && dateValue) {
+    if (dateLine) {
       dateLine.hidden = !body.dispatchDate;
-      if (body.dispatchDate) dateValue.textContent = body.dispatchDate;
+      text("[data-track-date-value]", body.dispatchDate ?? "", dateLine);
     }
 
     paintLines(toOrder(body.items));
@@ -748,13 +832,9 @@ function pollPaymentStatus(checkoutRequestId: string, reference: string, started
   const retry = () =>
     Date.now() - startedAt >= 480_000
       ? showStatus("stalled")
-      : window.setTimeout(() => pollPaymentStatus(checkoutRequestId, reference, startedAt), 4_000);
+      : setTimeout(() => pollPaymentStatus(checkoutRequestId, reference, startedAt), 4_000);
 
-  fetch("/api/mpesa/status", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ checkoutRequestId, reference }),
-  })
+  post("/api/mpesa/status", { checkoutRequestId, reference })
     .then((r) => r.json())
     .then((b: { status?: string; breakdown?: Record<string, string> }) => {
       /* Only an answer that proved the order — a 404 carries no status and
@@ -772,26 +852,19 @@ function pollPaymentStatus(checkoutRequestId: string, reference: string, started
  * modelled: that needs a real calendar, and a date quietly wrong twice a year is
  * worse than one honest about counting working days only. */
 function workingDaysFrom(start: Date, days: number): Date {
-  const date = new Date(start.getTime());
-  let left = days;
-  while (left > 0) {
+  const date = new Date(+start);
+  for (let left = days; left > 0; ) {
     date.setDate(date.getDate() + 1);
-    const day = date.getDay();
-    if (day !== 0 && day !== 6) left--;
+    /* getDay() % 6 is 0 for Sunday (0) and Saturday (6), and for no other day. */
+    if (date.getDay() % 6) left--;
   }
   return date;
 }
 
-const LONG_DATE = new Intl.DateTimeFormat("en-GB", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-});
-
 function paintReceived(): void {
   if (!received || !receivedNone) return;
 
-  const wanted = new URLSearchParams(window.location.search).get("ref");
+  const wanted = new URLSearchParams(location.search).get("ref");
 
   let snapshot: {
     reference?: string;
@@ -799,7 +872,7 @@ function paintReceived(): void {
     items?: { slug: string; qty: number }[];
   } | null = null;
   try {
-    const raw = window.localStorage.getItem(PLACED);
+    const raw = localStorage.getItem(PLACED);
     if (raw) snapshot = JSON.parse(raw);
   } catch {
     snapshot = null;
@@ -816,11 +889,10 @@ function paintReceived(): void {
      * ?ref= would render the last order under a stranger's number. */
     (wanted === null || wanted === snapshot.reference);
 
-  if (usable && snapshot && snapshot.items) {
-    const placed = toOrder(snapshot.items);
+  if (usable) {
+    const placed = toOrder(snapshot!.items);
 
-    const refSlot = q("[data-received-ref]");
-    if (refSlot) refSlot.textContent = snapshot.reference ?? "";
+    text("[data-received-ref]", snapshot!.reference!);
 
     let longest = 0;
     let everyLineHasLead = true;
@@ -835,9 +907,12 @@ function paintReceived(): void {
      * real lead time — one null and the order's arrival is unknown, and the
      * longest of the known ones would be a guess dressed as a commitment. */
     const dateLine = q("[data-received-date]");
-    const dateValue = q("[data-received-date-value]");
-    if (everyLineHasLead && longest > 0 && dateLine && dateValue) {
-      dateValue.textContent = LONG_DATE.format(workingDaysFrom(new Date(), longest));
+    if (everyLineHasLead && longest > 0 && dateLine) {
+      text(
+        "[data-received-date-value]",
+        workingDaysFrom(new Date(), longest).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+        dateLine
+      );
       dateLine.hidden = false;
     }
 
@@ -847,7 +922,7 @@ function paintReceived(): void {
     /* Starts on "pending" — the markup's own default — and polls until Daraja
        has actually answered. isCheckoutRequestId() already proved the field
        above, so this cast is a formality, not a trust boundary. */
-    pollPaymentStatus(snapshot.checkoutRequestId as string, snapshot.reference as string, Date.now());
+    pollPaymentStatus(snapshot!.checkoutRequestId!, snapshot!.reference!, Date.now());
   }
 }
 
@@ -860,5 +935,5 @@ const start = () => {
   paintReceived();
 };
 
-if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(start);
-else window.setTimeout(start, 0);
+/* requestIdleCallback where it exists, a zero-delay timer where it does not. */
+(self.requestIdleCallback ?? setTimeout)(start);
