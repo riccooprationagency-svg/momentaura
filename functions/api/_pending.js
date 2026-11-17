@@ -31,6 +31,8 @@
  * and does the amount match" is how one of them grows a check the other lacks.
  */
 
+import { phoneKey, promoPhoneKey, promoUseKey } from "./_promo.js";
+
 /** How long a pending order stays readable. */
 const TTL_SECONDS = 60 * 60 * 24 * 7;
 
@@ -88,6 +90,43 @@ async function persist(env, checkoutRequestId, record) {
 }
 
 /**
+ * Records that a promo code was used by this order. Called on ONE branch only:
+ * the one about to write `paid`, after the amount has matched. Never on a
+ * mismatch, never on a failure, never on a replay of a terminal order.
+ *
+ * THE USE IS A KEY, NOT A COUNT. promo-use:<CODE>:<reference>, value the
+ * reference. There is no counter to read, add one to and write back, which on a
+ * store with no compare-and-swap loses an increment whenever two orders settle
+ * together. Two different orders write two different keys and cannot lose each
+ * other; the same order written twice writes the same key twice and is still one
+ * use. The cap is the number of these keys, counted when a push is requested.
+ *
+ * WRITTEN BEFORE THE PAID WRITE, so every failure is a retry that converges:
+ *   - this write fails: it throws, the order is still `pending`, the callback
+ *     answers 500, Safaricom retries, and the retry writes it again
+ *   - the paid write fails after this one landed: the order is still `pending`,
+ *     the retry writes the same key and then the paid record. One marker
+ * What it costs: an order whose paid write then never succeeds holds a use of a
+ * code it did not complete. That is the safe direction for a cap.
+ *
+ * `promoOncePerPhone` was recorded on the order when the push was requested, so
+ * no promo record is read, and none can be misparsed, on this path.
+ *
+ * No expirationTtl: putPending() would give these seven days, and a use must last
+ * as long as the code. The reference is the only handle; nothing here is logged.
+ */
+async function markPromoUse(env, record) {
+  if (typeof record.promoCode !== "string" || !record.promoCode) return;
+  if (typeof record.reference !== "string" || !record.reference) return;
+
+  const kv = binding(env);
+  await kv.put(promoUseKey(record.promoCode, record.reference), record.reference);
+  if (record.promoOncePerPhone === true) {
+    await kv.put(promoPhoneKey(record.promoCode, await phoneKey(record.msisdn)), record.reference);
+  }
+}
+
+/**
  * Settles a pending order, once.
  *
  * IDEMPOTENT ON CheckoutRequestID. Safaricom retries callbacks — a delivery it
@@ -139,6 +178,9 @@ export async function settle(env, checkoutRequestId, result) {
       await persist(env, checkoutRequestId, flagged);
       return { outcome: "mismatch", record: flagged };
     }
+
+    /* The use of a promo code, BEFORE the paid write. See markPromoUse(). */
+    await markPromoUse(env, record);
 
     const paid = {
       ...record,

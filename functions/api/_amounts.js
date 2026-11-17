@@ -10,10 +10,14 @@
  * sends these and nothing else. One copy, so the confirmation and the lookup
  * cannot disagree about what one order cost.
  *
- * Already formatted, so the page puts each value straight into its slot with
- * textContent and the cart carries no formatting for it. A key that is absent
- * hides its line, which is how an order placed before delivery fees existed
- * shows a total and nothing it does not have.
+ * The three amounts are already formatted, so the page puts each value straight
+ * into its slot with textContent and the cart carries no formatting for it. A key
+ * that is absent hides its line, which is how an order placed before delivery
+ * fees existed shows a total and nothing it does not have.
+ *
+ * An order that used a promo code adds four more keys, promoCode, promoPercent,
+ * discountKsh and itemsSubtotal, and those four are NOT formatted: the code is a
+ * string and the rest are raw integers. An order without a code has none of them.
  */
 
 /* Matches price() in src/lib/products.ts and money() in the cart: integer KSh,
@@ -27,5 +31,20 @@ export function amounts(record) {
   if (Number.isInteger(fee)) out.fee = fee === 0 ? "Free" : money(fee);
   if (Number.isInteger(record.subtotal)) out.subtotal = money(record.subtotal);
   if (Number.isInteger(record.amount)) out.total = money(record.amount);
+
+  /* The promo, as the order recorded it — never looked up again. A code edited
+   * or deleted after the order was placed must not rewrite what that order was
+   * charged. Present only on an order that used a code, so an order without one
+   * answers with exactly the keys it always did.
+   *
+   * RAW INTEGERS, unlike the three above, because the names carry the unit
+   * (promoPercent, discountKsh, itemsSubtotal) and the cart script has no byte
+   * budget to format them. Whatever shows them formats them. */
+  if (typeof record.promoCode === "string" && record.promoCode) {
+    out.promoCode = record.promoCode;
+    if (Number.isInteger(record.promoPercent)) out.promoPercent = record.promoPercent;
+    if (Number.isInteger(record.discountKsh)) out.discountKsh = record.discountKsh;
+    if (Number.isInteger(record.itemsSubtotal)) out.itemsSubtotal = record.itemsSubtotal;
+  }
   return out;
 }
