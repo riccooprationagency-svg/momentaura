@@ -25,13 +25,23 @@ import Base from "../layouts/Base.astro";
 import DispatchRule from "../components/DispatchRule.astro";
 import ProductCard from "../components/ProductCard.astro";
 import { campaign, campaignGroups, campaignLive, longDate, shortDate } from "../lib/campaign";
+import { systemFor } from "../lib/products";
 
 const live = campaignLive();
 const groups = campaignGroups();
 const ends = longDate(campaign.endsOn);
+
+/* The page chrome follows the same rule a product does: derived from the
+   photographs, never stored. systemFor() is per product, and a listing holds
+   several, so the page goes dark only when every product on it would. One
+   product still awaiting a photograph keeps the ground, headings and footer
+   light, which is the honest state and the one the cards already render in.
+   Each card keeps its own system either way. */
+const system = groups.every((g) => g.items.every((p) => systemFor(p) === "dark")) ? "dark" : "light";
 ---
 
 <Base
+  system={system}
   title={`${campaign.name} — MomentAura`}
   description={live
     ? `${campaign.name}: black pieces, to ${ends}.`
