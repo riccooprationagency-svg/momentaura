@@ -293,6 +293,12 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
     margin-block: var(--s-40);
   }
 
+  /* The anchor target of the footer's "Collect in person": without this the
+     sticky header covers the heading the link was meant to land on. */
+  #pickup {
+    scroll-margin-block-start: var(--s-80);
+  }
+
   .page__reach {
     display: flex;
     flex-wrap: wrap;
