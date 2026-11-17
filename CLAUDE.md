@@ -250,7 +250,7 @@ Gradients of any kind · gradient text · glassmorphism or `backdrop-blur` · pi
 above headlines · three-column icon grids · centred body copy · font weights above 600 ·
 dark heroes with radial glows · scroll-triggered animation · fade-up-on-scroll · parallax ·
 bento grids · drop shadows · emoji anywhere including code comments · 3D blobs · mesh
-gradients · stock illustration · decorative icons · skeleton loaders · countdown timers ·
+gradients · stock illustration · decorative icons (the balloons in "Campaign motion" are the one exception) · skeleton loaders · countdown timers ·
 "only N left" · fake stock counts · testimonials or star ratings before real reviews
 exist · exit-intent popups · "someone just bought this" notifications
 
@@ -284,11 +284,41 @@ No exclamation marks. No "simply", "just", or "please". No "we" if it is one per
 ## Motion
 
 Transitions 200–300ms on `cubic-bezier(0.625, 0.05, 0, 1)`. Opacity, transform and
-border-colour only. Never spring, bounce, animated hue, scroll-jacking, or parallax.
+border-colour only. The campaign rise in "Campaign motion" is the one place a longer, linear transform is allowed. Never spring, bounce, animated hue, scroll-jacking, or parallax.
 
 One elaborate moment permitted site-wide: the box-opening or fold sequence on a product
 page. Image sequence, under 400KB, lazy-loaded, tap-triggered, below the fold. It answers
 "what is actually in it" — it is not atmosphere.
+
+### Campaign motion — one named exception
+
+The box-opening sequence stays the one elaborate moment on a product page. This is a second,
+named exception, not a loosening of the rule above it, and it is narrower on purpose.
+
+**Where:** `/black-november` and nowhere else. **When:** only while `src/data/campaign.json`
+says the campaign is live. The build does not emit the motion classes once `endsOn` has
+passed, and a follow-up PR removes the CSS within seven days of `endsOn`.
+
+**Allowed on that page, CSS only, zero JavaScript:**
+- Balloons: one inline SVG shape defined once and reused, flat fills from existing
+  tokens (no new token, no accent), rising and swaying on `transform` for one pass, then gone.
+  At most eleven on desktop and five under 640px. They are never a button, a link or a stock
+  illustration.
+- A spotlight: product cards that already exist in the listing take turns, one at a time, with
+  a single soft pulse of at most 280ms and a zoom of at most 1.06, then settle at rest.
+  Photographs only: a placeholder never zooms.
+- Linear timing for the rise is allowed. Everything else keeps the site easing.
+
+**Required:**
+- A Pause motion control that works without JavaScript, 44px, keyboard operable.
+- `prefers-reduced-motion: reduce` shows nothing moving and no balloons.
+- No element flashes more than once per 2 seconds, and no pulse covers more than the
+  card it belongs to.
+- The page stays under the 1MB budget and adds no `.js` file and no inline script.
+
+**Still banned here, no exception:** looping forever, scroll-triggered motion, parallax,
+countdown timers, "only N left", glows, gradients, shadows, sound, and any element that
+moves after the user has pressed Pause.
 
 Everything respects `prefers-reduced-motion`.
 
