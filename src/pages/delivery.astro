@@ -23,6 +23,7 @@
 // describes what the code does rather than a fact only Ric holds.
 import Base from "../layouts/Base.astro";
 import Gap from "../components/Gap.astro";
+import PickupDocket from "../components/PickupDocket.astro";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 import {
   site,
@@ -220,6 +221,11 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
 
       <Gap field="delivery.zones" />
 
+      <hr class="page__hair" />
+      <section id="pickup">
+        <PickupDocket />
+      </section>
+
       {
         hasReturns && (
           <>
@@ -285,6 +291,12 @@ const hasReturns = known(site.delivery.returnsWindowDays) && known(site.delivery
     border-block-start: 1px solid var(--border);
     width: 100%;
     margin-block: var(--s-40);
+  }
+
+  /* The anchor target of the footer's "Collect in person": without this the
+     sticky header covers the heading the link was meant to land on. */
+  #pickup {
+    scroll-margin-block-start: var(--s-80);
   }
 
   .page__reach {

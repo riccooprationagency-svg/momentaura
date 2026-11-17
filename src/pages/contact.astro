@@ -18,6 +18,7 @@
 import Base from "../layouts/Base.astro";
 import Button from "../components/Button.astro";
 import Gap from "../components/Gap.astro";
+import PickupDocket from "../components/PickupDocket.astro";
 import {
   emailParts,
   known,
@@ -92,6 +93,10 @@ const hasHours = known(hours);
 
       <Gap field="contact.hours" />
 
+      <div class="page__pickup">
+        <PickupDocket />
+      </div>
+
       <h2 class="page__sub">Checking an order yourself</h2>
       <p class="page__body">
         An order can be looked up with its reference and the phone number it was placed
@@ -132,6 +137,10 @@ const hasHours = known(hours);
     letter-spacing: var(--tr-label);
     color: var(--fg-muted);
     margin-block-end: var(--s-16);
+    margin-block-start: var(--s-40);
+  }
+
+  .page__pickup {
     margin-block-start: var(--s-40);
   }
 
