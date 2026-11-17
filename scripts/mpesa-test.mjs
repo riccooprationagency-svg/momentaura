@@ -50,14 +50,16 @@ cpSync(API, scratch, { recursive: true });
    package.json is out of reach from tmp. */
 writeFileSync(join(scratch, "package.json"), '{"type":"module"}\n', "utf8");
 
-const orderPath = join(scratch, "_order.js");
-const orderSource = readFileSync(orderPath, "utf8");
-const orderPatched = orderSource.replace(
-  /^import catalogue from .*$/m,
-  "const catalogue = globalThis.__catalogue;"
-);
-if (orderPatched === orderSource) throw new Error("could not find the catalogue import — has _order.js moved it?");
-writeFileSync(orderPath, orderPatched, "utf8");
+/* Every shipped file that prices from the catalogue: _order.js for the push, and
+   promo/check.js for the preview. The same line is substituted in both, so the
+   two price from one fixture and a case can compare what each of them says. */
+for (const file of ["_order.js", "promo/check.js"]) {
+  const path = join(scratch, file);
+  const source = readFileSync(path, "utf8");
+  const patched = source.replace(/^import catalogue from .*$/m, "const catalogue = globalThis.__catalogue;");
+  if (patched === source) throw new Error(`could not find the catalogue import — has ${file} moved it?`);
+  writeFileSync(path, patched, "utf8");
+}
 
 globalThis.__catalogue = [
   { slug: "crew-tee", name: "Crew tee", price: 650, stock: 6 },
@@ -103,6 +105,7 @@ globalThis.__site = JSON.parse(readFileSync(join(ROOT, "src", "data", "site.json
 const load = (rel) => import(pathToFileURL(join(scratch, rel)).href);
 
 const { onRequest: stk } = await load("mpesa/stk.js");
+const { onRequest: promoCheck } = await load("promo/check.js");
 const { onRequest: status } = await load("mpesa/status.js");
 const { onRequest: callback } = await load("mpesa/callback/[token].js");
 const daraja = await load("_daraja.js");
@@ -1728,10 +1731,235 @@ await check("markers and phone keys are written with no expirationTtl, the promo
   }
 });
 
+
+/* ================= the promo preview, /api/promo/check =================
+ *
+ * ADVISORY, and these cases hold it to that: it never writes, never counts a use,
+ * never reads a figure from the request, and its figures are the ones the push then
+ * sends to Daraja. Case P1 is the one that matters most — the previewed total and
+ * the amount asked of the buyer's phone are asserted equal, in the same case, from
+ * the same basket. */
+
+const checkPromo = (body, env = baseEnv(), method = "POST") =>
+  promoCheck({
+    request: new Request(`${ORIGIN}/api/promo/check`, {
+      method,
+      body: method === "POST" ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
+    }),
+    env,
+  });
+const basket = (slug = "tee-1200", qty = 1) => [{ slug, qty }];
+/* What the checkout page shows as the total: the server's items, less the server's
+   discount, plus the delivery fee the page already holds for the county. */
+const previewedTotal = (answer, fee) => answer.itemsSubtotal - answer.discountKsh + fee;
+
+await check("P1. preview of ALEX10 on KSh 1,200: 10%, KSh 120 off, items 1,200 — and the push then sends exactly the previewed total", async () => {
+  await seedPromo("ALEX10");
+  const res = await checkPromo({ promo: "ALEX10", lines: basket() });
+  eq(res.status, 200, "status");
+  const answer = await res.json();
+  eq(answer, { ok: true, percent: 10, itemsSubtotal: 1200, discountKsh: 120 }, "the preview, exactly these four keys");
+  /* Kirinyaga is 250: delivery is added after the discount and never discounted. */
+  const previewed = previewedTotal(answer, 250);
+  eq(previewed, 1330, "previewed total: 1,200 - 120 + 250");
+  const pushed = await push(tee({ promo: "ALEX10", county: "kirinyaga" }));
+  eq(pushed.status, 200, "the push");
+  eq(pushes[0].Amount, previewed, "amount sent to Daraja equals the previewed total");
+  eq((await pushed.json()).total, previewed, "total the push reports equals the previewed total");
+  const stored = await record();
+  eq([stored.discountKsh, stored.itemsSubtotal], [answer.discountKsh, answer.itemsSubtotal], "the push recorded the figures the preview showed");
+});
+
+await check("P2. preview and push agree on rounding too: KSh 1,399 at 10% is 139.9, discount 139 on both", async () => {
+  await seedPromo("ALEX10");
+  const answer = await (await checkPromo({ promo: "ALEX10", lines: basket("tee-1399") })).json();
+  eq([answer.itemsSubtotal, answer.discountKsh], [1399, 139], "preview");
+  await push(tee({ promo: "ALEX10" }, "tee-1399"));
+  eq(pushes[0].Amount, previewedTotal(answer, 0), "Daraja amount, Nairobi CBD delivery free");
+});
+
+await check("P3. a code typed in lower case with spaces previews like the code (the server normalises)", async () => {
+  await seedPromo("ALEX10");
+  const answer = await (await checkPromo({ promo: "  alex10 ", lines: basket() })).json();
+  eq(answer.ok, true, "ok");
+  eq(answer.discountKsh, 120, "discount");
+});
+
+await check("P4. a client price, percent or discount in the request is read past: the catalogue and the record decide", async () => {
+  await seedPromo("ALEX10");
+  const answer = await (
+    await checkPromo({
+      promo: "ALEX10",
+      lines: [{ slug: "tee-1200", qty: 1, price: 1, amount: 1, discount: 999 }],
+      price: 1,
+      percent: 99,
+      discountKsh: 999,
+      itemsSubtotal: 1,
+      total: 1,
+    })
+  ).json();
+  eq(answer, { ok: true, percent: 10, itemsSubtotal: 1200, discountKsh: 120 }, "catalogue price 1,200 and the record's 10 percent");
+});
+
+await check("P5. a quantity multiplies the catalogue price: 3 x 1,200 = 3,600, 10% = 360", async () => {
+  await seedPromo("ALEX10");
+  const answer = await (await checkPromo({ promo: "ALEX10", lines: basket("tee-1200", 3) })).json();
+  eq([answer.itemsSubtotal, answer.discountKsh], [3600, 360], "figures");
+});
+
+await check("P6. an unknown, ended, unstarted, switched-off and used-up code, and a malformed one, all answer with ONE body", async () => {
+  await seedPromo("ENDED", { endsAt: PAST });
+  await seedPromo("LATER", { startsAt: FAR });
+  await seedPromo("OFF", { active: false });
+  await seedPromo("FULL", { maxUses: 1 });
+  await seedMarkers("FULL", 1);
+  const bodies = [];
+  for (const code of ["NOSUCH", "ENDED", "LATER", "OFF", "FULL", "x", "has space", "", "   "]) {
+    const res = await checkPromo({ promo: code, lines: basket() });
+    eq(res.status, 200, `status for ${JSON.stringify(code)}`);
+    bodies.push(await res.text());
+  }
+  eq(new Set(bodies).size, 1, "every refusal is the same body, byte for byte");
+  const refused = JSON.parse(bodies[0]);
+  eq(refused.ok, false, "ok false");
+  has(refused.message, "not valid or has ended", "the message says what happened");
+  has(refused.message, "0753 181 901", "and carries the shop number");
+  eq(Object.keys(refused).sort(), ["message", "ok"], "no field that tells the reasons apart");
+});
+
+await check("P7. a code that is not a string is refused the same way, never read as no code", async () => {
+  await seedPromo("ALEX10");
+  const refused = await (await checkPromo({ promo: "NOSUCH", lines: basket() })).text();
+  for (const promo of [10, ["ALEX10"], { code: "ALEX10" }, true, null, undefined]) {
+    const res = await checkPromo({ promo, lines: basket() });
+    eq(await res.text(), refused, `promo ${JSON.stringify(promo)}`);
+  }
+});
+
+await check("P8. it NEVER writes to KV: no marker, no counter, no promo record change, no throttle key", async () => {
+  await seedPromo("ALEX10", { maxUses: 5, oncePerPhone: true });
+  const writes = [];
+  const put = kv.put.bind(kv);
+  kv.put = async (...args) => (writes.push(args[0]), put(...args));
+  const before = [...kv.store.entries()];
+  for (const promo of ["ALEX10", "NOSUCH", "alex10"]) {
+    await checkPromo({ promo, lines: basket() });
+  }
+  eq(writes, [], "no put at all");
+  eq([...kv.store.entries()], before, "the store is exactly as it was");
+  eq(markers("ALEX10"), [], "no use counted");
+});
+
+await check("P9. asking does not use the code up: a code with one use left previews twice, and the push still takes it", async () => {
+  await seedPromo("LAST1", { maxUses: 1 });
+  eq((await (await checkPromo({ promo: "LAST1", lines: basket() })).json()).ok, true, "first preview");
+  eq((await (await checkPromo({ promo: "LAST1", lines: basket() })).json()).ok, true, "second preview");
+  eq((await push(tee({ promo: "LAST1" }))).status, 200, "the push is not refused");
+});
+
+await check("P10. a used-up code previews as refused, from the markers, exactly as the push counts it", async () => {
+  await seedPromo("CAPPED", { maxUses: 2 });
+  await seedMarkers("CAPPED", 2);
+  eq((await (await checkPromo({ promo: "CAPPED", lines: basket() })).json()).ok, false, "preview");
+  eq((await push(tee({ promo: "CAPPED" }))).status, 400, "and the push agrees");
+});
+
+await check("P11. STATED LIMIT: once-per-phone cannot be judged without a phone, so the preview says ok and the push is the one that refuses", async () => {
+  const { phoneKey } = await loadPromo();
+  await seedPromo("TEAM15-TEST", { percent: 15, oncePerPhone: true });
+  await kv.put(`promo-phone:TEAM15-TEST:${await phoneKey("254712345678")}`, "MA-OLD");
+  eq((await (await checkPromo({ promo: "TEAM15-TEST", lines: basket() })).json()).ok, true, "the preview cannot know");
+  const refused = await push(tee({ promo: "TEAM15-TEST" }));
+  eq(refused.status, 400, "the push refuses it");
+  eq(pushes.length, 0, "and sends nothing to Daraja");
+});
+
+await check("P12. an unreadable request is a 400, never a priced one: bad JSON, no lines, too many, a duplicate, a bad quantity, an unknown slug", async () => {
+  await seedPromo("ALEX10");
+  const withLines = (lines) => JSON.stringify({ promo: "ALEX10", lines });
+  const bad = [
+    "not json",
+    "null",
+    "[]",
+    JSON.stringify({ promo: "ALEX10" }),
+    withLines([]),
+    withLines("tee-1200"),
+    withLines(Array.from({ length: 11 }, (_, i) => ({ slug: i ? "tee-1399" : "tee-1200", qty: 1 }))),
+    withLines([{ slug: "tee-1200", qty: 1 }, { slug: "tee-1200", qty: 1 }]),
+    withLines([{ slug: "tee-1200", qty: 0 }]),
+    withLines([{ slug: "tee-1200", qty: 1.5 }]),
+    withLines([{ slug: "tee-1200", qty: "2" }]),
+    withLines([{ slug: "tee-1200", qty: 100 }]),
+    withLines([{ slug: "nope", qty: 1 }]),
+    withLines([{ slug: 7, qty: 1 }]),
+    withLines([null]),
+    withLines([{ slug: "__proto__", qty: 1 }]),
+  ];
+  for (const body of bad) {
+    const res = await checkPromo(body);
+    eq(res.status, 400, `status for ${body.slice(0, 60)}`);
+    eq((await res.json()).ok, false, `ok for ${body.slice(0, 60)}`);
+  }
+});
+
+await check("P13. a KV that cannot be read is a 503 with its own message, NOT the refusal, and the code is not logged", async () => {
+  await seedPromo("ALEX10");
+  kv.failReads = true;
+  const lines = [];
+  const log = console.log;
+  console.log = (line) => lines.push(String(line));
+  let res;
+  try {
+    res = await checkPromo({ promo: "ALEX10", lines: basket() });
+  } finally {
+    console.log = log;
+  }
+  eq(res.status, 503, "status");
+  const body = await res.json();
+  eq(body.ok, false, "ok false");
+  lacks(body.message, "not valid", "an outage is not worded as an invalid code");
+  has(body.message, "0753 181 901", "and carries the shop number");
+  eq(lines.length, 1, "one log line");
+  lacks(lines.join(" "), "ALEX10", "the code is not logged");
+});
+
+await check("P14. a list that fails while counting uses is a 503 too, not a refusal", async () => {
+  await seedPromo("CAPPED", { maxUses: 3 });
+  kv.failLists = true;
+  eq((await checkPromo({ promo: "CAPPED", lines: basket() })).status, 503, "status");
+});
+
+await check("P15. only POST: GET is 405, and a response is never cached or sniffed", async () => {
+  const get = await checkPromo(null, baseEnv(), "GET");
+  eq(get.status, 405, "GET");
+  eq(get.headers.get("Allow"), "POST", "Allow");
+  await seedPromo("ALEX10");
+  const ok = await checkPromo({ promo: "ALEX10", lines: basket() });
+  eq(ok.headers.get("Cache-Control"), "no-store", "no-store");
+  eq(ok.headers.get("X-Content-Type-Options"), "nosniff", "nosniff");
+});
+
+await check("P16. a sold-out line is priced by the preview (stock is the push's to refuse, and it does, by name)", async () => {
+  await seedPromo("ALEX10");
+  eq((await (await checkPromo({ promo: "ALEX10", lines: basket("faith-hoodie") })).json()).ok, true, "priced from the catalogue regardless of stock");
+  eq((await push(tee({ promo: "ALEX10" }, "faith-hoodie"))).status, 409, "the push says sold out");
+});
+
+await check("P17. the refusal in the preview and the refusal from the push say the same thing, apart from what each can claim", async () => {
+  const previewed = (await (await checkPromo({ promo: "NOSUCH", lines: basket() })).json()).message;
+  const pushed = await (await push(tee({ promo: "NOSUCH" }))).json();
+  eq(pushed.field, "promo", "the push names the field");
+  eq(
+    previewed,
+    pushed.message.replace(" Nothing has been charged.", "").replace("Remove the code", "Remove it"),
+    "same words"
+  );
+});
+
 /* ================= no secret in the source ================= */
 
 await check("no key, passkey or shortcode is written into the source", async () => {
-  for (const file of ["_daraja.js", "_order.js", "_site.js", "_amounts.js", "_pending.js", "_promo.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
+  for (const file of ["_daraja.js", "_order.js", "_site.js", "_amounts.js", "_pending.js", "_promo.js", "promo/check.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
     const src = readFileSync(join(API, file), "utf8");
     for (const pattern of [/passkey\s*=\s*["'][A-Za-z0-9]{8,}/i, /["'][A-Za-z0-9]{40,}["']/]) {
       const hitMatch = src.match(pattern);

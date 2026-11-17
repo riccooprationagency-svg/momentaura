@@ -9,6 +9,14 @@
 // again by functions/api/_order.js from the county key, and the M-Pesa prompt
 // on the buyer's phone shows that one.
 //
+// THE PROMO CODE IS ADVISORY HERE. Apply asks /api/promo/check what the code would
+// take off and the summary shows it; the pay button posts whatever is in the
+// field, and /api/mpesa/stk judges the code again and recomputes every figure. Its
+// answer is final. The code lives in the field and nowhere else: not in storage,
+// not in the placed-order snapshot, so a tampered value has nothing to inflate.
+// The field is last, directly before the pay button, so focus runs field, Apply,
+// pay — and the cart makes Enter in it apply the code rather than submit.
+//
 // NO CARD FIELD EXISTS HERE, and none may ever be added. M-Pesa is the only
 // payment method this shop takes, and the prompt is completed on the buyer's
 // own phone with their own PIN — nothing resembling a card or PIN field is
@@ -131,6 +139,21 @@ const groups = timingGroups();
           />
 
           <!--
+            Optional. name="promo" is what makes the pay button send it: the cart
+            posts every named field. A refusal from either endpoint lands in this
+            field's own message slot, which is prose at body-sm (see .promo).
+          -->
+          <div class="promo">
+            <Field
+              name="promo"
+              label="Promo code"
+              autocomplete="off"
+              hint="Checked again when you pay."
+            />
+            <Button variant="ghost" type="button" data-promo-apply>Apply</Button>
+          </div>
+
+          <!--
             STATE WHAT HAPPENS BEFORE IT HAPPENS. Prose, above the button. Not
             a tooltip, not fine print under the fold, and not after the click.
           -->
@@ -209,6 +232,16 @@ const groups = timingGroups();
           <p class="summary__row">
             <span class="summary__total-label">Subtotal</span>
             <span class="summary__total-value" data-order-total>KSh 0</span>
+          </p>
+          <!--
+            The discount, between the items and the delivery, because that is the
+            order it is taken in: off the items, then delivery added, undiscounted.
+            Hidden until Apply has an answer from the server, and cleared by any
+            edit to the code. The cart fills both slots; the minus is only here.
+          -->
+          <p class="summary__row summary__promo" data-promo hidden>
+            <span class="summary__total-label" data-promo-label></span>
+            <span class="summary__total-value">&minus;<span data-promo-off></span></span>
           </p>
           <p class="summary__row">
             <span class="summary__total-label">Delivery</span>
@@ -290,6 +323,47 @@ const groups = timingGroups();
   .checkout__error {
     color: var(--fg-muted);
     max-width: var(--measure);
+  }
+
+  /* The field and its Apply button on one line, the button level with the input
+     whatever is above or below it. The field's wrapper stops being a box
+     (display: contents) so its label, hint, input and message become cells of
+     this grid and the button can take the input's row. Rows are named because
+     the message sits under both. */
+  .promo {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: var(--s-20);
+    row-gap: var(--s-8);
+    align-items: end;
+  }
+
+  .promo :global(.field) {
+    display: contents;
+  }
+
+  .promo :global(.field__label) {
+    grid-area: 1 / 1 / 2 / -1;
+  }
+
+  .promo :global(.field__hint) {
+    grid-area: 2 / 1 / 3 / -1;
+  }
+
+  .promo :global(.field__input) {
+    grid-area: 3 / 1;
+  }
+
+  .promo :global(.btn) {
+    grid-area: 3 / 2;
+  }
+
+  /* The message about the code is a sentence the buyer has to act on, so it is
+     set as prose at body-sm like the rest of the page's sentences, not at the
+     caption size the other field messages use. */
+  .promo :global(.field__error) {
+    grid-area: 4 / 1 / 5 / -1;
+    font-size: var(--t-body-sm);
   }
 
   .checkout__actions {
@@ -390,6 +464,12 @@ const groups = timingGroups();
   .summary__total {
     border-block-start: 1px dashed var(--border);
     padding-block-start: var(--s-8);
+  }
+
+  /* The discount line is a note on the subtotal above it, in the docket's own
+     size, so the three figures that matter keep the larger setting. */
+  .summary__promo .summary__total-value {
+    font-size: var(--t-docket);
   }
 
   .summary__total-label {
