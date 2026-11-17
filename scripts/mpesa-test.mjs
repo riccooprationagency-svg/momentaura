@@ -62,6 +62,13 @@ writeFileSync(orderPath, orderPatched, "utf8");
 globalThis.__catalogue = [
   { slug: "crew-tee", name: "Crew tee", price: 650, stock: 6 },
   { slug: "faith-hoodie", name: "Faith hoodie", price: 3500, stock: 0 },
+  /* Fixtures for the promo arithmetic, chosen for the figure rather than the
+     product: 1,200 divides cleanly at 10 percent, 1,399 does not, 10 is the
+     live-test price, and 1 is the floor the discount must never reach. */
+  { slug: "tee-1200", name: "Tee 1200", price: 1200, stock: 50 },
+  { slug: "tee-1399", name: "Tee 1399", price: 1399, stock: 50 },
+  { slug: "ten-bob", name: "Ten bob", price: 10, stock: 50 },
+  { slug: "one-bob", name: "One bob", price: 1, stock: 50 },
   /* A fixture, not shop data: no product in products.json has sizes yet. Two
      labels, one with measurements and one without, because the server reads
      only the label and must not care whether the chart could render. */
@@ -1220,10 +1227,398 @@ await check("a wrong reference gets no amounts", async () => {
   lacks(text, "1,300", "the total");
 });
 
+/* ================= promo codes =================
+ *
+ * The code decides the discount; the browser decides nothing. Every figure is
+ * written into the case name, so a failure reads as arithmetic rather than as an
+ * unexplained "expected 1080". `_promo.js` is loaded INSIDE each case, not at the
+ * top of the file, so that when it is missing every case fails on its own
+ * instead of the whole file dying before the first one runs. */
+
+const FAR = "2099-12-31T23:59:59+03:00";
+const PAST = "2020-01-01T00:00:00+03:00";
+const loadPromo = () => load("_promo.js");
+
+const promoRecord = (over = {}) => ({
+  percent: 10,
+  endsAt: FAR,
+  maxUses: null,
+  usedCount: 0,
+  oncePerPhone: false,
+  active: true,
+  channel: "test",
+  ...over,
+});
+const seedPromo = (code, over) => kv.put(`promo:${code}`, JSON.stringify(promoRecord(over)));
+const promoUses = async (code) => (await kv.get(`promo:${code}`, "json")).usedCount;
+const tee = (extra = {}, slug = "tee-1200", qty = 1) => ({ ...ORDER, items: [{ slug, qty }], ...extra });
+
+/* A pushed promo order aged past the callback grace, so the status query will
+   ask Daraja. */
+const pushPromoThenAge = async (body) => {
+  const res = await push(body);
+  const out = await res.json();
+  const stored = await record();
+  stored.pushedAt = Date.now() - 120_000;
+  stored.createdAt = stored.pushedAt;
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  return out;
+};
+
+await check("1. no code: items 1,200 + Nairobi CBD delivery 0 = 1,200 to Daraja as before, and the record keeps one shape", async () => {
+  const res = await push(tee({ county: "nairobi-cbd" }));
+  eq(pushes[0].Amount, 1200, "amount to Daraja, nothing taken off");
+  eq((await res.json()).total, 1200, "total returned");
+  const stored = await record();
+  eq(
+    [stored.promoCode, stored.promoPercent, stored.discountKsh, stored.itemsSubtotal],
+    [null, null, 0, 1200],
+    "promoCode, promoPercent, discountKsh, itemsSubtotal"
+  );
+  /* The same order with the field present but empty. */
+  resetAll();
+  await push(tee({ promo: "" }));
+  eq(pushes[0].Amount, 1200, "an empty code is no code");
+  await push(tee({ promo: "   " }));
+  eq(pushes[1].Amount, 1200, "a blank code is no code");
+  await push(tee({ promo: null }));
+  eq(pushes[2].Amount, 1200, "a null code is no code");
+});
+
+await check("2. valid 10% on KSh 1,200: discount 120, items 1,080", async () => {
+  await seedPromo("ALEX10");
+  const res = await push(tee({ promo: "ALEX10" }));
+  eq(res.status, 200, "status");
+  eq(pushes[0].Amount, 1080, "amount to Daraja");
+  eq((await res.json()).total, 1080, "total returned");
+  const stored = await record();
+  eq(
+    [stored.promoCode, stored.promoPercent, stored.discountKsh, stored.itemsSubtotal, stored.subtotal, stored.amount],
+    ["ALEX10", 10, 120, 1200, 1200, 1080],
+    "recorded"
+  );
+});
+
+await check("3. rounding: KSh 1,399 at 10% is 139.9, so discount 139 (floor), items 1,260", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }, "tee-1399"));
+  eq(pushes[0].Amount, 1260, "amount to Daraja");
+  eq((await record()).discountKsh, 139, "discount");
+});
+
+await check("4. delivery is not discounted: items 1,200 + Kirinyaga 250, 10% off the items = 1,080 + 250 = 1,330", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10", county: "kirinyaga" }));
+  eq(pushes[0].Amount, 1330, "amount to Daraja");
+  const stored = await record();
+  eq([stored.delivery.fee, stored.discountKsh, stored.amount], [250, 120, 1330], "fee, discount, amount");
+});
+
+await check("5. a client-sent amount, discount or percent beside a valid code is ignored: still 1,080", async () => {
+  await seedPromo("ALEX10");
+  const res = await push(tee({ promo: "ALEX10", amount: 1, discount: 999, percent: 99, discountKsh: 999, total: 1 }));
+  eq(res.status, 200, "status");
+  eq(pushes[0].Amount, 1080, "amount to Daraja");
+  const stored = await record();
+  eq([stored.promoPercent, stored.discountKsh], [10, 120], "recorded percent and discount");
+});
+
+await check('6. " alex10 " resolves to ALEX10: trimmed and upper-cased, recorded as ALEX10', async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: " alex10 " }));
+  eq(pushes[0].Amount, 1080, "amount to Daraja");
+  eq((await record()).promoCode, "ALEX10", "recorded code");
+});
+
+await check('7. "AL EX!", 40 characters, a number and an object are rejected with the one body; none is "no code"', async () => {
+  await seedPromo("ALEX10");
+  const reference = await (await push(tee({ promo: "NOSUCH" }))).text();
+  for (const bad of ["AL EX!", "A".repeat(40), "AB", "ALEX10;", 12345, { code: "ALEX10" }, ["ALEX10"], "ß".repeat(3)]) {
+    const res = await push(tee({ promo: bad }));
+    eq(res.status, 400, `status for ${JSON.stringify(bad)}`);
+    eq(await res.text(), reference, `body for ${JSON.stringify(bad)}`);
+  }
+  eq(pushes.length, 0, "nothing was pushed");
+});
+
+await check("8. unknown, expired, not-yet-started, inactive, over-cap and used-by-this-phone: one 400 body, no STK request, nothing recorded", async () => {
+  const { phoneKey } = await loadPromo();
+  await seedPromo("EXPIRED", { endsAt: PAST });
+  await seedPromo("SOON", { startsAt: FAR });
+  await seedPromo("OFF", { active: false });
+  await seedPromo("FULL", { maxUses: 5, usedCount: 5 });
+  await seedPromo("ONCE", { oncePerPhone: true });
+  await kv.put(`promo-phone:ONCE:${await phoneKey("254712345678")}`, "MA-OLD");
+
+  const unknown = await push(tee({ promo: "NOSUCH" }));
+  eq(unknown.status, 400, "unknown status");
+  const body = await unknown.text();
+  const message = JSON.parse(body).message;
+  has(message, globalThis.__site.contact.phone, "the message carries the phone number");
+  has(message, "Nothing has been charged", "says what happened to the money");
+
+  for (const code of ["EXPIRED", "SOON", "OFF", "FULL", "ONCE"]) {
+    const res = await push(tee({ promo: code }));
+    eq(res.status, 400, `${code} status`);
+    eq(await res.text(), body, `${code} body is the unknown-code body`);
+  }
+  eq(pushes.length, 0, "no STK request was sent");
+  const orders = [...kv.store.keys()].filter((k) => k.startsWith("ref:") || k.startsWith("ws_"));
+  eq(orders, [], "no order was recorded");
+});
+
+await check("9. a record with percent 0, 16, 150, 5.5 or '10', a bad date, a bad cap or active as a string behaves as unknown", async () => {
+  const reference = await (await push(tee({ promo: "NOSUCH" }))).text();
+  const broken = [
+    { percent: 0 },
+    { percent: 16 },
+    { percent: 150 },
+    { percent: 5.5 },
+    { percent: "10" },
+    { percent: -10 },
+    { endsAt: "2099-12-31T23:59:59" },
+    { endsAt: "2099-12-31" },
+    { endsAt: "tomorrow" },
+    { endsAt: undefined },
+    { startsAt: "2020-01-01T00:00:00" },
+    { maxUses: 0 },
+    { maxUses: 1.5 },
+    { usedCount: -1 },
+    { usedCount: "0" },
+    { active: "true" },
+    { oncePerPhone: "true" },
+  ];
+  for (const [i, over] of broken.entries()) {
+    await seedPromo("BROKEN", over);
+    const res = await push(tee({ promo: "BROKEN" }));
+    eq(res.status, 400, `status for ${JSON.stringify(over)} (#${i})`);
+    eq(await res.text(), reference, `body for ${JSON.stringify(over)} (#${i})`);
+  }
+  eq(pushes.length, 0, "nothing was pushed");
+  /* And 15 is the edge that IS allowed. */
+  await seedPromo("EDGE15", { percent: 15 });
+  await push(tee({ promo: "EDGE15" }));
+  eq(pushes[0].Amount, 1020, "15% of 1,200 is 180, items 1,020");
+});
+
+await check("10. the discount is clamped so a KSh 1 items total cannot reach zero", async () => {
+  const { discountFor } = await loadPromo();
+  eq(discountFor(1, 100), 0, "1 at 100%");
+  eq(discountFor(2, 100), 1, "2 at 100%");
+  eq(discountFor(1, 15), 0, "1 at 15%");
+  eq(discountFor(0, 10), 0, "nothing to discount");
+  eq(discountFor(1200, 10), 120, "1,200 at 10%");
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }, "one-bob"));
+  eq(pushes[0].Amount, 1, "the amount sent to Daraja");
+  eq((await record()).discountKsh, 0, "discount");
+});
+
+await check("11. a KSh 10 item with a 10% code: discount 1, items 9", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }, "ten-bob"));
+  eq(pushes[0].Amount, 9, "the live-test amount");
+  eq((await record()).discountKsh, 1, "discount");
+});
+
+await check("12. an STK push that is never completed does not count: usedCount stays 0, promoCounted is absent", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }));
+  eq((await record()).promoCode, "ALEX10", "the code is on the order");
+  eq(await promoUses("ALEX10"), 0, "usedCount after the push");
+  eq((await record()).promoCounted, undefined, "promoCounted");
+  /* A cancelled prompt, and a forged success for the undiscounted figure. */
+  await hit(callbackBody({ code: 1032 }));
+  eq(await promoUses("ALEX10"), 0, "usedCount after a cancelled prompt");
+  resetAll();
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }));
+  await hit(callbackBody({ amount: 1200 }));
+  eq((await record()).status, "mismatch", "a callback for the undiscounted amount is a mismatch");
+  eq(await promoUses("ALEX10"), 0, "usedCount after a mismatch");
+});
+
+await check("13a. a paid callback counts once: usedCount 1, and the same callback replayed leaves it at 1", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }));
+  await hit(callbackBody({ amount: 1080 }));
+  eq((await record()).status, "paid", "status");
+  eq(await promoUses("ALEX10"), 1, "usedCount after the callback");
+  eq((await record()).promoCounted, true, "promoCounted");
+  await hit(callbackBody({ amount: 1080 }));
+  await hit(callbackBody({ amount: 1080 }));
+  eq(await promoUses("ALEX10"), 1, "usedCount after two replays");
+});
+
+await check("13b. a callback and then a status query for one order count once", async () => {
+  await seedPromo("ALEX10");
+  const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
+  await hit(callbackBody({ amount: 1080 }));
+  await askStatus(body);
+  eq(await promoUses("ALEX10"), 1, "usedCount");
+});
+
+await check("13c. a status query and then a callback for one order count once", async () => {
+  await seedPromo("ALEX10");
+  const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
+  await askStatus(body);
+  eq((await record()).status, "paid", "settled by the query");
+  eq(await promoUses("ALEX10"), 1, "usedCount after the query");
+  await hit(callbackBody({ amount: 1080 }));
+  eq(await promoUses("ALEX10"), 1, "usedCount after the callback");
+});
+
+await check("13d. a count that fails is finished by the callback retry, once", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }));
+  kv.failWritesTo = (key) => key === "promo:ALEX10";
+  const first = await hit(callbackBody({ amount: 1080 }));
+  eq(first.status, 500, "the callback is not acknowledged, so Safaricom retries");
+  eq((await record()).status, "paid", "the money fact was written first");
+  kv.failWritesTo = null;
+  eq((await hit(callbackBody({ amount: 1080 }))).status, 200, "the retry");
+  eq(await promoUses("ALEX10"), 1, "usedCount after the retry");
+  await hit(callbackBody({ amount: 1080 }));
+  eq(await promoUses("ALEX10"), 1, "usedCount after a further replay");
+});
+
+await check("13f. a query that settles paid but fails to count is finished by the NEXT poll, with no callback ever arriving", async () => {
+  await seedPromo("TEAM15-TEST", { oncePerPhone: true, percent: 15 });
+  const body = await pushPromoThenAge(tee({ promo: "TEAM15-TEST" }));
+  kv.failWritesTo = (key) => key === "promo:TEAM15-TEST";
+  const first = await (await askStatus(body)).json();
+  eq(first.status, "pending", "the poll that hit the failure answers pending");
+  eq((await record()).status, "paid", "though the order is paid");
+  eq(await promoUses("TEAM15-TEST"), 0, "and not counted");
+  kv.failWritesTo = null;
+  const second = await (await askStatus(body)).json();
+  eq(second.status, "paid", "the next poll");
+  eq(await promoUses("TEAM15-TEST"), 1, "usedCount after the next poll");
+  const phoneKeys = [...kv.store.keys()].filter((k) => k.startsWith("promo-phone:TEAM15-TEST:"));
+  eq(phoneKeys.length, 1, "the phone is recorded, so the code cannot be used from it again");
+  await askStatus(body);
+  eq(await promoUses("TEAM15-TEST"), 1, "usedCount after a third poll");
+});
+
+await check("13e. an order paid after the cap was reached is still honoured and counted: usedCount passes maxUses", async () => {
+  await seedPromo("LAST1", { maxUses: 1 });
+  await push(tee({ promo: "LAST1" }));
+  const stored = await record();
+  await kv.put("promo:LAST1", JSON.stringify(promoRecord({ maxUses: 1, usedCount: 1 })));
+  await hit(callbackBody({ amount: 1080 }));
+  eq((await record()).status, "paid", "still paid");
+  eq(await promoUses("LAST1"), 2, "overshoots by the order in flight");
+  eq(stored.promoCode, "LAST1", "it was a valid code when the push was requested");
+});
+
+await check("14. oncePerPhone: a second order from the same phone is refused, a different phone is accepted", async () => {
+  await seedPromo("TEAM15-TEST", { oncePerPhone: true, percent: 15, maxUses: 20 });
+  const first = await push(tee({ promo: "TEAM15-TEST" }));
+  eq(first.status, 200, "first order");
+  eq(pushes[0].Amount, 1020, "15% off 1,200");
+  await hit(callbackBody({ amount: 1020 }));
+  eq(await promoUses("TEAM15-TEST"), 1, "counted at payment");
+
+  const same = await push(tee({ promo: "TEAM15-TEST", phone: "0712 345 678" }));
+  eq(same.status, 400, "the same phone, typed differently");
+  eq(pushes.length, 1, "no second STK request");
+
+  const other = await push(tee({ promo: "TEAM15-TEST", phone: "0722345678" }));
+  eq(other.status, 200, "a different phone");
+  eq(pushes.length, 2, "its STK request was sent");
+});
+
+await check("14b. oncePerPhone is not spent by a push that was never paid", async () => {
+  await seedPromo("TEAM15-TEST", { oncePerPhone: true, percent: 15 });
+  eq((await push(tee({ promo: "TEAM15-TEST" }))).status, 200, "first push");
+  eq((await push(tee({ promo: "TEAM15-TEST" }))).status, 200, "the same phone again, unpaid");
+  eq(pushes.map((p) => p.Amount), [1020, 1020], "both at the discounted figure: 15% off 1,200");
+});
+
+await check("15. the status endpoint returns the RECORDED percent and discount after the record is edited to 15% and after it is deleted", async () => {
+  await seedPromo("ALEX10");
+  const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
+  const ask = async () => (await (await askStatus(body)).json()).breakdown;
+  const recorded = { promoCode: "ALEX10", promoPercent: 10, discountKsh: 120, itemsSubtotal: 1200 };
+  const pick = (b) => ({ promoCode: b.promoCode, promoPercent: b.promoPercent, discountKsh: b.discountKsh, itemsSubtotal: b.itemsSubtotal });
+
+  eq(pick(await ask()), recorded, "as placed");
+  await seedPromo("ALEX10", { percent: 15 });
+  eq(pick(await ask()), recorded, "after the record was edited to 15%");
+  kv.store.delete("promo:ALEX10");
+  eq(pick(await ask()), recorded, "after the record was deleted");
+
+  /* Wrong reference: no promo fields, and nothing else either. */
+  const wrong = await askStatus({ checkoutRequestId: body.checkoutRequestId, reference: "MA-WRON-GREF" });
+  lacks(await wrong.text(), "ALEX10", "the code, to a caller without the reference");
+});
+
+await check("15b. (a guard: passes before the change too) an order with no code answers with exactly the breakdown keys it always had", async () => {
+  const body = await pushPromoThenAge(tee());
+  const { breakdown } = await (await askStatus(body)).json();
+  eq(Object.keys(breakdown).sort(), ["fee", "subtotal", "total"], "keys");
+});
+
+await check("16. no raw phone number appears in any KV key written during a full promo order", async () => {
+  await seedPromo("TEAM15-TEST", { oncePerPhone: true, percent: 15 });
+  const written = [];
+  const put = kv.put.bind(kv);
+  kv.put = async (key, value, opts) => {
+    written.push(key);
+    return put(key, value, opts);
+  };
+  const body = await pushPromoThenAge(tee({ promo: "TEAM15-TEST" }));
+  await askStatus(body);
+  await hit(callbackBody({ amount: 1020 }));
+  const keys = [...written, ...kv.store.keys()];
+  for (const key of keys) {
+    for (const raw of ["0712345678", "712345678", "254712345678"]) lacks(key, raw, `KV key ${key}`);
+  }
+  const phoneKeys = keys.filter((k) => k.startsWith("promo-phone:"));
+  if (phoneKeys.length === 0) throw new Error("no promo-phone key was written, so this case proved nothing");
+  if (!/^promo-phone:TEAM15-TEST:[0-9a-f]{64}$/.test(phoneKeys[0])) throw new Error(`unexpected key shape: ${phoneKeys[0]}`);
+});
+
+await check("a promo that cannot be read (KV down) is unavailable, not 'invalid', and nothing is pushed", async () => {
+  kv.failReads = true;
+  const res = await push(tee({ promo: "ALEX10" }));
+  eq(res.status, 503, "status");
+  has((await res.json()).message, "not responding right now", "says it is us");
+  eq(pushes.length, 0, "nothing was pushed");
+});
+
+await check("counting rewrites the promo record with no expirationTtl, and the code is never logged beside a phone number", async () => {
+  await seedPromo("ALEX10");
+  const promoPuts = [];
+  const put = kv.put.bind(kv);
+  kv.put = async (key, value, opts) => {
+    if (key === "promo:ALEX10") promoPuts.push(opts);
+    return put(key, value, opts);
+  };
+  const lines = [];
+  const log = console.log;
+  console.log = (...a) => lines.push(a.join(" "));
+  try {
+    const body = await pushPromoThenAge(tee({ promo: "ALEX10", phone: "0712345678" }));
+    await askStatus(body);
+    await hit(callbackBody({ amount: 1080 }));
+    kv.failReads = true;
+    await push(tee({ promo: "ALEX10" }));
+  } finally {
+    console.log = log;
+  }
+  eq(promoPuts, [undefined], "one rewrite of the record, with no options (putPending would give it seven days)");
+  for (const line of lines) {
+    if (line.includes("ALEX10") && (line.includes("254712345678") || line.includes("0712345678") || line.includes("Amina"))) {
+      throw new Error(`a log line carries the code and a buyer: ${line}`);
+    }
+  }
+});
+
 /* ================= no secret in the source ================= */
 
 await check("no key, passkey or shortcode is written into the source", async () => {
-  for (const file of ["_daraja.js", "_order.js", "_site.js", "_amounts.js", "_pending.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
+  for (const file of ["_daraja.js", "_order.js", "_site.js", "_amounts.js", "_pending.js", "_promo.js", "mpesa/stk.js", "mpesa/status.js", "mpesa/callback/[token].js"]) {
     const src = readFileSync(join(API, file), "utf8");
     for (const pattern of [/passkey\s*=\s*["'][A-Za-z0-9]{8,}/i, /["'][A-Za-z0-9]{40,}["']/]) {
       const hitMatch = src.match(pattern);

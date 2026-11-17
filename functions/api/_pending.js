@@ -31,6 +31,8 @@
  * and does the amount match" is how one of them grows a check the other lacks.
  */
 
+import { phoneKey, promoKey, promoPhoneKey } from "./_promo.js";
+
 /** How long a pending order stays readable. */
 const TTL_SECONDS = 60 * 60 * 24 * 7;
 
@@ -73,9 +75,12 @@ export const refKey = (reference) => `ref:${reference}`;
  * round, a failed reference write would be permanent: the retry would find a
  * terminal status, return `already`, and never come back to it.
  *
- * Which is why `already` above repairs nothing: it cannot be reached with a
- * stale copy, so code to repair one there would be dead weight implying a state
- * that cannot happen. That is a real guarantee resting on two lines of ordering,
+ * Which is why `already` below never repairs a stale reference copy: it cannot
+ * be reached with one, so code to repair one there would be dead weight implying
+ * a state that cannot happen. (It does finish an uncounted promo, through
+ * countPromo() — that repairs a different thing, the code's use count, and it
+ * writes through this same function so the ordering below still holds.)
+ * That is a real guarantee resting on two lines of ordering,
  * so it is asserted rather than described — mpesa-test.mjs drives both settling
  * roads with the reference write failing and the rest of KV healthy, and fails
  * if the canonical record is ever terminal over a pending copy.
@@ -85,6 +90,58 @@ async function persist(env, checkoutRequestId, record) {
     await putPending(env, refKey(record.reference), record);
   }
   await putPending(env, checkoutRequestId, record);
+}
+
+/**
+ * Counts a PAID order against its promo code, once.
+ *
+ * A code is used when the order is paid and not before: an STK prompt that is
+ * never completed costs the code nothing. Called from the two places a paid
+ * order passes through in settle(), and a no-op for an order with no code or one
+ * already counted, so non-promo orders see no extra read or write.
+ *
+ * WHAT ONCE MEANS HERE. `promoCounted` on the order is the guard, and it is
+ * written LAST. The two effects before it are ordered so that a retry after a
+ * failure is safe where it can be: the promo-phone key is idempotent, so it goes
+ * first; the usedCount increment is not, so it goes last. A KV failure anywhere
+ * throws, the callback answers 500, Safaricom retries, and settle() reaches this
+ * again through its `already` branch. The one window that cannot be closed is a
+ * failure of the final write AFTER the increment, where the retry increments a
+ * second time. KV has no atomic increment and no transaction, so the count can
+ * be off by one for the orders that hit it; it is recorded rather than hidden.
+ *
+ * THE CAP IS NOT CHECKED HERE. Expiry and cap were judged when the push was
+ * requested. An order paid after the cap was reached is still honoured and still
+ * counted, so usedCount can pass maxUses by the orders in flight.
+ *
+ * promo records are written with NO expirationTtl — putPending() would give them
+ * seven days, and a code must outlive an order.
+ *
+ * Nothing logged here carries the code or a number; the order reference is the
+ * only handle.
+ */
+async function countPromo(env, checkoutRequestId, record) {
+  if (typeof record.promoCode !== "string" || !record.promoCode || record.promoCounted === true) {
+    return record;
+  }
+
+  const kv = binding(env);
+  const key = promoKey(record.promoCode);
+  const promo = await kv.get(key, "json");
+
+  /* A record deleted since the push has nothing to count against. The order is
+     still paid and still honoured; it is marked counted so a replay does not
+     keep looking. */
+  if (promo && Number.isInteger(promo.usedCount) && promo.usedCount >= 0) {
+    if (promo.oncePerPhone === true) {
+      await kv.put(promoPhoneKey(record.promoCode, await phoneKey(record.msisdn)), record.reference ?? "1");
+    }
+    await kv.put(key, JSON.stringify({ ...promo, usedCount: promo.usedCount + 1 }));
+  }
+
+  const counted = { ...record, promoCounted: true };
+  await persist(env, checkoutRequestId, counted);
+  return counted;
 }
 
 /**
@@ -123,8 +180,17 @@ export async function settle(env, checkoutRequestId, result) {
   if (!record) return { outcome: "unknown" };
 
   /* Already terminal. A retry, and the correct response to a retry is to
-     acknowledge it and change nothing. */
-  if (record.status !== "pending") return { outcome: "already", record };
+     acknowledge it and change nothing — with ONE exception, below: a paid promo
+     order whose count never landed. */
+  if (record.status !== "pending") {
+    /* A paid order whose count did not land (KV failed after the paid write) is
+       finished here, on the retry. Every other terminal order, and every paid
+       one already counted, comes back untouched. */
+    if (record.status === "paid") {
+      return { outcome: "already", record: await countPromo(env, checkoutRequestId, record) };
+    }
+    return { outcome: "already", record };
+  }
 
   if (result.state === "paid") {
     /* The one comparison the whole unauthenticated endpoint rests on. */
@@ -148,7 +214,10 @@ export async function settle(env, checkoutRequestId, result) {
       via: result.via,
     };
     await persist(env, checkoutRequestId, paid);
-    return { outcome: "settled", record: paid };
+    /* The money fact is written first and counted second, never the other way:
+       a count that landed before a failed paid-write would use up a code for an
+       order that then retries as pending. */
+    return { outcome: "settled", record: await countPromo(env, checkoutRequestId, paid) };
   }
 
   const failed = {

@@ -257,6 +257,22 @@ await check("a found order shows county, area, subtotal, delivery and total", as
   );
 });
 
+await check("a promo order shows the code, percent, discount and items as recorded", async () => {
+  await store({ ...DELIVERED, subtotal: 1200, amount: 1080 + 250, promoCode: "ALEX10", promoPercent: 10, discountKsh: 120, itemsSubtotal: 1200 });
+  const { breakdown } = await (await ask(GOOD)).json();
+  eq(
+    [breakdown.promoCode, breakdown.promoPercent, breakdown.discountKsh, breakdown.itemsSubtotal],
+    ["ALEX10", 10, 120, 1200],
+    "recorded promo"
+  );
+});
+
+await check("(a guard: passes before the change too) an order without a code shows no promo keys", async () => {
+  await store(DELIVERED);
+  const plain = (await (await ask(GOOD)).json()).breakdown;
+  eq(Object.keys(plain).sort(), ["area", "county", "fee", "subtotal", "total"], "no promo keys on an order without a code");
+});
+
 await check("THE LANDMARK IS NEVER RETURNED", async () => {
   await store(DELIVERED);
   const text = await (await ask(GOOD)).text();

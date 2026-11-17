@@ -20,6 +20,7 @@
 import { DarajaError, stkPush } from "../_daraja.js";
 import { MESSAGES, readOrder, reference } from "../_order.js";
 import { putPending, refKey } from "../_pending.js";
+import { discountFor, phoneKey, resolvePromo } from "../_promo.js";
 import { REACH, Reach } from "../_site.js";
 
 /* What happened to the money, as opposed to what was wrong with the request.
@@ -35,6 +36,15 @@ const OUTCOME = {
     `The M-Pesa prompt could not be sent to that number. Nothing has been charged. ` +
     `Check the number and try again, or ${REACH}.`,
 };
+
+/* ONE BODY FOR EVERY REFUSED CODE. A code that does not exist, one that has
+ * ended, one not yet started, one switched off, one used up and one this phone
+ * has used all read the same, so a code cannot be probed for. It does not fall
+ * back to full price: the buyer expected a discount and must not be charged
+ * without one, so nothing is pushed and nothing is recorded. */
+const PROMO_REFUSED =
+  `That promo code is not valid or has ended. Nothing has been charged. ` +
+  `Remove the code to order at the listed price, or ${REACH}.`;
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), {
@@ -75,6 +85,38 @@ export async function onRequest({ request, env }) {
   const order = readOrder(payload);
   if (!order.ok) return fail(order.status, order.message, order.field);
 
+  /* ---------- the promo code, if there is one ----------
+   *
+   * Judged ONCE, here, at the moment the push is requested; settle() never
+   * re-checks it. A buyer quoted a discount at 23:58 who pays at 00:01 is
+   * honoured.
+   *
+   * Absent, null and a blank string mean no code. Anything else is a code, and a
+   * value that is not a usable string (a number, an object) is an invalid one,
+   * never "no code" — otherwise a malformed field would silently charge full
+   * price to a buyer who thought they had a discount.
+   *
+   * Only `promo` is read from the request. A `discount`, `percent` or `amount`
+   * beside it is not destructured and not looked at. */
+  const typed = payload.promo;
+  let promo = null;
+  if (typed !== undefined && typed !== null && !(typeof typed === "string" && typed.trim() === "")) {
+    try {
+      promo = await resolvePromo(env.ORDERS, typed, Date.now(), await phoneKey(order.msisdn));
+    } catch (error) {
+      /* KV could not be read. That is not "the code is invalid" and must not be
+         worded as if it were. The code and the number are not logged. */
+      console.log(JSON.stringify({ at: "stk", code: "promo_read_failed", detail: String(error) }));
+      return json(503, { message: OUTCOME.unavailable });
+    }
+    if (!promo.ok) return fail(400, PROMO_REFUSED, "promo");
+  }
+
+  /* The figures. Delivery is added AFTER the discount and is never discounted.
+     Whole KSh throughout; stkPush() refuses anything that is not an integer. */
+  const discount = promo ? discountFor(order.subtotal, promo.percent) : 0;
+  const total = order.subtotal - discount + order.delivery.fee;
+
   const ref = reference();
 
   /* ---------- the record goes down before the push goes out ----------
@@ -110,15 +152,24 @@ export async function onRequest({ request, env }) {
        the breakdown the buyer saw at checkout rather than recomputing it from a
        fee table that may have changed since. */
     subtotal: order.subtotal,
+    /* The promo, as THIS handler resolved it and never as the request claimed
+       it. The same four fields on every order, null and 0 when there was no code,
+       so an old order and a new one have one shape. `itemsSubtotal` repeats
+       `subtotal` on purpose: it is the figure the percentage was taken from, named
+       for that. promoCounted is absent until settle() counts a paid order. */
+    promoCode: promo ? promo.code : null,
+    promoPercent: promo ? promo.percent : null,
+    discountKsh: discount,
+    itemsSubtotal: order.subtotal,
     /* Where it is going. `label` is the county as it read when the order was
        placed; `county` is the key it was priced by. The landmark is for the
        rider and is never returned to the browser. */
     delivery: order.delivery,
-    /* WHAT WE COMPUTED: subtotal + delivery fee, whole KSh. This is the total,
-       the figure the push asks for, and the one the callback's amount is
-       checked against. Named `amount` rather than `total` because settle() and
-       every record already in KV carry it under that name. */
-    amount: order.total,
+    /* WHAT WE COMPUTED: subtotal - discount + delivery fee, whole KSh. This is
+       the total, the figure the push asks for, and the one the callback's amount
+       is checked against. Named `amount` rather than `total` because settle()
+       and every record already in KV carry it under that name. */
+    amount: total,
     msisdn: order.msisdn,
     name: order.name,
     email: order.email,
@@ -141,7 +192,7 @@ export async function onRequest({ request, env }) {
   try {
     pushed = await stkPush({
       env,
-      amount: order.total,
+      amount: total,
       msisdn: order.msisdn,
       reference: ref,
       description: `MomentAura ${ref}`,
@@ -207,6 +258,6 @@ export async function onRequest({ request, env }) {
   return json(200, {
     reference: ref,
     checkoutRequestId: pushed.checkoutRequestId,
-    total: order.total,
+    total,
   });
 }
