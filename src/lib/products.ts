@@ -52,6 +52,7 @@ export interface Product {
   name: string;
   category: string;
   price: number;
+  material: string | null;
   fabricWeight: string | null;
   fit: string | null;
   printMethod: string | null;
@@ -129,6 +130,12 @@ for (const product of products) {
       );
     }
   });
+
+  /* Material is explicit like fabricWeight: null, or a non-empty string. An absent
+     key is an error, so a product added by hand cannot silently skip the row. */
+  if (!("material" in product) || !(product.material === null || (typeof product.material === "string" && product.material.trim() !== ""))) {
+    throw new Error(`products.json: "${product.slug}" needs "material": null or a non-empty string.`);
+  }
 
   /* Sizes. The label is posted by the checkout form and matched exactly by the
      server, so it is held to a short, printable string; a duplicate would make

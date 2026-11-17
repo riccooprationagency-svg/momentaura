@@ -32,6 +32,7 @@ const { product, detail = false } = Astro.props;
 
 // Fixed order regardless of which fields survive. The reader learns the shape.
 const FIELDS = [
+  { label: "Material", value: product.material },
   { label: "Fabric weight", value: product.fabricWeight },
   { label: "Fit", value: product.fit },
   { label: "Print method", value: product.printMethod },
