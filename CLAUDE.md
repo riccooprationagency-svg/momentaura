@@ -325,7 +325,36 @@ Everything respects `prefers-reduced-motion`.
 ## Imagery
 
 Real photographs only. **No AI-generated product imagery. No AI-generated people. No
-supplier photos in production. No stock lifestyle. No blank mockups presented as products.**
+supplier photos in production. No stock lifestyle. No blank mockups presented as products.** (Exception: see Rendered imagery below.)
+
+### Rendered imagery — one named, temporary exception
+
+Until a real photograph exists for a product, that product may use a render supplied by
+the owner, under every condition below. A condition that fails means the render is not
+used. The placeholder rule above still applies to any product without one.
+
+- **Disclosed, always.** A product that uses a render carries `photoKind: "render"` in
+  `products.json`, and `Gallery.astro` prints the line "Studio render. Not a photograph
+  of the garment." beneath the image on every surface that shows it, including the
+  homepage reveal and the hero. Archivo at `--t-caption` in `--fg-muted`. Never mono,
+  never hidden, never shortened. A render without the line is a banned dishonest
+  photograph under the rule above.
+- **The garment shown is the garment shipped.** Colour, print, placement and cut match
+  what the buyer receives. A render of a design that is not being sold, or sold in a
+  different colour, is not used. The owner confirms this per image before it is added.
+- **No invented people as evidence.** A person in a render is never described as a
+  customer, never named, never quoted, never used as a testimonial or "worn by" claim.
+- **One look.** Only renders on the same studio-style backdrop are used together. A
+  render in a different setting is left out.
+- **It expires per product.** The day a real photograph of that product goes through
+  `scripts/images.mjs`, its render is removed and `photoKind` becomes `"photograph"`.
+  This exception never covers a new product and is never extended by default.
+- **The build knows.** `src/lib/products.ts` throws on a product that has photos and no
+  valid `photoKind`.
+
+Everything else in this section stands, including: the pipeline through
+`scripts/images.mjs`, the 200KB file limit, explicit width and height, and the rule
+that nothing is hand-edited into the `photos` array.
 
 One surface, one light, one angle, one 3:4 crop, across every product. AVIF with a WebP
 fallback, three widths, lazy below the fold, **explicit width and height on every image**.
