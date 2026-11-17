@@ -18,7 +18,7 @@
  */
 
 import { DarajaError, stkPush } from "../_daraja.js";
-import { MESSAGES, readOrder, reference } from "../_order.js";
+import { MESSAGES, checkStock, readOrder, reference } from "../_order.js";
 import { putPending, refKey } from "../_pending.js";
 import { discountFor, phoneKey, resolvePromo } from "../_promo.js";
 import { REACH, Reach } from "../_site.js";
@@ -84,6 +84,19 @@ export async function onRequest({ request, env }) {
 
   const order = readOrder(payload);
   if (!order.ok) return fail(order.status, order.message, order.field);
+
+  /* Is there enough left to sell? Stock is the catalogue's figure less the paid
+     sales recorded since it was counted, so this reads KV. A count that cannot be
+     taken is not "in stock": it is the same 503 as any other unreadable KV, and
+     nothing is pushed. */
+  let refusal;
+  try {
+    refusal = await checkStock(env.ORDERS, order.lines);
+  } catch (error) {
+    console.log(JSON.stringify({ at: "stk", code: "stock_read_failed", detail: String(error) }));
+    return json(503, { message: OUTCOME.unavailable });
+  }
+  if (refusal) return fail(refusal.status, refusal.message, refusal.field);
 
   /* ---------- the promo code, if there is one ----------
    *

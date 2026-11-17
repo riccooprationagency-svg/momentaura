@@ -12,6 +12,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
+
+    "stockCountedAt": null,
     "photos": [],
     "sizes": []
   },
@@ -28,6 +30,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
+
+    "stockCountedAt": null,
     "photos": [],
     "sizes": []
   },
@@ -44,6 +48,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
+
+    "stockCountedAt": null,
     "photos": [],
     "sizes": []
   },
@@ -60,6 +66,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 0,
+
+    "stockCountedAt": null,
     "photos": [],
     "sizes": []
   },
@@ -76,6 +84,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 5,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": []
   },
@@ -92,6 +102,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -113,6 +125,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -134,6 +148,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -155,6 +171,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -176,6 +194,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -197,6 +217,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -218,6 +240,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -239,6 +263,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -260,6 +286,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -281,6 +309,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
@@ -302,6 +332,8 @@
     "leadTimeDays": null,
     "dispatch": "Nairobi",
     "stock": 20,
+
+    "stockCountedAt": "2026-11-17T19:42:00+03:00",
     "photos": [],
     "sizes": [
       { "label": "S", "chestCm": null, "lengthCm": null },
