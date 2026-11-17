@@ -108,22 +108,8 @@ export async function onRequest({ request, env }) {
   const answer = (status) =>
     json(200, { status, reference: record.reference, breakdown: amounts(record) });
 
-  /* Already terminal. No query. No write either, with one exception: a PAID
-     order that used a promo code and was never counted. That is the state left
-     when the query below settled it and the count then failed — the poll
-     answered pending, and this is the next one. If the callback never arrives,
-     which is the case this endpoint exists for, nothing else would ever count
-     it, and a oncePerPhone code would never record that phone. settle() takes
-     it through its `already` branch to the same countPromo() the callback uses.
-     A failure here changes nothing the buyer is told: the order is paid. */
+  /* Already terminal. No query, no write. */
   if (record.status !== "pending") {
-    if (record.status === "paid" && record.promoCode && record.promoCounted !== true) {
-      try {
-        await settle(env, checkoutRequestId, { state: "paid", amount: record.amount, via: "query" });
-      } catch (error) {
-        console.log(JSON.stringify({ at: "status", checkoutRequestId, code: "promo_count_failed", detail: String(error) }));
-      }
-    }
     return answer(record.status);
   }
 

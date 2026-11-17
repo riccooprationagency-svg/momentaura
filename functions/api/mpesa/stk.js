@@ -156,9 +156,11 @@ export async function onRequest({ request, env }) {
        it. The same four fields on every order, null and 0 when there was no code,
        so an old order and a new one have one shape. `itemsSubtotal` repeats
        `subtotal` on purpose: it is the figure the percentage was taken from, named
-       for that. promoCounted is absent until settle() counts a paid order. */
+       for that. `promoOncePerPhone` is what settle() needs to know about the code
+       and is recorded here so it never has to read the promo record again. */
     promoCode: promo ? promo.code : null,
     promoPercent: promo ? promo.percent : null,
+    promoOncePerPhone: promo ? promo.record.oncePerPhone === true : null,
     discountKsh: discount,
     itemsSubtotal: order.subtotal,
     /* Where it is going. `label` is the county as it read when the order was
