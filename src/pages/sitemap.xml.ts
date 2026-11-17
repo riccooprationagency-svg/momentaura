@@ -35,7 +35,7 @@
  */
 
 import type { APIRoute } from "astro";
-import { categories, products } from "../lib/products";
+import { audiencesWithPages, categories, products } from "../lib/products";
 import { origin } from "../lib/site";
 
 /* Named, not globbed. A glob over src/pages would sweep in the transactional
@@ -56,6 +56,7 @@ export const GET: APIRoute = () => {
     : [
         ...STATIC,
         ...categories.map((category) => `/${category.slug}`),
+        ...audiencesWithPages().map((audience) => `/for/${audience}`),
         ...products.map((product) => `/products/${product.slug}`),
       ];
 
