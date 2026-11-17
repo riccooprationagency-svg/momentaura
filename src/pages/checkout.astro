@@ -34,6 +34,7 @@ import CountyOptions from "../components/CountyOptions.astro";
 import { products, price } from "../lib/products";
 import { GATEWAY_NAME } from "../../functions/api/_daraja.js";
 import { MAX_AREA, MAX_LANDMARK } from "../../functions/api/_order.js";
+import { REACH } from "../../functions/api/_site.js";
 import { dispatchRule, timingGroups, listJoin } from "../lib/site";
 
 /* The dispatch rule and arrival times, stated once under the county field.
@@ -152,6 +153,14 @@ const groups = timingGroups();
             />
             <Button variant="ghost" type="button" data-promo-apply>Apply</Button>
           </div>
+          <p
+            class="checkout__error"
+            data-promo-note
+            data-msg
+            data-dropped={`The connection dropped before the code could be checked. Check your connection and try again, or ${REACH}.`}
+            role="alert"
+            hidden
+          ></p>
 
           <!--
             STATE WHAT HAPPENS BEFORE IT HAPPENS. Prose, above the button. Not
@@ -167,7 +176,20 @@ const groups = timingGroups();
                order as a whole — a gateway that is down, or a line that sold
                out between the order page and here. Field-level messages go
                under their own field instead. -->
-          <p class="checkout__error" id="checkout-error" data-checkout-error role="alert" hidden></p>
+          <!-- The two sentences below are the cart's to reveal and never its to write:
+               the dropped connection (data-dropped) and a failure with no wording
+               of its own (data-fallback). Each carries the shop number from the
+               same REACH the server's messages use. -->
+          <p
+            class="checkout__error"
+            id="checkout-error"
+            data-checkout-error
+            data-msg
+            data-dropped={`The connection dropped before the payment prompt could be sent. Nothing has been charged. Check your connection and try again, or ${REACH}.`}
+            data-fallback={`That did not go through. Nothing has been charged. Try again, or ${REACH}.`}
+            role="alert"
+            hidden
+          ></p>
 
           <div class="checkout__actions">
             <!-- data-pay is the label the cart extends with the total once a

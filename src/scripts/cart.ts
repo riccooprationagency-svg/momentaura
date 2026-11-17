@@ -144,7 +144,9 @@ function fill(breakdown?: Record<string, string | number>): void {
      * markup says how each is dressed (data-pre="KSh ", data-post="%"), so no
      * formatting rule about a particular key lives in here. */
     slot.textContent = typeof value === "number" ? pre + value.toLocaleString("en-KE") + post : (value ?? "");
-    slot.parentElement!.hidden = !value;
+    /* Missing hides the row; zero does not. A recorded discount of 0 is a fact
+     * the order has, and an order that lacks the key is one that never had it. */
+    slot.parentElement!.hidden = value == null;
   }
 }
 
@@ -244,6 +246,13 @@ const county = q<HTMLSelectElement>("[name=county]");
  * Cleared on any edit to the field (below), and by a refusal from the push. */
 let promo: { code: string; percent: number; itemsSubtotal: number; discountKsh: number } | null = null;
 const promoRow = q("[data-promo]");
+
+/* Which answer may still be applied. Bumped when Apply starts, on every edit to
+ * the field, and when the push refuses the code; a response applies only if it
+ * still holds the value it was sent with. One number covers the answer that
+ * arrives after the field changed and the answer that arrives after the push
+ * has already said the code is no good. */
+let seq = 0;
 
 /* Read once, before anything can strip it. A blocked checkout drops its href
  * rather than leaning on aria-disabled to stop navigation — the rule
@@ -376,8 +385,12 @@ function paintOrder(): void {
  * which is the count quietly lying. */
 if (lines.length) {
   const known = new Set(lines.map((line) => line.dataset.slug));
-  for (const slug of Object.keys(order)) if (!known.has(slug)) delete order[slug];
-  write(order);
+  for (const slug of Object.keys(order)) {
+    if (!known.has(slug)) {
+      delete order[slug];
+      write(order);
+    }
+  }
 
   for (const line of lines) {
     const slug = line.dataset.slug ?? "";
@@ -500,15 +513,14 @@ const setFieldError = (field: string, message: string | null) => {
   }
 };
 
-/* Both forms clear the same way: every field message off, then the one above
- * the button. Every field on the page rather than a list per form — each page
- * carries one form, and a list is a second place to forget a new field. */
-const clearErrors = (slot: HTMLElement | null) => {
+/* Both forms clear the same way: every field message off, then every message
+ * the page marks data-msg (the line above the button and the dropped-connection
+ * notes). Every one on the page rather than a list per form — each page carries
+ * its own, and a list is a second place to forget a new one. Hidden only, never
+ * blanked: a slot's own wording lives in its markup. */
+const clearErrors = () => {
   for (const field of qa("[data-field-error]")) setFieldError(field.dataset.fieldError!, null);
-  if (slot) {
-    slot.textContent = "";
-    slot.hidden = true;
-  }
+  for (const note of qa("[data-msg]")) note.hidden = true;
 };
 
 /* The two forms on this site do the same five things around one fetch: refuse a
@@ -535,8 +547,7 @@ async function send(
   busy: string,
   url: string,
   payload: unknown,
-  slot: HTMLElement | null,
-  dropped: string
+  slot: HTMLElement | null
 ): Promise<Sent | null> {
   const label = button.textContent;
   attr(button, OFF, "true");
@@ -555,7 +566,10 @@ async function send(
      * failed" would be a claim about the buyer's money we are not in a position
      * to make. */
     restore();
-    say(slot, `${dropped} Check your connection and try again.`);
+    /* The sentence is the page's: data-dropped on the slot, written in the
+     * template with the shop number, the way every other message here carries
+     * one. This only reveals it. */
+    say(slot, slot?.dataset.dropped ?? "");
     return null;
   }
 }
@@ -565,7 +579,7 @@ if (form && submitButton) {
     event.preventDefault();
     if (isOff(submitButton)) return;
 
-    clearErrors(formError);
+    clearErrors();
 
     const items = basket();
     if (!items.length) return;
@@ -578,8 +592,7 @@ if (form && submitButton) {
        * — by name, plus the items. No price and no fee: the server reads neither
        * and the form has no field for either. */
       { items, ...Object.fromEntries(new FormData(form)) },
-      formError,
-      "The connection dropped before the payment prompt could be sent. Nothing has been charged."
+      formError
     );
     /* send() has already restored the label it captured; repaint so the
      * button states the total for the county chosen now. */
@@ -619,11 +632,14 @@ if (form && submitButton) {
       return;
     }
 
-    if (body.field === "promo") promo = null;
+    if (body.field === "promo") {
+      promo = null;
+      seq++;
+    }
     sent.restore();
     paintOrder();
 
-    const message = body.message ?? "That did not go through. Nothing has been charged.";
+    const message = body.message ?? formError!.dataset.fallback!;
     if (body.field && body.field !== "items") {
       setFieldError(body.field, message);
     } else say(formError, message);
@@ -641,34 +657,35 @@ if (form && submitButton) {
  * be asking for a payment they had not yet seen the total of. */
 const promoField = q<HTMLInputElement>("[name=promo]");
 const promoApply = q("[data-promo-apply]");
+const promoNote = q("[data-promo-note]");
 
 if (promoField && promoApply) {
   const apply = async () => {
     const code = promoField.value.trim();
     if (!code || isOff(promoApply)) return;
 
-    setFieldError("promo", null);
+    clearErrors();
+    const mine = ++seq;
     const sent = await send(
       promoApply,
       "Checking the code",
       "/api/promo/check",
       { promo: code, lines: basket() },
-      formError,
-      "The connection dropped before the code could be checked."
+      promoNote
     );
     if (!sent) return;
     sent.restore();
 
-    /* The field changed while the answer was on its way: it is about some other
-     * text, and showing it would put a discount on screen for a code that is not
-     * the one in the field. */
-    if (promoField.value.trim() !== code) return;
+    /* Superseded: the field changed, or the push refused the code, while this
+     * was on its way. */
+    if (mine !== seq) return;
 
+    /* A refusal removes whatever was previewed BEFORE the message goes up: a
+     * code that has just been refused must not leave its discount on screen. */
     const body = sent.body as NonNullable<typeof promo> & { ok?: boolean; message?: string };
-    if (body.ok) {
-      promo = { ...body, code };
-      paintOrder();
-    } else setFieldError("promo", body.message ?? null);
+    promo = body.ok ? { ...body, code } : null;
+    paintOrder();
+    if (!body.ok) setFieldError("promo", body.message ?? null);
   };
 
   on(promoApply, "click", apply);
@@ -682,6 +699,7 @@ if (promoField && promoApply) {
    * answer. */
   on(promoField, "input", () => {
     promo = null;
+    seq++;
     setFieldError("promo", null);
     paintOrder();
   });
@@ -714,7 +732,7 @@ if (trackForm && trackButton && trackResult) {
      * so hiding only the result leaves the last answer on screen underneath a
      * connection error — a buyer reading "that order cannot be found" about an
      * attempt that never reached the server. */
-    clearErrors(trackError);
+    clearErrors();
     trackResult.hidden = true;
     showStatus("");
 
@@ -725,8 +743,7 @@ if (trackForm && trackButton && trackResult) {
       /* The form's own fields by name — reference and phone, which are the
        * two names the endpoint reads. */
       Object.fromEntries(new FormData(trackForm)),
-      trackError,
-      "The connection dropped before the order could be looked up."
+      trackError
     );
     if (!sent) return;
 
@@ -758,7 +775,7 @@ if (trackForm && trackButton && trackResult) {
       /* A 400 the buyer can fix, or a 503 they cannot. Both belong above the
        * button, except the two fields they typed themselves — which the server
        * names by the same names the form uses, so no translation is needed. */
-      const message = body.message ?? "That order could not be looked up.";
+      const message = body.message ?? trackError!.dataset.fallback!;
       if (body.field) setFieldError(body.field, message);
       else say(trackError, message);
       return;

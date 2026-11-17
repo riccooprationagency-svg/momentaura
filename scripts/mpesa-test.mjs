@@ -1630,6 +1630,22 @@ await check("15b. (a guard: passes before the change too) an order with no code 
   eq(Object.keys(breakdown).sort(), ["fee", "subtotal", "total"], "keys");
 });
 
+await check("15c. a recorded discount of 0 is SENT, as the number 0 beside the code and percent, so the confirmation can say KSh 0 instead of hiding the row", async () => {
+  await seedPromo("ALEX10");
+  const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
+  const stored = await record();
+  stored.discountKsh = 0;
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  const { breakdown } = await (await askStatus(body)).json();
+  eq(Object.hasOwn(breakdown, "discountKsh"), true, "the key is present");
+  eq(breakdown.discountKsh, 0, "and it is the number 0, not absent and not a string");
+  eq([breakdown.promoCode, breakdown.promoPercent], ["ALEX10", 10], "beside the code and percent");
+  /* The page's half: fill() in cart.ts hides a row on null or undefined and on
+     nothing else, so this 0 is written as "KSh 0" (data-pre) and an order with no
+     code, which has no such key at all, shows none of the promo rows. Checked in
+     a browser for this PR; nothing in this repo can run the cart. */
+});
+
 await check("16. no raw phone number appears in any KV key written during a full promo order", async () => {
   await seedPromo("TEAM15-TEST", { oncePerPhone: true, percent: 15 });
   const written = [];
