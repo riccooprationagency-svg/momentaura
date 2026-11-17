@@ -314,6 +314,13 @@ for (const slug of Object.keys(CATEGORY_COPY)) {
   }
 }
 
+/* /black-november is a page of its own at the root, beside [category].astro. A
+ * category with that slug would be two routes for one address. Astro prefers the
+ * static one, so the category's page would vanish without an error. */
+if (Object.hasOwn(CATEGORY_COPY, "black-november")) {
+  throw new Error(`CATEGORY_COPY key "black-november" is the campaign page's address. A category cannot take it.`);
+}
+
 /** Products listed for an audience, in catalogue order. */
 export const productsFor = (audience: Audience): Product[] =>
   products.filter((p) => p.audience.includes(audience));

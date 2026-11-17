@@ -1,0 +1,144 @@
+---
+// A listing of the products that really are black, for the dates the campaign
+// really runs. Not a dark page: no product has a photograph yet, and the dark
+// system does not degrade without one, so this renders in the light system like
+// every other listing. No token and no ground is added for it.
+//
+// Everything on it is read from src/data/campaign.json through src/lib/campaign,
+// which has already thrown on a bad date or a slug that is not in the catalogue.
+// Nothing here reads the clock in a browser; the date is read once, at build.
+//
+// The listing is the content. Rhythm is the audience page's: heading, then
+// grids grouped by category, no 100dvh reveal.
+//
+// After endsOn the page still builds and says so, in prose, with a way back to
+// the shop. It does not 404, because a link someone sent on WhatsApp should land
+// on an honest sentence rather than an error.
+//
+// NOT BUILT HERE, on purpose, and reported in the PR rather than skipped quietly:
+//   - the capacity notice: no such component exists in this repo, and runSize is
+//     null. CLAUDE.md: if every number cannot be verified, it does not render.
+//   - the motion (line draw, balloons, spotlight, Pause motion): verify.mjs V6
+//     rejects the animation construct the motion needs, in source and in dist/,
+//     and V2b flags the time units. See the PR.
+import Base from "../layouts/Base.astro";
+import DispatchRule from "../components/DispatchRule.astro";
+import ProductCard from "../components/ProductCard.astro";
+import { campaign, campaignGroups, campaignLive, longDate, shortDate } from "../lib/campaign";
+
+const live = campaignLive();
+const groups = campaignGroups();
+const ends = longDate(campaign.endsOn);
+---
+
+<Base
+  title={`${campaign.name} — MomentAura`}
+  description={live
+    ? `${campaign.name}: black pieces, to ${ends}.`
+    : `${campaign.name} ended on ${ends}.`}
+>
+  <div class="wrap page">
+    <header class="page__head">
+      <h1 class="page__heading">{campaign.name}</h1>
+    </header>
+
+    {
+      live ? (
+        <>
+          <div class="page__rule">
+            <DispatchRule label={`To ${shortDate(campaign.endsOn)}`} />
+          </div>
+
+          {campaign.promoPublic && (
+            <p class="page__code">
+              Use <span class="page__mono">{campaign.promoCode}</span> at checkout for{" "}
+              <span class="page__mono">{campaign.promoPercent}%</span> off the items, until {ends}.
+              Delivery is not discounted.
+            </p>
+          )}
+
+          {groups.map((group) => (
+            <section class="group" aria-labelledby={`group-${group.slug}`}>
+              <h2 class="group__heading" id={`group-${group.slug}`}>{group.name}</h2>
+              <div class="grid">
+                {group.items.map((product) => <ProductCard product={product} />)}
+              </div>
+            </section>
+          ))}
+        </>
+      ) : (
+        <p class="page__ended">
+          {campaign.name} ended on {ends}. <a href="/">Back to the shop</a>.
+        </p>
+      )
+    }
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-block: var(--s-56) var(--s-80);
+  }
+
+  .page__head {
+    margin-block-end: var(--s-28);
+  }
+
+  .page__heading {
+    font-size: var(--t-heading);
+    line-height: var(--lh-display);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+  }
+
+  .page__rule {
+    margin-block-end: var(--s-40);
+  }
+
+  /* Prose is Archivo; only the code and the percentage are data, so only they
+     go mono. */
+  .page__code,
+  .page__ended {
+    font-size: var(--t-body-sm);
+    line-height: var(--lh-ui);
+    max-width: var(--measure);
+    margin-block-end: var(--s-56);
+  }
+
+  .page__mono {
+    font-family: var(--font-mono);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .group + .group {
+    margin-block-start: var(--s-80);
+  }
+
+  .group__heading {
+    font-size: var(--t-label);
+    line-height: 1.4;
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+    color: var(--fg-muted);
+    margin-block-end: var(--s-20);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s-40) var(--s-20);
+  }
+
+  @media (min-width: 640px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

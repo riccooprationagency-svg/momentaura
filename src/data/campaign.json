@@ -1,0 +1,28 @@
+{
+  "name": "Black November",
+  "startsOn": "2026-11-17",
+  "endsOn": "2026-11-30",
+  "slugs": [
+    "tee-chest-logo",
+    "tee-do-i-look-like-i-care",
+    "tee-trust-no-one",
+    "tee-kwani-mi-hudo",
+    "tee-lion-back-print",
+    "tee-trust-gods-plan",
+    "hoodie-chest-logo",
+    "hoodie-sleeve-stripes",
+    "sweatshirt-chest-logo",
+    "sweatshirt-sleeve-stripes",
+    "tracksuit-m-logo"
+  ],
+  "showcase": [
+    "tee-chest-logo",
+    "hoodie-chest-logo",
+    "sweatshirt-chest-logo",
+    "tracksuit-m-logo"
+  ],
+  "promoPublic": false,
+  "promoCode": "BLACK10",
+  "promoPercent": 10,
+  "runSize": null
+}

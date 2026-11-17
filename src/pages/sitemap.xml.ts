@@ -43,7 +43,7 @@ import { origin } from "../lib/site";
    written out anyway — and an exclusion list that is wrong fails open, into
    publishing a page, while an inclusion list that is wrong fails closed, into
    omitting one. V13 catches either. */
-const STATIC = ["/", "/about", "/contact", "/delivery", "/privacy"];
+const STATIC = ["/", "/about", "/black-november", "/contact", "/delivery", "/privacy"];
 
 const escape = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
