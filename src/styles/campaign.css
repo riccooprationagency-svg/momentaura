@@ -1,27 +1,37 @@
 /* Black November motion. CSS only. Imported by src/pages/black-november.astro
    as a string and written into the page only while campaign.json is live. */
 
-.campaign-block {
+/* The root is the full width of the page and is the sky's containing block. The
+   sky is the first viewport, out of flow, so nothing moves when it is there. It
+   sits behind the content: the content column is positioned one step above it,
+   so a balloon passes behind the heading, the Pause control and every card, and
+   shows in the gutters and margins. The repo has no z-index scale beyond the nav
+   (10), the skip link (20) and the edge label (5); 0 and 1 are the smallest
+   change and stay under all three. */
+.campaign-root {
   position: relative;
 }
 
-.campaign-block h1,
-.campaign-label {
+.campaign-root > .page {
   position: relative;
+  z-index: 1;
 }
 
 .campaign-sky {
   position: absolute;
-  inset: 0;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: var(--campaign-sky);
   overflow: hidden;
   pointer-events: none;
+  z-index: 0;
 }
 
 .campaign-defs {
   position: absolute;
 }
 
-/* The row starts at the block's lower edge, so every balloon begins below it. */
+/* The row starts at the sky's lower edge, so every balloon begins below it. */
 .campaign-row {
   position: absolute;
   inset-inline: 0;
@@ -91,6 +101,7 @@
 }
 
 .campaign-label {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -106,11 +117,11 @@
   cursor: pointer;
 }
 
-.campaign-pause:checked ~ .campaign-label {
+.campaign-pause:checked ~ .page .campaign-label {
   background-color: var(--surface);
 }
 
-.campaign-pause:focus-visible ~ .campaign-label {
+.campaign-pause:focus-visible ~ .page .campaign-label {
   outline: 2px solid var(--fg);
   outline-offset: 2px;
 }
@@ -148,8 +159,12 @@
   from {
     transform: translateY(0);
   }
+  /* The balloon starts with its top on the sky's lower edge, so clearing the
+     sky takes the sky's height plus the balloon's own: the largest is about
+     90px tall, and the token alone left it resting with a strip showing at the
+     top. One space step more than that, so it holds at any viewport height. */
   to {
-    transform: translateY(var(--campaign-travel));
+    transform: translateY(calc(var(--campaign-travel) - var(--s-120)));
   }
 }
 

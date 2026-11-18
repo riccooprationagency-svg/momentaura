@@ -168,8 +168,9 @@
      hedge against emptiness — a full empty viewport reads as broken where a
      short one reads as composed — and that argument ends once the type is the
      image rather than a caption waiting for one. The floor keeps it from
-     collapsing on a landscape phone. Used as max(--hero-min, --hero-height)
-     so both hold. */
+     collapsing on a landscape phone. The hero holds --hero-min itself, and
+     --hero-height less the nav is the height of the box that holds the strip
+     and the hero together (see index.astro). */
   --hero-height: 100dvh;
   --hero-min: 480px;
 
@@ -180,6 +181,15 @@
      its height instead of growing to hold the picture. Floor and cap are rem so
      a landscape phone and a tall desktop both get a usable picture. */
   --hero-image-width: clamp(9rem, calc((100dvh - 26rem) * 0.75), 28rem);
+
+  /* The same width while the Black November strip sits above the hero. The strip
+     is one tap-target row on a desktop, and the 26rem above was written before
+     it existed, so with it present the mark ended below the fold. The photograph
+     is the only elastic part of the frame, so it gives the row up. On a phone the
+     strip wraps to two rows, but there the column, not the height, sets the
+     width, and the mark has room to spare. Applied only when the strip renders,
+     so the page without it keeps the larger photograph. */
+  --hero-image-width-strip: clamp(9rem, calc((100dvh - 26rem - var(--tap-target)) * 0.75), 28rem);
 
   /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome
      makes 100vh taller than the visible viewport and strands the buyer below
@@ -205,6 +215,7 @@
      spotlight tokens (pulse, zoom) because the spotlight is not built. */
   --campaign-rise: 6s;           /* one pass, linear. Inside the 5 to 8s band */
   --campaign-sway: 3s;           /* one side-to-side cycle, so two cycles in a rise */
+  --campaign-sky: 100svh;       /* the first viewport, small-viewport units so it does not resize as a phone's address bar hides */
   --campaign-travel: -110vh;     /* upward, so negative: clears the viewport top */
   --campaign-tilt: 2deg;         /* swings plus and minus: 4deg end to end, at the ceiling on either reading */
   --campaign-delay-step: 250ms;  /* ten steps is 2500ms, under the 3s stagger ceiling */
