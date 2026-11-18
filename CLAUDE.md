@@ -260,6 +260,8 @@ exist · exit-intent popups · "someone just bought this" notifications
 luxury · premium · bespoke · signature · aura · moments · journey · experience · discover ·
 founded on a passion for · born from a love of*
 
+The banned-words list governs copy the site writes. It does not govern the names of products, which the owner chooses. This exemption covers only these names: The Signature, Signature Jogger, The Femme Aura, Auraflex.
+
 No exclamation marks. No "simply", "just", or "please". No "we" if it is one person.
 
 ## Copy rules
