@@ -1,0 +1,89 @@
+---
+// A one-line entry to /black-november/, shown only while the campaign is live.
+//
+// Everything it says is read from src/data/campaign.json through src/lib/campaign,
+// the same source the campaign page uses, and the live/ended decision is that
+// page's own campaignLive(). No date is written here and no code is named. When
+// the build says the campaign has ended it renders nothing at all: no wrapper,
+// no spacing.
+//
+// Not a popup and not sticky. It is part of the page and scrolls away with it.
+// No script, no motion, no accent: a date here is not worth a second sanctioned
+// use of the accent.
+import { campaign, campaignLive, shortDate } from "../lib/campaign";
+
+const live = campaignLive();
+---
+
+{
+  live && (
+    <div class="strip" data-system="dark">
+      <div class="strip__bar">
+        <div class="wrap strip__inner">
+          <p class="strip__name">{campaign.name}</p>
+          <p class="strip__window">{`To ${shortDate(campaign.endsOn)}`}</p>
+          <a class="strip__link" href="/black-november/">See the offers</a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+<style>
+  /* Ground and ink together: data-system remaps --fg for the subtree, so the
+     ground is painted here too. */
+  .strip {
+    background-color: var(--bg);
+    color: var(--fg);
+  }
+
+  /* The one elevated step: canvas to Kraft Board. */
+  .strip__bar {
+    background-color: var(--surface);
+    border-block-end: 1px solid var(--border);
+  }
+
+  .strip__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--s-20);
+    row-gap: 0;
+  }
+
+  .strip__name,
+  .strip__window,
+  .strip__link {
+    min-height: var(--tap-target);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .strip__name {
+    font-size: var(--t-label);
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+  }
+
+  .strip__window {
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    letter-spacing: var(--tr-docket);
+    text-transform: uppercase;
+  }
+
+  /* Pushed right on desktop; on mobile the three wrap in reading order. */
+  .strip__link {
+    font-size: var(--t-label);
+    letter-spacing: var(--tr-label);
+    text-transform: uppercase;
+    font-weight: var(--w-medium);
+  }
+
+  @media (min-width: 640px) {
+    .strip__link {
+      margin-inline-start: auto;
+    }
+  }
+</style>

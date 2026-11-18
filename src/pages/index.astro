@@ -14,6 +14,7 @@
 // data does. See BUILD-ORDER section 5.
 import Base from "../layouts/Base.astro";
 import DispatchRule from "../components/DispatchRule.astro";
+import CampaignStrip from "../components/CampaignStrip.astro";
 import CategoryTile from "../components/CategoryTile.astro";
 import ProductReveal from "../components/ProductReveal.astro";
 import { categories, products } from "../lib/products";
@@ -31,6 +32,7 @@ const revealed = products.slice(0, 2);
   title="MomentAura — apparel and accessories, Nairobi"
   description="Apparel and accessories made and dispatched from Nairobi. Prices in KSh, payment by M-Pesa."
 >
+  <CampaignStrip />
   <!--
     The wordmark at --t-hero is the image. There is still no photograph of stock
     we hold, and the three alternatives are each banned by name in CLAUDE.md —
