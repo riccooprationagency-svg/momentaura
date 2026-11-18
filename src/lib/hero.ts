@@ -32,3 +32,13 @@ const resolve = (): Product | null => {
 };
 
 export const heroProduct: Product | null = resolve();
+
+/* The most photographs the hero shows. Three is a ceiling, not a target: a product
+ * with one photograph shows one and a product with two shows two, and nothing is
+ * repeated or padded to reach three. The hero shows the first of them, in order. */
+export const HERO_MAX = 3;
+
+/* How many of heroProduct's photographs the hero actually shows: 0 with no hero
+ * product, otherwise between 1 and HERO_MAX. Gallery.astro derives the same count
+ * from the same two numbers; index.astro reads this one to size the wrapper. */
+export const heroCount: number = heroProduct ? Math.min(HERO_MAX, heroProduct.photos.length) : 0;
