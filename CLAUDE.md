@@ -396,6 +396,8 @@ used. The placeholder rule above still applies to any product without one.
 - **The build knows.** `src/lib/products.ts` throws on a product that has photos and no
   valid `photoKind`.
 
+One further extension, by the owner's decision on 18 November 2026: `tee-white-three-cats`, `tee-white-line-art-face`, `tee-white-yellow-hands`, `tee-white-woman-with-drink`, `hoodie-m-chest-logo` and `tracksuit-sleeve-stripes-m-logo` may use owner-supplied renders while `stock` is above 0, because the owner states he holds 20 of each. Every other condition in this section applies unchanged: the disclosure line under every render, the owner's per-image confirmation against what he holds, a studio-backdrop lead, and removal the day a real photograph of that product goes through `scripts/images.mjs`. The extension ends for each product on that day. It covers no other product.
+
 Everything else in this section stands, including: the pipeline through
 `scripts/images.mjs`, the 200KB file limit, explicit width and height, and the rule
 that nothing is hand-edited into the `photos` array.
