@@ -19,7 +19,7 @@ import CampaignStrip from "../components/CampaignStrip.astro";
 import CategoryTile from "../components/CategoryTile.astro";
 import ProductReveal from "../components/ProductReveal.astro";
 import Gallery from "../components/Gallery.astro";
-import { heroProduct } from "../lib/hero";
+import { heroProduct, heroCount } from "../lib/hero";
 import { campaignLive } from "../lib/campaign";
 import { categories, firstIn, listed } from "../lib/products";
 
@@ -71,7 +71,7 @@ const stripLive = campaignLive();
       <h1 class="hero__mark">MomentAura</h1>
       {
         heroProduct && (
-          <div class="hero__image">
+          <div class:list={["hero__image", { "hero__image--row": heroCount > 1 }]}>
             <Gallery product={heroProduct} hero strip={stripLive} />
           </div>
         )
@@ -153,6 +153,13 @@ const stripLive = campaignLive();
     order: -1;
     width: var(--hero-image-width);
     max-width: 100%;
+  }
+
+  /* Two or more photographs: the wrapper is the whole column and Gallery lays the
+     row out inside it, each slide the width the token gives one image. One
+     photograph keeps the token's width above, untouched. */
+  .hero__image--row {
+    width: 100%;
   }
 
   .hero__line {

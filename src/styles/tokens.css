@@ -191,6 +191,14 @@
      so the page without it keeps the larger photograph. */
   --hero-image-width-strip: clamp(9rem, calc((100dvh - 26rem - var(--tap-target)) * 0.75), 28rem);
 
+  /* With two or more hero photographs, below 900px they sit in one scrolling row,
+     and a slide is never wider than this share of the row. The remainder is what
+     lets the next slide's edge show, which is the only cue that the row scrolls:
+     there is no button and no script. At the narrowest column a slide is 80% and
+     the edge of the next is a fifth of the row less one gap. The same number is
+     written as 0.8 in Gallery.astro's sizes, which cannot read a token. */
+  --hero-slide-share: 80%;
+
   /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome
      makes 100vh taller than the visible viewport and strands the buyer below
      the fold with no visible affordance. */

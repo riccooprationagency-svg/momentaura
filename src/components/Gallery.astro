@@ -65,6 +65,7 @@
 // it until its thumbnail is chosen. The buyer pays for the photograph they look
 // at, plus a 400px thumbnail of each of the others.
 import { systemFor, type Product } from "../lib/products";
+import { HERO_MAX } from "../lib/hero";
 
 interface Props {
   product: Product;
@@ -98,7 +99,20 @@ if (switching && photos.length > SWITCH_MAX) {
   );
 }
 
-const shown = last ? photos.slice(-1) : detail ? photos : photos.slice(0, 1);
+/* The hero shows up to HERO_MAX photographs, in order, and HERO_MAX is a ceiling,
+   not a target: one photograph is one image, exactly as before this prop learned
+   to show more. */
+const shown = last
+  ? photos.slice(-1)
+  : detail
+    ? photos
+    : hero
+      ? photos.slice(0, HERO_MAX)
+      : photos.slice(0, 1);
+
+/* Two or more hero photographs: a row of slides, each with its own caption. One
+   photograph keeps the plain markup below, so the one-image hero is unchanged. */
+const heroRow = hero && !detail && !last && shown.length > 1;
 
 /* ---------- deriving the other five URLs ----------
  *
@@ -192,6 +206,19 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * breakpoints are the three declared at the top of tokens.css — read and change
  * them there.
  */
+/* The hero row (two or more photographs). Each image is a slide of
+   --hero-image-width, the same height-derived box as the single photograph, so
+   the row costs the page no more height than one image did. Three regimes, in
+   the order of the entries above:
+     1240px and up   the column stops growing at 1176px; three slides and two
+                     --s-16 gaps leave 71.5rem, a third of which is 23.84rem
+     900 to 1239px   the column is 100vw less two 2rem gutters; the same arithmetic
+                     leaves (100vw - 6rem) / 3 for each
+     under 900px     one scrolling row, a slide at most 80% of the column
+                     (--hero-slide-share, here as 0.8), the column being 100vw less
+                     two gutters, 2rem from 640px and 1.25rem under it
+   Each is the smaller of that and the height clamp, which is the box the CSS
+   uses. Rounded up, for the reason above. */
 /* Both hero widths are written out in full, one string per line with its media
    condition, because V2b reads a line at a time and exempts a length only beside
    the condition it belongs to, and because sizes cannot read a custom property.
@@ -199,6 +226,14 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
    2.75rem) taken off the height. Keep the pair in step with tokens.css. */
 const SIZES = last
   ? "(min-width: 1240px) 565px, 60vw"
+  : heroRow && strip
+    ? "(min-width: 1240px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), 23.84rem), " +
+      "(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 6rem) / 3)), " +
+      "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
+    : heroRow
+      ? "(min-width: 1240px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), 23.84rem), " +
+        "(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 6rem) / 3)), " +
+        "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
   : hero && strip
     ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
     : hero
@@ -279,6 +314,37 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
         ))}
       </div>
     </div>
+  ) : heroRow ? (
+    /* The scrolling element is the region: focusable so a keyboard can scroll it,
+       and named from the product so a screen reader says what it holds. It needs
+       no script. Only the first image is eager and high priority; the rest are
+       lazy, which on a phone is below the fold sideways. */
+    <div
+      class="gallery gallery--hero"
+      role="region"
+      aria-label={`Photographs of ${product.name}`}
+      tabindex="0"
+    >
+      {shown.map((photo, i) => (
+        <div class="gallery__hero-slide">
+          <picture>
+            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
+            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
+            <img
+              class="gallery__img"
+              src={photo.src}
+              alt={photo.alt}
+              width={photo.width}
+              height={photo.height}
+              loading={i === 0 ? "eager" : "lazy"}
+              fetchpriority={i === 0 ? "high" : undefined}
+              decoding="async"
+            />
+          </picture>
+          {render && <p class="gallery__caption">{CAPTION}</p>}
+        </div>
+      ))}
+    </div>
   ) : (
     <div class={last ? "gallery gallery--last" : "gallery"}>
       {shown.map((photo, i) => {
@@ -341,6 +407,46 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     line-height: 1.4;
     color: var(--fg-muted);
     text-align: left;
+  }
+
+  /* ---------- the hero row ---------- */
+
+  /* Under 900px: one horizontal row that snaps. Mandatory snapping with each slide
+     aligned to the start puts one image square on the left edge and lets the next
+     one's edge show on the right, which is the only cue. The page never scrolls
+     sideways: the overflow is this element's own, and overscroll-behavior stops a
+     swipe at the end of the row from turning into a browser back gesture. */
+  .gallery--hero {
+    display: flex;
+    gap: var(--s-16);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+  }
+
+  /* A slide is the hero box, never wider than its share of the row. The caption
+     sits directly beneath its own image and travels with it. */
+  .gallery__hero-slide {
+    flex: 0 0 min(var(--hero-image-width), var(--hero-slide-share));
+    display: grid;
+    gap: var(--s-12);
+    align-content: start;
+    scroll-snap-align: start;
+  }
+
+  /* From 900px: one row, equal widths, left-aligned. Each track is at most the
+     hero box and shrinks equally when the column is narrower than three of them,
+     so the row never overflows and never scrolls. minmax(0, ...) is what lets a
+     track go below its content's minimum. */
+  @media (min-width: 900px) {
+    .gallery--hero {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, var(--hero-image-width));
+      justify-content: start;
+      overflow: visible;
+      scroll-snap-type: none;
+    }
   }
 
   /* ---------- the switch ---------- */
