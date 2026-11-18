@@ -2,31 +2,31 @@
 // One category. Identical treatment across all of them — variation between
 // tiles reads as instability, which is what a suspicious buyer is scanning for.
 //
-// No category has a photograph yet, so every tile carries the same honest
-// placeholder and renders light.
+// A tile exists only for a category with a listed product, so it always has a
+// photograph to show: that category's first listed product's lead image, through
+// Gallery with its defaults (one image, lazy, the render caption beneath). There
+// is no placeholder branch because there is no case that reaches one.
+import Gallery from "./Gallery.astro";
+import { systemFor, type Product } from "../lib/products";
+
 interface Props {
   slug: string;
   name: string;
   /** What the category holds, from CATEGORY_COPY. Declared there, never
    *  invented at render time. */
   line: string;
-  photo?: string | null;
+  /** The category's first listed product. */
+  product: Product;
 }
 
-const { slug, name, line, photo = null } = Astro.props;
-const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "light";
+const { slug, name, line, product } = Astro.props;
+const system = systemFor(product);
 ---
 
 <!-- /hoodies, not /shop/hoodies. The category pages sit at the root, and this
      href pointed at a path step 6 does not build. -->
 <a class="tile" href={`/${slug}`} data-system={system}>
-  {
-    system === "light" ? (
-      <span class="photo-pending" aria-hidden="true">{name}</span>
-    ) : (
-      <img src={photo} alt={name} width="600" height="800" loading="lazy" decoding="async" />
-    )
-  }
+  <Gallery product={product} />
   <span class="tile__name">{name}</span>
   <span class="tile__line">{line}</span>
 </a>
@@ -49,14 +49,6 @@ const system = typeof photo === "string" && photo.trim() !== "" ? "dark" : "ligh
 
   .tile:hover {
     border-color: var(--border);
-  }
-
-  .tile img {
-    aspect-ratio: 3 / 4;
-    object-fit: cover;
-    border-radius: var(--radius-surface);
-    width: 100%;
-    height: auto;
   }
 
   .tile__name {

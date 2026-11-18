@@ -1954,11 +1954,13 @@ function socialViolations(pages, expected) {
  */
 
 /** Every way the categories depart from the rules above.
- *  declared: CATEGORY_COPY keys. inData: categories products.json uses.
- *  pages: [{ slug, html }] for every declared slug, html null when not built. */
-function categoryViolations(declared, inData, pages) {
+ *  declared: CATEGORY_COPY keys. inData: categories that hold a LISTED product.
+ *  pages: [{ slug, html }] for every declared slug, html null when not built.
+ *  everyInData: every category products.json uses, listed or not, which is what
+ *  the "declared" rule reads; it defaults to inData. */
+function categoryViolations(declared, inData, pages, everyInData = inData) {
   const out = [];
-  for (const slug of inData) {
+  for (const slug of everyInData) {
     if (!declared.includes(slug)) out.push(`category "${slug}" is in products.json but not declared in CATEGORY_COPY`);
   }
   for (const { slug, html } of pages) {
@@ -1986,7 +1988,14 @@ function categoryViolations(declared, inData, pages) {
   if (declared.length === 0) fail("V16", "no CATEGORY_COPY entries found in src/lib/products.ts — the block moved and this check is blind");
 
   const data = JSON.parse(readFileSync(join(SRC, "data", "products.json"), "utf8"));
-  const inData = [...new Set(data.map((p) => p.category))];
+  /* "Has products" means has a LISTED product: photos.length > 0, the definition
+     in src/lib/products.ts isListed. That file is the source of truth and the two
+     must change together. A product with no photograph is still built at
+     /products/<slug> but is listed nowhere, so a category holding only such
+     products has no page, and must not be required to. The declared-in-CATEGORY_COPY
+     rule still reads every category in the data, listed or not. */
+  const everyInData = [...new Set(data.map((p) => p.category))];
+  const inData = [...new Set(data.filter((p) => Array.isArray(p.photos) && p.photos.length > 0).map((p) => p.category))];
 
   /* Self-test. A check that has never been seen to fail is a comment. */
   const card = `<article class="card" data-system="light"><a href="/products/x">x</a></article>`;
@@ -2011,11 +2020,11 @@ function categoryViolations(declared, inData, pages) {
       const file = join(DIST, slug, "index.html");
       return { slug, html: existsSync(file) ? readFileSync(file, "utf8") : null };
     });
-    const found = categoryViolations(declared, inData, pages);
+    const found = categoryViolations(declared, inData, pages, everyInData);
     for (const v of found) fail("V16", v);
     const built = pages.filter((p) => p.html !== null).length;
     console.log(
-      `  V16 categories        ${declared.length} declared, ${inData.length} in products.json, ${built} page(s) built, ` +
+      `  V16 categories        ${declared.length} declared, ${inData.length} with a listed product, ${built} page(s) built, ` +
         `${found.length === 0 ? "every page has a card" : `${found.length} violation(s)`}`
     );
   }

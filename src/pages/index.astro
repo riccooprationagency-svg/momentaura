@@ -21,15 +21,17 @@ import ProductReveal from "../components/ProductReveal.astro";
 import Gallery from "../components/Gallery.astro";
 import { heroProduct } from "../lib/hero";
 import { campaignLive } from "../lib/campaign";
-import { categories, products } from "../lib/products";
+import { categories, firstIn, listed } from "../lib/products";
 
 // The categories are derived from products.json in one place now, so the tiles
-// here and the pages they link to cannot drift apart. Six are declared in
-// src/lib/products.ts; a tile renders only for one that has products.
+// here and the pages they link to cannot drift apart. A tile renders only for a
+// category that has a listed product, and shows that category's first one.
+// Listed means photographed (src/lib/products.ts): nothing on this page is a
+// kraft placeholder.
 
-// Two reveals, not five. Enough to establish the rhythm; five identical
-// placeholder screens would be five identical placeholder screens.
-const revealed = products.slice(0, 2);
+// Two reveals, not five. Enough to establish the rhythm. The first two listed
+// products in catalogue order; fewer than two listed renders fewer.
+const revealed = listed.slice(0, 2);
 const stripLive = campaignLive();
 ---
 
@@ -89,7 +91,7 @@ const stripLive = campaignLive();
       <h2 class="section-heading">What is made here</h2>
       <div class="tiles">
         {categories.map((c) => (
-          <CategoryTile slug={c.slug} name={c.name} line={c.line} />
+          <CategoryTile slug={c.slug} name={c.name} line={c.line} product={firstIn(c.slug)!} />
         ))}
       </div>
     </div>
