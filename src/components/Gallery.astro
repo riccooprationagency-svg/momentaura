@@ -148,10 +148,13 @@ const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
   return RENDITIONS.map((w) => `${stem}-${w}.${hash}.${ext} ${w}w`).join(", ");
 };
 
-/* A thumbnail is 72px wide, 216 device pixels on a 3x phone, so the 400px
-   rendition is the largest it can ever use. Offering only that one keeps the
-   browser from fetching a 1200px file into a 72px box, and keeps V4 from
-   charging the page for one. */
+/* A desktop thumbnail is --thumb-width, 96px, 288 device pixels on a 3x screen,
+   so the 400px rendition covers it. A phone tile is a third of the row, about
+   110px, and half of it with two photographs, about 170px: 330 and 510 device
+   pixels at 3x, which the 400px file stretches slightly on the two-photograph
+   product. Offering only that one keeps the browser from fetching a 1200px file
+   into a tile, and keeps V4 from charging the page for one. No new file is made
+   for the larger tile. */
 const thumbOf = (src: string, ext: "avif" | "webp"): string => {
   const [stem, hash] = parse(src);
   return `${stem}-${RENDITIONS[0]}.${hash}.${ext}`;
@@ -176,8 +179,8 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * column by the strip's width when there is one, so the photograph is the same
  * size with or without thumbnails beside it.
  *
- * The second-row photograph sits in the other column: 1176 - 471 - 84 (strip
- * and its gap) - 56 (column gap) = 565px at the cap, and under 60vw below it.
+ * The second-row photograph sits in the other column: 1176 - 471 - 108 (strip
+ * and its gap) - 56 (column gap) = 541px at the cap, and under 60vw below it.
  * Below 900 it is not displayed, and a lazy image that is display: none is not
  * fetched, so the value there is never used.
  *
@@ -231,7 +234,7 @@ const gaps = cols - 1;
    The strip's is --hero-image-width-strip: the same clamp with --tap-target (44px,
    2.75rem) taken off the height. Keep the pair in step with tokens.css. */
 const SIZES = last
-  ? "(min-width: 1240px) 565px, 60vw"
+  ? "(min-width: 1240px) 541px, 60vw"
   : heroRow && strip
     ? `(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - ${4 + gaps}rem) / ${cols})), ` +
       "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
@@ -295,11 +298,19 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
               />
             </picture>
             {render && <p class="gallery__caption">{CAPTION}</p>}
+            {/* A fact about the page, so mono and muted, never the accent. Each
+                frame carries its own, which is how the CSS switch changes it with
+                the picture: no script. Only here, so only with two or more. */}
+            <p class="gallery__count">{`Angle ${i + 1} of ${photos.length}`}</p>
           </div>
         ))}
       </div>
 
-      <div class="gallery__thumbs" role="group" aria-label="Photographs">
+      <div
+        class:list={["gallery__thumbs", { "gallery__thumbs--two": photos.length === 2 }]}
+        role="group"
+        aria-label="Photographs"
+      >
         {photos.map((photo, i) => (
           <label class="gallery__thumb" for={`${group}-${i + 1}`}>
             <picture>
@@ -469,25 +480,44 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     gap: var(--s-12);
   }
 
-  /* Below 900px the strip is a row under the photograph that wraps onto a
-     second line once there are more thumbnails than fit: six at 72px plus five
-     8px gaps is 472px, and a 390px phone has 350px between its gutters. Every
-     thumbnail stays in view, so nothing has to be scrolled to be found and the
-     row needs no focus stop of its own — the radios are the keyboard path. */
+  /* The count under the caption: a fact about the page, so docket type, muted. */
+  .gallery__count {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    line-height: var(--lh-docket);
+    letter-spacing: var(--tr-docket);
+    color: var(--fg-muted);
+    text-align: left;
+  }
+
+  /* Below 900px the strip is equal-width tiles filling the row under the
+     photograph and its caption: three across, wrapping to a second row after
+     that, or two across for a two-photograph product so the pair fills the row
+     rather than leaving half of it empty. A tile is a third of 350px less two
+     gaps, about 110px wide and 147px tall at 390px, far over the 44px minimum
+     on both axes. Every tile stays in view, so nothing has to be scrolled to be
+     found and the row needs no focus stop of its own — the radios are the
+     keyboard path. */
   .gallery__thumbs {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--s-8);
   }
 
-  /* 72 by 96, over the 44px touch minimum on both axes. A border, never a
-     shadow, and never the accent — the accent means "you can check this", and
-     which photograph is on screen is not a fact about the product. Every
-     thumbnail carries a transparent 1px border so choosing one changes a
-     colour, not a size, and nothing beside it moves. */
+  .gallery__thumbs--two {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* A border, never a shadow, and never the accent — the accent means "you can
+     check this", and which photograph is on screen is not a fact about the
+     product. The selected tile is the one wearing a 2px frame in full-contrast
+     text colour: a frame present or absent, which reads without telling two
+     colours apart. Every tile carries a transparent 2px border so choosing one
+     changes a colour, not a size, and nothing beside it moves. */
   .gallery__thumb {
-    flex: 0 0 var(--thumb-width);
-    border: 1px solid transparent;
+    display: block;
+    border: 2px solid transparent;
     border-radius: var(--radius-surface);
     cursor: pointer;
     transition: border-color var(--dur) var(--ease);
@@ -526,10 +556,10 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
   }
 
   /* From 900px the page is two columns and the strip stands to the left of the
-     photograph, top-aligned with it. Six thumbnails are 6 x 96 + 5 x 8 = 616px
-     tall against a 628px photograph at the 471px cap, so the strip never runs
-     past the photograph at full width. Between 900 and 1240 the photograph is
-     shorter and the strip may run on below it; nothing overlaps. */
+     photograph, top-aligned with it, one tile wide at --thumb-width (96px, 128px
+     tall). Three thumbnails are 3 x 128 + 2 x 8 = 400px, inside the 628px
+     photograph at the 471px cap. Six would be 808px and run on below the
+     photograph; nothing overlaps, and no product has more than three. */
   @media (min-width: 900px) {
     .gallery--switch {
       grid-template-columns: var(--thumb-width) 1fr;
@@ -541,10 +571,11 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
       grid-row: 1;
     }
 
-    .gallery__thumbs {
+    .gallery__thumbs,
+    .gallery__thumbs--two {
       grid-column: 1;
       grid-row: 1;
-      flex-direction: column;
+      grid-template-columns: 1fr;
     }
   }
 </style>
