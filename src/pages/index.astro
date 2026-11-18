@@ -3,7 +3,8 @@
 //
 // Not present, each because the data behind it does not exist yet:
 //   hero video       no footage
-//   hero photograph  no real photography of stock we hold
+//   hero photograph  no real photography of stock we hold. A disclosed render
+//                    of one product (site.json heroProduct) stands in until there is
 //   capacity notice  no production figure, no cut-off date
 //   dispatch ledger  zero orders dispatched
 //   testimonials     no reviews, and none until roughly twenty orders
@@ -17,6 +18,8 @@ import DispatchRule from "../components/DispatchRule.astro";
 import CampaignStrip from "../components/CampaignStrip.astro";
 import CategoryTile from "../components/CategoryTile.astro";
 import ProductReveal from "../components/ProductReveal.astro";
+import Gallery from "../components/Gallery.astro";
+import { heroProduct } from "../lib/hero";
 import { categories, products } from "../lib/products";
 
 // The categories are derived from products.json in one place now, so the tiles
@@ -45,16 +48,22 @@ const revealed = products.slice(0, 2);
     edge to edge within the gutter, so there is no emptiness left to hedge
     against.
 
-    When the shoot happens the photograph sits BEHIND these letterforms rather
-    than replacing them: the mark stays at --t-hero, the image goes underneath,
-    and the section keeps its height. It does not become a photograph with a
-    caption over it. Nothing in this block changes but the addition of the
-    image and its ground.
+    One product's lead photograph sits ABOVE the line and the mark, never under
+    a letter: there is no scrim to be had (gradients are banned) and no gate can
+    read legibility over a picture, so the type stays on solid --bg. If the lead
+    is a render, its caption prints directly beneath it.
   -->
   <section class="hero" data-system="dark">
     <div class="wrap hero__inner">
       <p class="hero__line">Nairobi — apparel and accessories</p>
       <h1 class="hero__mark">MomentAura</h1>
+      {
+        heroProduct && (
+          <div class="hero__image">
+            <Gallery product={heroProduct} hero />
+          </div>
+        )
+      }
     </div>
   </section>
 
@@ -100,9 +109,26 @@ const revealed = products.slice(0, 2);
     color: var(--fg);
   }
 
+  /* One explicit column that cannot grow past the container. An implicit auto
+     column is sized by its widest item, so a child wider than the container
+     stretches the track and a percentage max-width on it resolves against the
+     stretched track, not the container: the cap does nothing. minmax(0, 1fr)
+     is the track the percentage needs. */
   .hero__inner {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--s-16);
+  }
+
+  /* Above the line and the mark: the markup puts it last so the text comes first
+     in the document, and order puts it first on the page. The width is the
+     token's, and max-width is what keeps it inside the column when the viewport
+     is tall and narrow: the token follows height, the column follows width, and
+     on a 390px phone 1000px tall the token alone is wider than the column. */
+  .hero__image {
+    order: -1;
+    width: var(--hero-image-width);
+    max-width: 100%;
   }
 
   .hero__line {
@@ -119,6 +145,12 @@ const revealed = products.slice(0, 2);
      require it to be 600. Line-height 0.9 is what makes the stack read as solid
      form, and it matters more here than anywhere else on the site. */
   .hero__mark {
+    /* global.css lets headings break mid-word. The mark is one word set at 12vw,
+       so on a phone it is a few pixels wider than its column (339px in a 335px
+       column at 390) and the column used to stretch around it. With the column
+       fixed, break-word would split the name across two lines. It stays whole
+       and spends the difference in the gutter, as it always has. */
+    overflow-wrap: normal;
     font-size: var(--t-hero);
     line-height: var(--lh-display);
     text-transform: uppercase;

@@ -173,6 +173,14 @@
   --hero-height: 100dvh;
   --hero-min: 480px;
 
+  /* The hero photograph's width. Its height is this times 4/3, and the 26rem is
+     what the section spends on everything else in the frame: both paddings, the
+     line, the mark, the gaps and the render caption, which wraps to two lines on a narrow image. So photograph and caption
+     fit inside the viewport the hero is already sized to, and the section keeps
+     its height instead of growing to hold the picture. Floor and cap are rem so
+     a landscape phone and a tall desktop both get a usable picture. */
+  --hero-image-width: clamp(9rem, calc((100dvh - 26rem) * 0.75), 28rem);
+
   /* Feeds min-height, never height. 100dvh, not 100vh: mobile browser chrome
      makes 100vh taller than the visible viewport and strands the buyer below
      the fold with no visible affordance. */
