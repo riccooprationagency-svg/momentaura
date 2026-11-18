@@ -476,6 +476,69 @@
     ]
   },
   {
+    "slug": "cropped-hoodie-chest-logo",
+    "name": "Beige cropped hoodie, MOMENTAURA chest logo",
+    "category": "hoodies",
+    "audience": [
+      "women"
+    ],
+    "price": 3000,
+    "material": null,
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 0,
+    "stockCountedAt": null,
+    "incoming": {
+      "by": null
+    },
+    "photos": [
+      {
+        "src": "/img/cropped-hoodie-chest-logo-1-800.9e529e34.webp",
+        "alt": "Render of a woman in a beige cropped hoodie with a green MOMENTAURA chest print and beige trousers, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/cropped-hoodie-chest-logo-2-800.c8eb7307.webp",
+        "alt": "Render of a woman in side profile in a beige cropped hoodie with a green MOMENTAURA chest print, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/cropped-hoodie-chest-logo-3-800.3bf800b2.webp",
+        "alt": "Render of a woman from behind in a beige cropped hoodie and beige trousers, grey studio backdrop",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
     "slug": "hoodie-sleeve-stripes",
     "name": "Black hoodie, MOMENTAURA chest logo and M sleeve stripes",
     "category": "hoodies",

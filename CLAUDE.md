@@ -382,7 +382,15 @@ used. The placeholder rule above still applies to any product without one.
   flat-on-white render, never a setting with a visible wall or floor.
 - **It expires per product.** The day a real photograph of that product goes through
   `scripts/images.mjs`, its render is removed and `photoKind` becomes `"photograph"`.
-  This exception never covers a new product and is never extended by default.
+  This exception does not cover a new product by default. One extension, narrower than
+  the rule it extends: a product that is on order and has never been held (`incoming`
+  set, stock 0) may use renders supplied by the owner, because no real photograph of it
+  can exist yet. The render shows the garment as ordered, and the owner confirms that per
+  image against the order specification before the render is added. When the pieces
+  arrive, and before `stock` is set above 0, the owner compares the real garment with its
+  render. A render that does not match is removed that day, and the product returns to
+  the placeholder rule. The extension ends for that product the day a real photograph
+  goes through `scripts/images.mjs`.
 - **The build knows.** `src/lib/products.ts` throws on a product that has photos and no
   valid `photoKind`.
 
