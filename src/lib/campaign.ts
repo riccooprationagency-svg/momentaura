@@ -1,5 +1,5 @@
 import data from "../data/campaign.json";
-import { categories, products, type Product } from "./products";
+import { categories, isListed, products, type Product } from "./products";
 
 /* The Black November campaign, read once at build and checked before anything
  * renders from it.
@@ -117,11 +117,13 @@ export const longDate = (iso: string): string => {
   return `${day} ${MONTHS_LONG[month]}`;
 };
 
-/** The campaign's products in "slugs" order, grouped by category in the
- *  catalogue's declared category order. Nothing outside "slugs" appears. */
+/** The campaign's LISTED products in "slugs" order, grouped by category in the
+ *  catalogue's declared category order. Nothing outside "slugs" appears, and a
+ *  product without a photograph (isListed, src/lib/products.ts) does not: a slug
+ *  stays valid in campaign.json, it just is not offered until it is listed. */
 export const campaignGroups = (): { slug: string; name: string; items: Product[] }[] => {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
-  const items = campaign.slugs.map((s) => bySlug.get(s)!);
+  const items = campaign.slugs.map((s) => bySlug.get(s)!).filter(isListed);
   return categories
     .map((c) => ({ slug: c.slug, name: c.name, items: items.filter((p) => p.category === c.slug) }))
     .filter((g) => g.items.length > 0);
