@@ -245,6 +245,28 @@ for (const product of products) {
   });
 }
 
+/* ---------- what is listed ----------
+ *
+ * A product is LISTED when it has at least one photograph, and nothing else
+ * decides it. Every surface that offers products to browse reads `listed`, never
+ * `products`: category tiles and pages, audience pages, the campaign page, the
+ * homepage reveals, related items and the sitemap. A kraft block in a grid is an
+ * empty slot, and an empty slot on a shop whose buyer arrives suspicious reads
+ * as a shop with nothing to sell.
+ *
+ * Listing is not existence. Every product still builds /products/<slug>, so a
+ * direct link works and stays buyable; the catalogue the server re-prices from,
+ * /order, the cart and everything under functions/ read `products` in full. When
+ * a real photograph goes through scripts/images.mjs the product lists itself.
+ * There is no flag to set, so there is none to forget to clear.
+ *
+ * Derived from photos.length for the reason systemFor() is: the loop above has
+ * already thrown on any entry that is not a real photograph, so a count is safe.
+ */
+export const isListed = (product: Product): boolean => product.photos.length > 0;
+
+export const listed: Product[] = products.filter(isListed);
+
 /** The size chart's rows, or null unless every size has both measurements. */
 export const sizeChart = (product: Product): Size[] | null =>
   product.sizes.length > 0 && product.sizes.every((s) => s.chestCm !== null && s.lengthCm !== null)
@@ -308,7 +330,11 @@ export interface Category extends CategoryCopy {
   slug: string;
 }
 
-const present = new Set(products.map((p) => p.category));
+/* Every category in the data must be declared, listed or not, so a typo in an
+ * unlisted product's category fails the build now rather than the day it lists. */
+const declared = new Set(products.map((p) => p.category));
+/* A category exists only while it holds a listed product. */
+const present = new Set(listed.map((p) => p.category));
 
 /* A category in the data with no entry above fails the build rather than
  * rendering a page headed by its own slug with nothing under it. That page would
@@ -319,7 +345,7 @@ const present = new Set(products.map((p) => p.category));
  * downstream instead of the deliberate error this loop exists to raise. It also
  * matches Object.entries in the filter underneath, which enumerates own keys
  * only, so the guard and the thing it guards now agree about what a key is. */
-for (const slug of present) {
+for (const slug of declared) {
   if (!Object.hasOwn(CATEGORY_COPY, slug)) {
     throw new Error(
       `products.json carries category "${slug}" with no entry in CATEGORY_COPY ` +
@@ -348,18 +374,22 @@ if (Object.hasOwn(CATEGORY_COPY, "black-november")) {
   throw new Error(`CATEGORY_COPY key "black-november" is the campaign page's address. A category cannot take it.`);
 }
 
-/** Products listed for an audience, in catalogue order. */
+/** Listed products for an audience, in catalogue order. */
 export const productsFor = (audience: Audience): Product[] =>
-  products.filter((p) => p.audience.includes(audience));
+  listed.filter((p) => p.audience.includes(audience));
 
 /** Audiences that have a page: only those with at least one product. */
 export const audiencesWithPages = (): Audience[] =>
   AUDIENCES.filter((a) => productsFor(a).length > 0);
 
+/** Listed products in a category, in catalogue order. */
 export const productsIn = (category: string): Product[] =>
-  products.filter((p) => p.category === category);
+  listed.filter((p) => p.category === category);
 
-/** Related items: same category, never the product itself, never padded from
+/** The first listed product in a category, or undefined when there is none. */
+export const firstIn = (category: string): Product | undefined => productsIn(category)[0];
+
+/** Related items (listed only): same category, never the product itself, never padded from
  *  another category. Fewer than the ceiling is a true answer. */
 export const relatedTo = (product: Product, limit = 4): Product[] =>
   productsIn(product.category)

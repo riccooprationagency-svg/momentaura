@@ -58,7 +58,10 @@ export function getStaticPaths() {
     params: { slug: product.slug },
     props: {
       product,
-      category: named.get(product.category)!,
+      /* Undefined for a product that is not listed in a category that has no
+         page: the category link and the related row are both omitted, never
+         pointed at a page that is not built. */
+      category: named.get(product.category),
       related: relatedTo(product),
     },
   }));
@@ -66,7 +69,7 @@ export function getStaticPaths() {
 
 interface Props {
   product: Product;
-  category: Category;
+  category: Category | undefined;
   related: Product[];
 }
 
@@ -123,9 +126,13 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
       </div>
 
       <div class="detail__body">
-        <p class="detail__category">
-          <a href={`/${category.slug}`}>{category.name}</a>
-        </p>
+        {
+          category && (
+            <p class="detail__category">
+              <a href={`/${category.slug}`}>{category.name}</a>
+            </p>
+          )
+        }
 
         <h1 class="detail__name">{product.name}</h1>
 
@@ -262,7 +269,7 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
     /* Same category only, never padded from another. Two products sit alone in
        their category, so this section does not render on their pages at all —
        an empty heading over an empty grid is a worse answer than no heading. */
-    related.length > 0 && (
+    category && related.length > 0 && (
       <section class="related">
         <div class="wrap">
           <div class="related__head">
