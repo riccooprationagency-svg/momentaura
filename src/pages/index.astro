@@ -3,7 +3,8 @@
 //
 // Not present, each because the data behind it does not exist yet:
 //   hero video       no footage
-//   hero photograph  no real photography of stock we hold
+//   hero photograph  no real photography of stock we hold. A disclosed render
+//                    of one product (site.json heroProduct) stands in until there is
 //   capacity notice  no production figure, no cut-off date
 //   dispatch ledger  zero orders dispatched
 //   testimonials     no reviews, and none until roughly twenty orders
@@ -17,6 +18,8 @@ import DispatchRule from "../components/DispatchRule.astro";
 import CampaignStrip from "../components/CampaignStrip.astro";
 import CategoryTile from "../components/CategoryTile.astro";
 import ProductReveal from "../components/ProductReveal.astro";
+import Gallery from "../components/Gallery.astro";
+import { heroProduct } from "../lib/hero";
 import { categories, products } from "../lib/products";
 
 // The categories are derived from products.json in one place now, so the tiles
@@ -45,16 +48,27 @@ const revealed = products.slice(0, 2);
     edge to edge within the gutter, so there is no emptiness left to hedge
     against.
 
-    When the shoot happens the photograph sits BEHIND these letterforms rather
-    than replacing them: the mark stays at --t-hero, the image goes underneath,
-    and the section keeps its height. It does not become a photograph with a
-    caption over it. Nothing in this block changes but the addition of the
-    image and its ground.
+    One product's lead photograph sits ABOVE the line and the mark, never under
+    a letter: there is no scrim to be had (gradients are banned) and no gate can
+    read legibility over a picture, so the type stays on solid --bg. If the lead
+    is a render, its caption prints directly beneath it.
   -->
   <section class="hero" data-system="dark">
     <div class="wrap hero__inner">
       <p class="hero__line">Nairobi — apparel and accessories</p>
       <h1 class="hero__mark">MomentAura</h1>
+      {
+        /* The rule rides with the image rather than in the page stylesheet. That
+           sheet is inlined into index.html, so any rule added to it changes the
+           page's bytes even when heroProduct is null. Here a null hero emits
+           nothing and the page is the page it was. Tokens only. */
+        heroProduct && (
+          <div class="hero__image">
+            <style is:inline set:html=".hero__image { order: -1; width: var(--hero-image-width); }" />
+            <Gallery product={heroProduct} hero />
+          </div>
+        )
+      }
     </div>
   </section>
 

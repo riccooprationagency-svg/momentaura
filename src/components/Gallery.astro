@@ -27,6 +27,21 @@
 // metered connection, and nothing on the page would look wrong while it happened.
 // A surface that forgets to opt in shows one lazy image, which costs nothing.
 //
+// ---------- hero, and why it defaults to off ----------
+//
+// The homepage hero is the one place outside a product page where a photograph
+// is the largest element in the first screen, so it is the LCP candidate there
+// and has to load like one: eager, high fetch priority. `hero` asks for exactly
+// that and for a `sizes` that matches the hero's own box, and for nothing else.
+// It does not switch, it does not add a strip, and it never touches the caption:
+// a render under the hero prints the same line, in the same register, as it does
+// on every other surface.
+//
+// Same reasoning as `detail`, and the same default. Off, the first photograph is
+// lazy. A surface that forgets to ask costs a late image; a surface that asks by
+// accident costs an eager full-width fetch on a page that did not need one. Only
+// src/pages/index.astro passes it.
+//
 // ---------- the strip, and why it has no script ----------
 //
 // With two or more photographs a detail view shows one at a time, chosen from a
@@ -57,9 +72,12 @@ interface Props {
   /** The product page's second-row photograph: the last one, lazily, and
    *  nothing at all for a product with no photographs. */
   last?: boolean;
+  /** The homepage hero's lead photograph: eager, high priority, sized to the
+   *  hero's box. Off unless the hero asks. */
+  hero?: boolean;
 }
 
-const { product, detail = false, last = false } = Astro.props;
+const { product, detail = false, last = false, hero = false } = Astro.props;
 
 const system = systemFor(product);
 const photos = product.photos;
@@ -145,6 +163,10 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * Below 900 it is not displayed, and a lazy image that is display: none is not
  * fetched, so the value there is never used.
  *
+ * The hero's box is --hero-image-width in tokens.css: at most 28rem, and on a
+ * phone it is narrower than the viewport less its two gutters. The condition is
+ * the first declared breakpoint, 640, and the length beside it is the cap.
+ *
  * They round up. An over-estimate costs bytes on one image; an under-estimate
  * puts a soft photograph on the page where a buyer is deciding whether the shop
  * is real, and of the two only one of them is recoverable by looking harder.
@@ -156,7 +178,9 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  */
 const SIZES = last
   ? "(min-width: 1240px) 565px, 60vw"
-  : detail
+  : hero
+    ? "(min-width: 640px) 28rem, calc(100vw - 2.5rem)"
+    : detail
     ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
     : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
 
@@ -239,8 +263,9 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
            it is above the fold and the largest thing on the page, so it is the
            LCP candidate. Everything else is below the fold, which is where
            CLAUDE.md's lazy rule applies, and that includes the first image of a
-           card or a homepage reveal: both sit under a 70dvh hero. */
-        const lead = detail && !last && i === 0;
+           card or a homepage reveal: both sit under the hero. The hero's own
+           photograph is the exception, and it asks with `hero`. */
+        const lead = (detail || hero) && !last && i === 0;
 
         return (
           <>
