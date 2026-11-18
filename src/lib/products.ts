@@ -84,9 +84,42 @@ export interface Product {
    *  has description copy yet, and the product page omits the paragraph rather
    *  than stubbing it. Add the key to a product when the copy is written. */
   description?: string | null;
+  /** On order and never held. Display only: it changes what a stock 0 product
+   *  says, never whether it can be ordered (the server refuses stock 0 either
+   *  way). Allowed only when stock is 0. `by` is the expected arrival, an ISO
+   *  date, or null when nobody can say. */
+  incoming?: { by: string | null };
 }
 
 export const products = data as Product[];
+
+/** Today in Nairobi (EAT, UTC+3, no daylight saving), read at build. The same
+ *  reading as buildDay() in campaign.ts, which imports this module and so cannot
+ *  be imported here. */
+const today = (): string => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+/** On order and never held: a third stock state, neither in stock nor sold out. */
+export const isIncoming = (product: Product): boolean => product.incoming !== undefined;
+
+/** The expected-by date, or null when there is none or it has passed. A passed
+ *  date is never shown and never throws: a deploy must not break on a day nobody
+ *  edited anything. The day itself still counts as not passed. */
+export const incomingBy = (product: Product): string | null => {
+  const by = product.incoming?.by ?? null;
+  return by !== null && by >= today() ? by : null;
+};
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS_LONG = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** "Monday 23 November". Parsed from the string, so no timezone moves the day. */
+export const longDate = (iso: string): string => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} ${MONTHS_LONG[m - 1]}`;
+};
 
 /**
  * The two-system rule, derived and never stored. A stored flag drifts out of
@@ -197,6 +230,27 @@ for (const product of products) {
     }
     if (instant > Date.now()) {
       throw new Error(`products.json: "${product.slug}" stockCountedAt is ${JSON.stringify(at)}, which is in the future.`);
+    }
+  }
+
+  /* incoming. Only a product we hold none of can be "not in stock yet", and the
+     date is a real calendar day or null. A date that has passed is not an error
+     here: incomingBy() just stops showing it. */
+  if (product.incoming !== undefined) {
+    const inc = product.incoming as { by?: unknown } | null;
+    if (inc === null || typeof inc !== "object" || Array.isArray(inc) || !("by" in inc)) {
+      throw new Error(`products.json: "${product.slug}" incoming must be { "by": null } or { "by": "YYYY-MM-DD" }.`);
+    }
+    if (product.stock !== 0) {
+      throw new Error(`products.json: "${product.slug}" has "incoming" but stock ${product.stock}. "incoming" is allowed only when stock is 0.`);
+    }
+    const by = inc.by;
+    if (by !== null) {
+      const m = typeof by === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(by) : null;
+      const real = m !== null && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toISOString().slice(0, 10) === by;
+      if (!real) {
+        throw new Error(`products.json: "${product.slug}" incoming.by is ${JSON.stringify(by)} — null or a real ISO date like 2026-11-23.`);
+      }
     }
   }
 

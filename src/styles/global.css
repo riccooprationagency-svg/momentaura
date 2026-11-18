@@ -322,6 +322,12 @@ a {
   text-transform: uppercase;
 }
 
+/* Muted, in the case it was written in. The Expected by date reads "Monday 23
+   November"; --closed would uppercase it. Same token, so nothing new to measure. */
+.docket__value--muted {
+  color: var(--fg-muted);
+}
+
 /* One item, one box. The docket's shape without the docket's fill: a product
    card, an order line, a delivery region. A 1px edge, the surface radius, and
    the page ground showing through — Kraft Board stays the docket's, the
