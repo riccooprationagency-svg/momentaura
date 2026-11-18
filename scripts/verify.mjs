@@ -2006,14 +2006,18 @@ function categoryViolations(declared, inData, pages, everyInData = inData) {
     ["an empty category given a page that still carries a card", ["hoodies", "watches"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "watches", html: card }], `"watches" has no products but has a built page`],
     ["a category with products and no page", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: null }], `"hoodies" has products but no built page`],
     ["a card class that only contains the word", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: `<article class="card__meta">` }], `"hoodies" page has no product card`],
+    /* The two cases the fourth argument exists for: everyInData is every category
+       in the data, inData only those holding a listed product. */
+    ["a declared category holding only unlisted products needs no page", ["hoodies", "bucket-hats"], ["hoodies"], [{ slug: "hoodies", html: card }, { slug: "bucket-hats", html: null }], null, ["hoodies", "bucket-hats"]],
+    ["an undeclared category present only on unlisted products", ["hoodies"], ["hoodies"], [{ slug: "hoodies", html: card }], `"scarves" is in products.json but not declared`, ["hoodies", "scarves"]],
   ];
   let ok = 0;
-  for (const [label, d, i, p, mustSay] of cases) {
-    const found = categoryViolations(d, i, p);
+  for (const [label, d, i, p, mustSay, every] of cases) {
+    const found = categoryViolations(d, i, p, every);
     if (mustSay === null ? found.length === 0 : found.some((m) => m.includes(mustSay))) ok++;
     else fail("V16", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with ${mustSay}`}, got: ${found.join("; ") || "no violation"}`);
   }
-  console.log(`  V16 category self-test ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+  console.log(`  V16 category self-test ${ok}/${cases.length} fixtures behave (2 pass, ${cases.length - 2} fail by name)`);
 
   if (existsSync(DIST)) {
     const pages = declared.map((slug) => {
@@ -2050,9 +2054,15 @@ function categoryViolations(declared, inData, pages, everyInData = inData) {
 /** pages: { men: html|null, women: html|null } for every declared audience. */
 function audienceViolations(declared, data, pages) {
   const out = [];
+  /* "Wanted" means a LISTED product with that audience: photos.length > 0, the
+     definition in src/lib/products.ts isListed, which is the source of truth; the
+     two must change together. A product with an audience and no photographs is
+     built at /products/<slug> but listed nowhere, so no /for page may be required
+     to carry it. It may not appear on one either: that is the last violation below. */
+  const isListed = (p) => Array.isArray(p.photos) && p.photos.length > 0;
   for (const a of declared) {
     const html = pages[a] ?? null;
-    const wanted = data.filter((p) => p.audience.includes(a)).map((p) => p.slug);
+    const wanted = data.filter((p) => isListed(p) && p.audience.includes(a)).map((p) => p.slug);
     if (html === null) {
       if (wanted.length > 0) out.push(`audience "${a}" has products but no built page`);
       continue;
@@ -2065,6 +2075,7 @@ function audienceViolations(declared, data, pages) {
     for (const slug of listed) {
       const product = data.find((p) => p.slug === slug);
       if (!product) out.push(`/for/${a} lists "${slug}", which is not in products.json`);
+      else if (!isListed(product)) out.push(`/for/${a} lists "${slug}", which is not listed (no photographs)`);
       else if (product.audience.length === 0) out.push(`/for/${a} lists "${slug}", whose audience is empty`);
       else if (!product.audience.includes(a)) out.push(`/for/${a} lists "${slug}", whose audience does not include "${a}"`);
     }
@@ -2085,9 +2096,10 @@ function audienceViolations(declared, data, pages) {
 
   const cardFor = (slug) => `<article class="card box"><a class="card__link" href="/products/${slug}">${slug}</a></article>`;
   const fx = [
-    { slug: "tee", audience: ["men", "women"] },
-    { slug: "cropped", audience: ["women"] },
-    { slug: "hat", audience: [] },
+    { slug: "tee", audience: ["men", "women"], photos: ["p"] },
+    { slug: "cropped", audience: ["women"], photos: ["p"] },
+    { slug: "hat", audience: [], photos: ["p"] },
+    { slug: "bare", audience: ["women"], photos: [] },
   ];
   const good = { men: cardFor("tee"), women: cardFor("tee") + cardFor("cropped") };
   const cases = [
@@ -2097,6 +2109,8 @@ function audienceViolations(declared, data, pages) {
     ["a product the data does not have", { ...good, men: good.men + cardFor("ghost") }, `"ghost", which is not in products.json`],
     ["a listed product missing from its page", { ...good, women: cardFor("tee") }, `/for/women does not list "cropped"`],
     ["an audience with products and no page", { ...good, women: null }, `audience "women" has products but no built page`],
+    ["an unlisted product with an audience is not required on its page", good, null],
+    ["an unlisted product on a page", { ...good, women: good.women + cardFor("bare") }, `"bare", which is not listed`],
   ];
   let ok = 0;
   for (const [label, pages, mustSay] of cases) {
@@ -2104,7 +2118,7 @@ function audienceViolations(declared, data, pages) {
     if (mustSay === null ? found.length === 0 : found.some((x) => x.includes(mustSay))) ok++;
     else fail("V16", `self-test: ${label} should ${mustSay === null ? "pass" : `fail with ${mustSay}`}, got: ${found.join("; ") || "no violation"}`);
   }
-  console.log(`  V16 audience self-test ${ok}/${cases.length} fixtures behave (1 passes, ${cases.length - 1} fail by name)`);
+  console.log(`  V16 audience self-test ${ok}/${cases.length} fixtures behave (2 pass, ${cases.length - 2} fail by name)`);
 
   if (existsSync(DIST)) {
     const pages = {};
