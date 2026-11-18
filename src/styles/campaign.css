@@ -1,27 +1,39 @@
 /* Black November motion. CSS only. Imported by src/pages/black-november.astro
    as a string and written into the page only while campaign.json is live. */
 
-.campaign-block {
-  position: relative;
-}
+/* The root is the full width of the page and is the sky's containing block. The
+   sky is the first viewport, out of flow, so nothing moves when it is there.
 
-.campaign-block h1,
-.campaign-label {
+   It sits in FRONT of the content. Behind it, the cards (opaque, and the full
+   width of a phone) hid a balloon for most of its rise at 390px; in front, a
+   balloon is seen for the whole of it. It cannot get in the way, because the sky
+   is pointer-events: none, so every tap and click goes through to what is under
+   it, and aria-hidden, so it is not in the accessibility tree or the tab order.
+
+   The order, bottom to top: the page and everything in it (nothing in it is
+   positioned above auto), then the sky at 2, then the edge label (5), the nav
+   (10) and the skip link (20). The repo has no z-index scale beyond those three,
+   so 2 is the smallest change that clears the content and stays under all of
+   them: a balloon never covers the nav, the skip link or the edge label. */
+.campaign-root {
   position: relative;
 }
 
 .campaign-sky {
   position: absolute;
-  inset: 0;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: var(--campaign-sky);
   overflow: hidden;
   pointer-events: none;
+  z-index: 2;
 }
 
 .campaign-defs {
   position: absolute;
 }
 
-/* The row starts at the block's lower edge, so every balloon begins below it. */
+/* The row starts at the sky's lower edge, so every balloon begins below it. */
 .campaign-row {
   position: absolute;
   inset-inline: 0;
@@ -91,6 +103,7 @@
 }
 
 .campaign-label {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -106,11 +119,11 @@
   cursor: pointer;
 }
 
-.campaign-pause:checked ~ .campaign-label {
+.campaign-pause:checked ~ .page .campaign-label {
   background-color: var(--surface);
 }
 
-.campaign-pause:focus-visible ~ .campaign-label {
+.campaign-pause:focus-visible ~ .page .campaign-label {
   outline: 2px solid var(--fg);
   outline-offset: 2px;
 }
@@ -148,8 +161,12 @@
   from {
     transform: translateY(0);
   }
+  /* The balloon starts with its top on the sky's lower edge, so clearing the
+     sky takes the sky's height plus the balloon's own: the largest is about
+     90px tall, and the token alone left it resting with a strip showing at the
+     top. One space step more than that, so it holds at any viewport height. */
   to {
-    transform: translateY(var(--campaign-travel));
+    transform: translateY(calc(var(--campaign-travel) - var(--s-120)));
   }
 }
 
