@@ -397,14 +397,96 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
   );
 }
 
-/* ---------- V6 — banned constructs ---------- */
+/* ---------- V6 — banned constructs ----------
+ *
+ * ---------- THE ONE CARVE-OUT: CAMPAIGN KEYFRAMES ----------
+ *
+ * @keyframes was banned outright. CLAUDE.md's "Campaign motion" section now
+ * permits one named exception: CSS-only balloons on /black-november, while
+ * campaign.json says the campaign is live. A blanket ban made that permission
+ * impossible to use, and a gate looser or tighter than the rule it enforces is
+ * the failure this repo keeps naming. This is the gate cut to the exception and
+ * not an inch wider.
+ *
+ * A keyframe is permitted only when ALL four hold, and each is checked
+ * separately so the failure says which:
+ *   1. its name starts with `campaign-`;
+ *   2. in src/, it sits in src/styles/campaign.css and nowhere else;
+ *   3. in dist/, it reaches dist/black-november/index.html and no other page;
+ *   4. in dist/, the campaign is live: startsOn <= today <= endsOn, today read
+ *      in Nairobi exactly as src/lib/campaign.ts reads it. The source file is
+ *      exempt from this one, because CLAUDE.md gives a follow-up PR seven days
+ *      after endsOn to delete the CSS. The built output is not: the build must
+ *      stop emitting the motion the day the campaign ends.
+ *
+ * Condition 3, as the build really behaves: astro.config.mjs sets
+ * inlineStylesheets "always", so the build emits no .css file and no
+ * stylesheet link. A campaign.css imported only by black-november.astro is
+ * inlined into dist/black-november/index.html and nowhere else; imported by
+ * Base.astro it is inlined into every page, and condition 3 fails on every
+ * page that is not the campaign's. The .css branch below is for the day that
+ * config changes to "auto" or "never": a stylesheet file may carry a campaign
+ * keyframe only if exactly one built page links it and that page is the
+ * campaign's. Without it, that config change would make the rule dead.
+ *
+ * What it buys: the balloons can ship with the gate on rather than switched
+ * off, and the gate still fails on any other animation, anywhere.
+ * What it costs: the name `campaign-` is now a key that opens the ban, so
+ * everything above is the lock. Nothing else changes: any other @keyframes in
+ * any file still fails, and gradients, shadows, scroll-behavior, weight and
+ * emoji below are untouched.
+ */
 
 {
+  const CAMPAIGN_CSS = "src/styles/campaign.css";
+  const CAMPAIGN_PAGE = "dist/black-november/index.html";
+  const CAMPAIGN_NAME = /^campaign-[A-Za-z0-9_-]+$/;
+  const KEYFRAMES = /@keyframes\s*([^\s{]*)/gi;
+  const BARE = "@keyframes — no scroll animation, no skeleton shimmer";
+
+  const dates = JSON.parse(readFileSync(join(SRC, "data", "campaign.json"), "utf8"));
+  const today = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const live = dates.startsOn <= today && today <= dates.endsOn;
+
+  // Built pages, read once, only to answer which of them a stylesheet reaches.
+  const builtPages = new Map(
+    walkAll(DIST).filter((f) => f.endsWith(".html")).map((f) => [rel(f), readFileSync(f, "utf8")])
+  );
+  const linkedFrom = (cssFile) => {
+    const url = "/" + relative(DIST, cssFile).replace(/\\/g, "/");
+    return [...builtPages].filter(([, text]) => text.includes(url)).map(([page]) => page);
+  };
+
+  // null when this keyframe is permitted, otherwise the reason it is not.
+  const keyframeProblem = (file, name) => {
+    if (!CAMPAIGN_NAME.test(name)) return BARE;
+    if (!file.startsWith(DIST)) {
+      return rel(file) === CAMPAIGN_CSS
+        ? null
+        : `@keyframes ${name} — a campaign keyframe lives in ${CAMPAIGN_CSS} and nowhere else`;
+    }
+    if (!live) {
+      return `@keyframes ${name} — built outside the campaign (${dates.startsOn} to ${dates.endsOn}, today ${today}); the build must not emit it`;
+    }
+    const reaches = file.endsWith(".html") ? [rel(file)] : file.endsWith(".css") ? linkedFrom(file) : [];
+    return reaches.length === 1 && reaches[0] === CAMPAIGN_PAGE
+      ? null
+      : `@keyframes ${name} — in dist/ it may reach ${CAMPAIGN_PAGE} and no other page (reaches: ${reaches.join(", ") || "none"})`;
+  };
+
+  // A rule is a regex with a label, or a function of (line, file) returning the
+  // reason or null. Keyframes need the file, so they are the function.
   const BANNED = [
     [/box-shadow|drop-shadow/i, "shadow — depth is the one luminance step, never a shadow"],
     [/linear-gradient|radial-gradient|conic-gradient/i, "gradient"],
     [/backdrop-filter/i, "backdrop-filter — no glassmorphism"],
-    [/@keyframes/i, "@keyframes — no scroll animation, no skeleton shimmer"],
+    [(line, file) => {
+      for (const m of line.matchAll(KEYFRAMES)) {
+        const why = keyframeProblem(file, m[1]);
+        if (why) return why;
+      }
+      return null;
+    }],
     [/scroll-behavior\s*:\s*smooth/i, "smooth scrolling"],
     [/font-weight\s*:\s*(bold(er)?|[7-9]0{2})\b/i, "font-weight above 600"],
     [/\p{Extended_Pictographic}/u, "emoji — banned anywhere, including code comments", true],
@@ -430,12 +512,13 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
     // comments there hid exactly what this check exists to find.
     const isBuilt = file.startsWith(DIST);
 
-    for (const [re, label, scanComments] of BANNED) {
+    for (const [rule, label, scanComments] of BANNED) {
       const lines = (scanComments || isBuilt ? raw : stripped).split(/\r?\n/);
       lines.forEach((line, i) => {
-        if (re.test(line)) {
+        const why = typeof rule === "function" ? rule(line, file) : rule.test(line) ? label : null;
+        if (why) {
           hits++;
-          fail("V6", `${rel(file)}:${i + 1}  ${label}`);
+          fail("V6", `${rel(file)}:${i + 1}  ${why}`);
         }
       });
     }

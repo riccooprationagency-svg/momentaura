@@ -181,6 +181,26 @@
   /* ---------- MOTION ---------- */
   --dur: 240ms;
   --ease: cubic-bezier(0.625, 0.05, 0, 1);
+
+  /* ---------- CAMPAIGN MOTION ----------
+     CLAUDE.md "Campaign motion": /black-november only, while campaign.json says
+     live, CSS only. These exist so src/styles/campaign.css never writes a raw
+     duration, angle or distance and V2b never has to be loosened. Every value
+     sits under a ceiling the amendment fixes; none is a colour. Keyframe
+     selectors are written from and to, never percentages, because V2b matches %.
+
+     The amendment's ceilings: rise 5 to 8 seconds, sway at most 4 degrees,
+     stagger at most 3 seconds, at most 11 balloons (5 under 640px), and no
+     element flashing more than once per 2 seconds. A balloon's delay is its
+     index times --campaign-delay-step, so the last of eleven (index 10) starts
+     at 2500ms. There is no token for the count: it is markup. There are no
+     spotlight tokens (pulse, zoom) because the spotlight is not built. */
+  --campaign-rise: 6s;           /* one pass, linear. Inside the 5 to 8s band */
+  --campaign-sway: 3s;           /* one side-to-side cycle, so two cycles in a rise */
+  --campaign-travel: -110vh;     /* upward, so negative: clears the viewport top */
+  --campaign-tilt: 2deg;         /* swings plus and minus: 4deg end to end, at the ceiling on either reading */
+  --campaign-line-draw: 300ms;   /* the top of the site's 200 to 300ms band */
+  --campaign-delay-step: 250ms;  /* ten steps is 2500ms, under the 3s stagger ceiling */
 }
 
 @media (max-width: 640px) {
