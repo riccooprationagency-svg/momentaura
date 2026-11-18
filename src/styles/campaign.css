@@ -2,19 +2,21 @@
    as a string and written into the page only while campaign.json is live. */
 
 /* The root is the full width of the page and is the sky's containing block. The
-   sky is the first viewport, out of flow, so nothing moves when it is there. It
-   sits behind the content: the content column is positioned one step above it,
-   so a balloon passes behind the heading, the Pause control and every card, and
-   shows in the gutters and margins. The repo has no z-index scale beyond the nav
-   (10), the skip link (20) and the edge label (5); 0 and 1 are the smallest
-   change and stay under all three. */
+   sky is the first viewport, out of flow, so nothing moves when it is there.
+
+   It sits in FRONT of the content. Behind it, the cards (opaque, and the full
+   width of a phone) hid a balloon for most of its rise at 390px; in front, a
+   balloon is seen for the whole of it. It cannot get in the way, because the sky
+   is pointer-events: none, so every tap and click goes through to what is under
+   it, and aria-hidden, so it is not in the accessibility tree or the tab order.
+
+   The order, bottom to top: the page and everything in it (nothing in it is
+   positioned above auto), then the sky at 2, then the edge label (5), the nav
+   (10) and the skip link (20). The repo has no z-index scale beyond those three,
+   so 2 is the smallest change that clears the content and stays under all of
+   them: a balloon never covers the nav, the skip link or the edge label. */
 .campaign-root {
   position: relative;
-}
-
-.campaign-root > .page {
-  position: relative;
-  z-index: 1;
 }
 
 .campaign-sky {
@@ -24,7 +26,7 @@
   block-size: var(--campaign-sky);
   overflow: hidden;
   pointer-events: none;
-  z-index: 0;
+  z-index: 2;
 }
 
 .campaign-defs {

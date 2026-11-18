@@ -75,9 +75,13 @@ interface Props {
   /** The homepage hero's lead photograph: eager, high priority, sized to the
    *  hero's box. Off unless the hero asks. */
   hero?: boolean;
+  /** The Black November strip renders above the hero, so the hero photograph
+   *  is the narrower --hero-image-width-strip. Off unless the homepage says so,
+   *  and only read together with `hero`. */
+  strip?: boolean;
 }
 
-const { product, detail = false, last = false, hero = false } = Astro.props;
+const { product, detail = false, last = false, hero = false, strip = false } = Astro.props;
 
 const system = systemFor(product);
 const photos = product.photos;
@@ -163,6 +167,9 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * Below 900 it is not displayed, and a lazy image that is display: none is not
  * fetched, so the value there is never used.
  *
+ * With the Black November strip above the hero the box is --hero-image-width-strip
+ * instead, 2.75rem less tall, and `strip` selects the matching sizes.
+ *
  * The hero's box is --hero-image-width in tokens.css, clamp(9rem, (100dvh -
  * 26rem) * 0.75, 28rem), held inside the column by max-width: 100%. sizes
  * follows the same box: from 640 the column is wider than the cap, so the clamp
@@ -185,13 +192,20 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * breakpoints are the three declared at the top of tokens.css — read and change
  * them there.
  */
+/* Both hero widths are written out in full, one string per line with its media
+   condition, because V2b reads a line at a time and exempts a length only beside
+   the condition it belongs to, and because sizes cannot read a custom property.
+   The strip's is --hero-image-width-strip: the same clamp with --tap-target (44px,
+   2.75rem) taken off the height. Keep the pair in step with tokens.css. */
 const SIZES = last
   ? "(min-width: 1240px) 565px, 60vw"
-  : hero
-    ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
-    : detail
-    ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
-    : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
+  : hero && strip
+    ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
+    : hero
+      ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
+      : detail
+        ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
+        : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
 
 const group = `photo-${product.slug}`;
 
