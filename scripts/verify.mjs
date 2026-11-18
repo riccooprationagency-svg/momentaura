@@ -435,6 +435,11 @@ const sourceFiles = walk(SRC).filter((f) => f !== TOKENS);
  * everything above is the lock. Nothing else changes: any other @keyframes in
  * any file still fails, and gradients, shadows, scroll-behavior, weight and
  * emoji below are untouched.
+ *
+ * The keyframe name must sit on the same line as @keyframes, because V6 reads
+ * one line at a time. A declaration split across lines fails closed under the
+ * blanket ban, never open: the name reads as empty, so it is refused, and the
+ * fix is to write the name beside the at-rule.
  */
 
 {

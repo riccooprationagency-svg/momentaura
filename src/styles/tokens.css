@@ -199,7 +199,6 @@
   --campaign-sway: 3s;           /* one side-to-side cycle, so two cycles in a rise */
   --campaign-travel: -110vh;     /* upward, so negative: clears the viewport top */
   --campaign-tilt: 2deg;         /* swings plus and minus: 4deg end to end, at the ceiling on either reading */
-  --campaign-line-draw: 300ms;   /* the top of the site's 200 to 300ms band */
   --campaign-delay-step: 250ms;  /* ten steps is 2500ms, under the 3s stagger ceiling */
 }
 
