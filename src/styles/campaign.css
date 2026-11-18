@@ -1,0 +1,163 @@
+/* Black November motion. CSS only. Imported by src/pages/black-november.astro
+   as a string and written into the page only while campaign.json is live. */
+
+.campaign-block {
+  position: relative;
+}
+
+.campaign-block h1,
+.campaign-label {
+  position: relative;
+}
+
+.campaign-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.campaign-defs {
+  position: absolute;
+}
+
+/* The row starts at the block's lower edge, so every balloon begins below it. */
+.campaign-row {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: flex-start;
+}
+
+.campaign-balloon {
+  --i: 0;
+  --size: var(--s-40);
+  inline-size: var(--size);
+}
+
+.campaign-balloon:nth-child(3n + 2) {
+  --size: var(--s-56);
+}
+
+.campaign-balloon:nth-child(3n) {
+  --size: var(--s-28);
+}
+
+.campaign-balloon:nth-child(2) { --i: 5; }
+.campaign-balloon:nth-child(3) { --i: 2; }
+.campaign-balloon:nth-child(4) { --i: 8; }
+.campaign-balloon:nth-child(5) { --i: 4; }
+.campaign-balloon:nth-child(6) { --i: 10; }
+.campaign-balloon:nth-child(7) { --i: 1; }
+.campaign-balloon:nth-child(8) { --i: 7; }
+.campaign-balloon:nth-child(9) { --i: 3; }
+.campaign-balloon:nth-child(10) { --i: 9; }
+.campaign-balloon:nth-child(11) { --i: 6; }
+
+.campaign-sway {
+  display: block;
+  transform-origin: center bottom;
+}
+
+.campaign-art {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+
+.campaign-body {
+  fill: var(--surface);
+  stroke: var(--fg);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.campaign-shine {
+  fill: var(--fg);
+  opacity: 0.18;
+}
+
+.campaign-knot {
+  fill: var(--fg-muted);
+}
+
+.campaign-string {
+  fill: none;
+  stroke: var(--fg-muted);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.campaign-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  margin-block-start: var(--s-20);
+  padding-inline: var(--s-28);
+  border: 1px solid var(--fg);
+  border-radius: var(--radius-button);
+  font-size: var(--t-label);
+  font-weight: var(--w-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-label);
+  cursor: pointer;
+}
+
+.campaign-pause:checked ~ .campaign-label {
+  background-color: var(--surface);
+}
+
+.campaign-pause:focus-visible ~ .campaign-label {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .campaign-balloon:nth-child(n + 6) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .campaign-balloon {
+    animation: campaign-rise var(--campaign-rise) linear calc(var(--i) * var(--campaign-delay-step)) 1 normal both;
+  }
+
+  .campaign-sway {
+    animation: campaign-sway var(--campaign-sway) var(--ease) calc(var(--i) * var(--campaign-delay-step)) 2 alternate both;
+  }
+
+  .campaign-pause:checked ~ .campaign-sky .campaign-balloon,
+  .campaign-pause:checked ~ .campaign-sky .campaign-sway {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campaign-sky,
+  .campaign-pause,
+  .campaign-label {
+    display: none;
+  }
+}
+
+@keyframes campaign-rise {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--campaign-travel));
+  }
+}
+
+@keyframes campaign-sway {
+  from {
+    transform: rotate(calc(var(--campaign-tilt) * -1));
+  }
+  to {
+    transform: rotate(var(--campaign-tilt));
+  }
+}
