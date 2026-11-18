@@ -20,7 +20,7 @@
 // nothing to say is vertical space instead, and the facts below it are the
 // fact a dispatch rule would carry, said once.
 import Gallery from "./Gallery.astro";
-import { systemFor, price, type Product } from "../lib/products";
+import { isIncoming, systemFor, price, type Product } from "../lib/products";
 
 interface Props {
   product: Product;
@@ -58,7 +58,7 @@ const soldOut = product.stock === 0;
       <dd class="docket__value">
         {
           soldOut ? (
-            <span class="docket__value--closed">Sold out</span>
+            <span class="docket__value--closed">{isIncoming(product) ? "Not in stock yet" : "Sold out"}</span>
           ) : (
             <span class="docket__value--fact">{`${product.stock} in stock`}</span>
           )

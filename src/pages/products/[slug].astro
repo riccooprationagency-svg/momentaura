@@ -47,6 +47,9 @@ import {
   sizeChart,
   systemFor,
   price,
+  isIncoming,
+  incomingBy,
+  longDate,
   type Category,
   type Product,
 } from "../../lib/products";
@@ -81,6 +84,11 @@ const system = systemFor(product);
 // page renders the closed state in practice; the open branch is the same
 // condition read the other way, not a second design.
 const soldOut = product.stock === 0;
+// Not in stock yet: stock 0 and never held. Not closed, so it says so in its own
+// words. No delivery date is computed anywhere on this page for it: it cannot
+// ship today, so a date from today would be false.
+const incoming = soldOut && isIncoming(product);
+const expectedBy = incoming ? incomingBy(product) : null;
 const chart = sizeChart(product);
 
 // Gallery draws the strip from two photographs up; the page only has to make
@@ -180,7 +188,7 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
         {
           soldOut ? (
             <Button variant="filled" disabled describedby="detail-closed">
-              <span class="detail__soldout">Sold out</span>
+              <span class="detail__soldout">{incoming ? "Not in stock yet" : "Sold out"}</span>
             </Button>
           ) : (
             <Button variant="filled" data-add data-slug={product.slug} data-stock={product.stock}>
@@ -190,11 +198,18 @@ const description = product.dispatch ? `${meta}. Dispatched from ${product.dispa
         }
 
         {
-          soldOut && (
+          incoming ? (
             <p class="detail__closed" id="detail-closed">
-              {product.name} is in the catalogue. It cannot be ordered until there is stock
-              to send.
+              Not in stock yet. It cannot be ordered until it arrives.
+              {expectedBy !== null && ` Expected by ${longDate(expectedBy)}.`}
             </p>
+          ) : (
+            soldOut && (
+              <p class="detail__closed" id="detail-closed">
+                {product.name} is in the catalogue. It cannot be ordered until there is stock
+                to send.
+              </p>
+            )
           )
         }
 

@@ -20,7 +20,7 @@
 // background: a surface that forgets to opt in renders quietly, never loudly. A
 // new page composing this component cannot accidentally spend the colour, and
 // spending it is unrecoverable — Seal means closed exactly as long as it is rare.
-import type { Product } from "../lib/products";
+import { incomingBy, isIncoming, longDate, type Product } from "../lib/products";
 
 interface Props {
   product: Product;
@@ -51,7 +51,16 @@ const FIELDS = [
   },
 ];
 
-const rows = FIELDS.filter((f) => f.value !== null && f.value !== undefined);
+// Not in stock yet is not closed: no stamp, no Seal, no accent, on any surface.
+// The Stock row reads in the muted register a card uses. The date is our own
+// expectation, not a checkable fact, so it is muted too and never the accent. Only
+// the detail view carries it, and a date that has passed is not shown.
+const incoming = isIncoming(product);
+const by = incomingBy(product);
+const rows = [
+  ...FIELDS,
+  ...(by !== null && detail ? [{ label: "Expected by", value: longDate(by), muted: true }] : []),
+].filter((f) => f.value !== null && f.value !== undefined);
 ---
 
 {
@@ -61,14 +70,18 @@ const rows = FIELDS.filter((f) => f.value !== null && f.value !== undefined);
         <>
           <dt class="docket__label">{row.label}</dt>
           <dd class="docket__value">
-            {row.closed ? (
+            {row.closed && incoming ? (
+              <span class="docket__value--closed">Not in stock yet</span>
+            ) : row.closed ? (
               detail ? (
                 <span class="stamp">Sold out</span>
               ) : (
                 <span class="docket__value--closed">Sold out</span>
               )
             ) : (
-              <span class={row.fact ? "docket__value--fact" : undefined}>
+              <span
+                class={row.fact ? "docket__value--fact" : row.muted ? "docket__value--muted" : undefined}
+              >
                 {row.label === "Stock" ? `${row.value} in stock` : row.value}
               </span>
             )}
