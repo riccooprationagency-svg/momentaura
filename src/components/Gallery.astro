@@ -511,13 +511,12 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
 
   /* A border, never a shadow, and never the accent — the accent means "you can
      check this", and which photograph is on screen is not a fact about the
-     product. The selected tile is the one wearing a 2px frame in full-contrast
-     text colour: a frame present or absent, which reads without telling two
-     colours apart. Every tile carries a transparent 2px border so choosing one
-     changes a colour, not a size, and nothing beside it moves. */
+     product. The selected tile is the one whose frame is the text colour.
+     Every tile carries a transparent 1px border so choosing one changes a
+     colour, not a size, and nothing beside it moves. */
   .gallery__thumb {
     display: block;
-    border: 2px solid transparent;
+    border: 1px solid transparent;
     border-radius: var(--radius-surface);
     cursor: pointer;
     transition: border-color var(--dur) var(--ease);
