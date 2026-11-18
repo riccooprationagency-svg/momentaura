@@ -208,17 +208,23 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  */
 /* The hero row (two or more photographs). Each image is a slide of
    --hero-image-width, the same height-derived box as the single photograph, so
-   the row costs the page no more height than one image did. Three regimes, in
-   the order of the entries above:
-     1240px and up   the column stops growing at 1176px; three slides and two
-                     --s-16 gaps leave 71.5rem, a third of which is 23.84rem
-     900 to 1239px   the column is 100vw less two 2rem gutters; the same arithmetic
-                     leaves (100vw - 6rem) / 3 for each
+   the row costs the page no more height than one image did. Two regimes, using
+   only the declared breakpoints:
+     900px and up    `cols` equal columns in a column 100vw less two 2rem
+                     gutters, less `gaps` --s-16 gaps: (100vw - (4 + gaps)rem) / cols,
+                     with cols and gaps taken from shown.length, never from a fixed
+                     three. Above 1240px the real column stops growing at 1176px
+                     while 100vw keeps going, so this runs wide there. That is
+                     safe: the height clamp is the smaller of the two on any screen
+                     that wide, and an estimate that is too wide only fetches a
+                     larger file, never a softer one.
      under 900px     one scrolling row, a slide at most 80% of the column
                      (--hero-slide-share, here as 0.8), the column being 100vw less
                      two gutters, 2rem from 640px and 1.25rem under it
    Each is the smaller of that and the height clamp, which is the box the CSS
    uses. Rounded up, for the reason above. */
+const cols = shown.length;
+const gaps = cols - 1;
 /* Both hero widths are written out in full, one string per line with its media
    condition, because V2b reads a line at a time and exempts a length only beside
    the condition it belongs to, and because sizes cannot read a custom property.
@@ -227,12 +233,10 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
 const SIZES = last
   ? "(min-width: 1240px) 565px, 60vw"
   : heroRow && strip
-    ? "(min-width: 1240px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), 23.84rem), " +
-      "(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 6rem) / 3)), " +
+    ? `(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - ${4 + gaps}rem) / ${cols})), ` +
       "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
     : heroRow
-      ? "(min-width: 1240px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), 23.84rem), " +
-        "(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 6rem) / 3)), " +
+      ? `(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - ${4 + gaps}rem) / ${cols})), ` +
         "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
   : hero && strip
     ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
