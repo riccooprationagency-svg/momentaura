@@ -163,9 +163,18 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * Below 900 it is not displayed, and a lazy image that is display: none is not
  * fetched, so the value there is never used.
  *
- * The hero's box is --hero-image-width in tokens.css: at most 28rem, and on a
- * phone it is narrower than the viewport less its two gutters. The condition is
- * the first declared breakpoint, 640, and the length beside it is the cap.
+ * The hero's box is --hero-image-width in tokens.css, clamp(9rem, (100dvh -
+ * 26rem) * 0.75, 28rem), held inside the column by max-width: 100%. sizes
+ * follows the same box: from 640 the column is wider than the cap, so the clamp
+ * alone is the width; below it the column, the viewport less two 1.25rem
+ * gutters, can be narrower, so the smaller of the two is. sizes does not take
+ * dvh, so it uses vh, which is never shorter than dvh: the slot it reports is the
+ * box or a little larger, and an over-estimate costs bytes on one image where an
+ * under-estimate would put a soft render at the top of the site. The condition
+ * is the first declared breakpoint, and a media condition is what V2b exempts
+ * the lengths beside it for; here it is also a real difference between the two
+ * branches, not a decoration. The clamp is written twice because V2b reads a
+ * string one line at a time.
  *
  * They round up. An over-estimate costs bytes on one image; an under-estimate
  * puts a soft photograph on the page where a buyer is deciding whether the shop
@@ -179,7 +188,7 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
 const SIZES = last
   ? "(min-width: 1240px) 565px, 60vw"
   : hero
-    ? "(min-width: 640px) 28rem, calc(100vw - 2.5rem)"
+    ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
     : detail
     ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
     : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";

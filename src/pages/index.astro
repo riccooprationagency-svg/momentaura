@@ -58,13 +58,8 @@ const revealed = products.slice(0, 2);
       <p class="hero__line">Nairobi — apparel and accessories</p>
       <h1 class="hero__mark">MomentAura</h1>
       {
-        /* The rule rides with the image rather than in the page stylesheet. That
-           sheet is inlined into index.html, so any rule added to it changes the
-           page's bytes even when heroProduct is null. Here a null hero emits
-           nothing and the page is the page it was. Tokens only. */
         heroProduct && (
           <div class="hero__image">
-            <style is:inline set:html=".hero__image { order: -1; width: var(--hero-image-width); }" />
             <Gallery product={heroProduct} hero />
           </div>
         )
@@ -114,9 +109,26 @@ const revealed = products.slice(0, 2);
     color: var(--fg);
   }
 
+  /* One explicit column that cannot grow past the container. An implicit auto
+     column is sized by its widest item, so a child wider than the container
+     stretches the track and a percentage max-width on it resolves against the
+     stretched track, not the container: the cap does nothing. minmax(0, 1fr)
+     is the track the percentage needs. */
   .hero__inner {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--s-16);
+  }
+
+  /* Above the line and the mark: the markup puts it last so the text comes first
+     in the document, and order puts it first on the page. The width is the
+     token's, and max-width is what keeps it inside the column when the viewport
+     is tall and narrow: the token follows height, the column follows width, and
+     on a 390px phone 1000px tall the token alone is wider than the column. */
+  .hero__image {
+    order: -1;
+    width: var(--hero-image-width);
+    max-width: 100%;
   }
 
   .hero__line {
@@ -133,6 +145,12 @@ const revealed = products.slice(0, 2);
      require it to be 600. Line-height 0.9 is what makes the stack read as solid
      form, and it matters more here than anywhere else on the site. */
   .hero__mark {
+    /* global.css lets headings break mid-word. The mark is one word set at 12vw,
+       so on a phone it is a few pixels wider than its column (339px in a 335px
+       column at 390) and the column used to stretch around it. With the column
+       fixed, break-word would split the name across two lines. It stays whole
+       and spends the difference in the gutter, as it always has. */
+    overflow-wrap: normal;
     font-size: var(--t-hero);
     line-height: var(--lh-display);
     text-transform: uppercase;
