@@ -267,7 +267,7 @@ No exclamation marks. No "simply", "just", or "please". No "we" if it is one per
 ## Copy rules
 
 - **Sentence case for products and prose. Uppercase for nav, labels, headings, buttons**
-- Product names the owner chose are exempt from the sentence-case rule and appear as written, including in the order list. This covers only the names in PROMPT-33.
+- Product names the owner chose are exempt from the sentence-case rule and appear as written, including in the order list. This covers only product names of the form 'Name: Descriptor' as they appear in src/data/products.json.
 - Uppercase applies to the primary nav. Footer links are sentence case at caption size, and the email address must never be transformed.
 - Product names say what the thing is
 - Concrete nouns and numbers instead of adjectives
