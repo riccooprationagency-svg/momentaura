@@ -147,7 +147,8 @@
   },
   {
     "slug": "tee-do-i-look-like-i-care",
-    "name": "Black t-shirt, \"Do I look like I care?\" back print",
+    "name": "The Unbothered: Graphic Tee",
+    "description": "Black t-shirt, \"Do I look like I care?\" back print",
     "category": "t-shirts",
     "audience": [
       "men",
@@ -208,7 +209,8 @@
   },
   {
     "slug": "tee-trust-no-one",
-    "name": "Black t-shirt, \"Trust no one\" back print",
+    "name": "The Outlook: Graphic Tee",
+    "description": "Black t-shirt, \"Trust no one\" back print",
     "category": "t-shirts",
     "audience": [
       "men",
@@ -306,7 +308,8 @@
   },
   {
     "slug": "tee-lion-back-print",
-    "name": "Black t-shirt, lion in sunglasses back print",
+    "name": "The Lionheart: Graphic Tee",
+    "description": "Black t-shirt, lion in sunglasses back print",
     "category": "t-shirts",
     "audience": [
       "men",
@@ -367,7 +370,8 @@
   },
   {
     "slug": "tee-trust-gods-plan",
-    "name": "Black t-shirt, \"Trust God's plan\" back print",
+    "name": "The Covenant: Graphic Tee",
+    "description": "Black t-shirt, \"Trust God's plan\" back print",
     "category": "t-shirts",
     "audience": [
       "men",
@@ -415,8 +419,199 @@
     ]
   },
   {
+    "slug": "tee-white-woman-with-drink",
+    "name": "The Dramatic: Graphic Tee",
+    "category": "t-shirts",
+    "audience": [],
+    "price": 1200,
+    "material": "Cotton Kings collection",
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 20,
+    "stockCountedAt": "2026-11-18T22:59:07+03:00",
+    "photos": [],
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
+    "slug": "tee-white-three-cats",
+    "name": "The Purrfect Trio: Graphic Tee",
+    "category": "t-shirts",
+    "audience": [],
+    "price": 1200,
+    "material": "Cotton Kings collection",
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 20,
+    "stockCountedAt": "2026-11-18T22:59:07+03:00",
+    "photos": [],
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
+    "slug": "tee-white-line-art-face",
+    "name": "The Femme Aura: Graphic Tee",
+    "category": "t-shirts",
+    "audience": [],
+    "price": 1200,
+    "material": "Cotton Kings collection",
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 20,
+    "stockCountedAt": "2026-11-18T22:59:07+03:00",
+    "photos": [],
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
+    "slug": "tee-white-yellow-hands",
+    "name": "The Bold Grip: Graphic Tee",
+    "category": "t-shirts",
+    "audience": [],
+    "price": 1200,
+    "material": "Cotton Kings collection",
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 20,
+    "stockCountedAt": "2026-11-18T22:59:07+03:00",
+    "photos": [],
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
+    "slug": "hoodie-m-chest-logo",
+    "name": "The Origin: Core Hoodie",
+    "category": "hoodies",
+    "audience": [],
+    "price": 3500,
+    "material": "Cotton Kings collection",
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 20,
+    "stockCountedAt": "2026-11-18T22:59:07+03:00",
+    "photos": [],
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
     "slug": "hoodie-chest-logo",
-    "name": "Black hoodie, MOMENTAURA chest logo",
+    "name": "The Signature: Wordmark Hoodie",
+    "description": "Black hoodie, MOMENTAURA chest logo",
     "category": "hoodies",
     "audience": [
       "men",
@@ -540,7 +735,8 @@
   },
   {
     "slug": "hoodie-sleeve-stripes",
-    "name": "Black hoodie, MOMENTAURA chest logo and M sleeve stripes",
+    "name": "The Trackform: Sleeve Line Hoodie",
+    "description": "Black hoodie, MOMENTAURA chest logo and M sleeve stripes",
     "category": "hoodies",
     "audience": [
       "men",
@@ -710,8 +906,47 @@
     ]
   },
   {
+    "slug": "tracksuit-sleeve-stripes-m-logo",
+    "name": "Velocity Set: Hoodie & Jogger Set",
+    "category": "tracksuits",
+    "audience": [],
+    "price": 6200,
+    "material": "Cotton Kings collection",
+    "fabricWeight": null,
+    "fit": null,
+    "printMethod": null,
+    "leadTimeDays": null,
+    "dispatch": "Nairobi",
+    "stock": 20,
+    "stockCountedAt": "2026-11-18T22:59:07+03:00",
+    "photos": [],
+    "sizes": [
+      {
+        "label": "S",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "M",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "L",
+        "chestCm": null,
+        "lengthCm": null
+      },
+      {
+        "label": "XL",
+        "chestCm": null,
+        "lengthCm": null
+      }
+    ]
+  },
+  {
     "slug": "tracksuit-m-logo",
-    "name": "Black tracksuit, hoodie and joggers, M logo on thigh",
+    "name": "Foundation Set: Hoodie & Jogger Set",
+    "description": "Black tracksuit, hoodie and joggers, M logo on thigh",
     "category": "tracksuits",
     "audience": [
       "men",

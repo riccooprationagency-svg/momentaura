@@ -260,11 +260,14 @@ exist · exit-intent popups · "someone just bought this" notifications
 luxury · premium · bespoke · signature · aura · moments · journey · experience · discover ·
 founded on a passion for · born from a love of*
 
+The banned-words list governs copy the site writes. It does not govern the names of products, which the owner chooses. This exemption covers only these names: The Signature, Signature Jogger, The Femme Aura, Auraflex.
+
 No exclamation marks. No "simply", "just", or "please". No "we" if it is one person.
 
 ## Copy rules
 
 - **Sentence case for products and prose. Uppercase for nav, labels, headings, buttons**
+- Product names the owner chose are exempt from the sentence-case rule and appear as written, including in the order list. This covers only the names in PROMPT-33.
 - Uppercase applies to the primary nav. Footer links are sentence case at caption size, and the email address must never be transformed.
 - Product names say what the thing is
 - Concrete nouns and numbers instead of adjectives
@@ -393,6 +396,8 @@ used. The placeholder rule above still applies to any product without one.
   goes through `scripts/images.mjs`.
 - **The build knows.** `src/lib/products.ts` throws on a product that has photos and no
   valid `photoKind`.
+
+One further extension, by the owner's decision on 18 November 2026: `tee-white-three-cats`, `tee-white-line-art-face`, `tee-white-yellow-hands`, `tee-white-woman-with-drink`, `hoodie-m-chest-logo` and `tracksuit-sleeve-stripes-m-logo` may use owner-supplied renders while `stock` is above 0, because the owner states he holds 20 of each. Every other condition in this section applies unchanged: the disclosure line under every render, the owner's per-image confirmation against what he holds, a studio-backdrop lead, and removal the day a real photograph of that product goes through `scripts/images.mjs`. The extension ends for each product on that day. It covers no other product.
 
 Everything else in this section stands, including: the pipeline through
 `scripts/images.mjs`, the 200KB file limit, explicit width and height, and the rule
