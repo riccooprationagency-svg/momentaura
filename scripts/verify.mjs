@@ -2448,6 +2448,47 @@ if (existsSync(RECEIVED)) {
   console.log(`  V19 fill slots        ${all} on /order-received, each a direct child of the row fill() hides`);
 }
 
+/* ---------- V20 — a retired product is shown to its past orders and sold to nobody ----------
+ *
+ * Paid orders keep the slug they were placed under, and /track and
+ * /order-received build their hidden order lines from the catalogue. A product
+ * removed from products.json would leave those pages with no row to fill, and
+ * the buyer a recorded total with nothing under "What was ordered" - the page
+ * behaviour no server test can see. src/data/retired.json keeps a display row
+ * for each such slug. This asserts both halves in the built output: the row is
+ * there on the two pages that show a past order, and the slug is on no other
+ * page, so it cannot be added to a cart, listed, linked or sitemapped. */
+
+{
+  const RETIRED = JSON.parse(readFileSync(join(SRC, "data", "retired.json"), "utf8"));
+  const pages = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (/\.(html|xml)$/.test(e.name)) pages.push(full);
+    }
+  };
+  walk(DIST);
+  const SHOWS = new Set([join(DIST, "track", "index.html"), join(DIST, "order-received", "index.html")]);
+
+  for (const { slug } of RETIRED) {
+    const row = new RegExp(String.raw`<li\b[^>]*\sdata-retired\b[^>]*\sdata-slug="${slug}"[^>]*\shidden`);
+    for (const page of SHOWS) {
+      if (!existsSync(page)) fail("V20", `${page} was not built`);
+      else if (!row.test(readFileSync(page, "utf8"))) fail("V20", `"${slug}" has no hidden retired row on ${page.replace(DIST, "dist")}`);
+    }
+    for (const page of pages) {
+      if (SHOWS.has(page)) continue;
+      const html = readFileSync(page, "utf8");
+      if (html.includes(`data-slug="${slug}"`) || html.includes(`/products/${slug}/`) || html.includes(`>${slug}<`)) {
+        fail("V20", `retired slug "${slug}" appears on ${page.replace(DIST, "dist")}`);
+      }
+    }
+  }
+  console.log(`  V20 retired products  ${RETIRED.length} slug(s), a hidden row on /track and /order-received, on no other page`);
+}
+
 /* ---------- report ---------- */
 
 for (const n of notes) console.log(`\n  note: ${n}`);

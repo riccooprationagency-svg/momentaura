@@ -29,6 +29,7 @@ import Button from "../components/Button.astro";
 import Field from "../components/Field.astro";
 import OrderHelp from "../components/OrderHelp.astro";
 import { products, price } from "../lib/products";
+import { retired } from "../lib/retired";
 import { REACH } from "../../functions/api/_site.js";
 ---
 
@@ -163,6 +164,17 @@ import { REACH } from "../../functions/api/_site.js";
                 <span class="tline__name">{product.name}</span>
                 <span class="tline__qty">
                   <span data-qty>0</span> &times; {price(product.price)}
+                </span>
+                <span class="tline__amount" data-line-total />
+              </li>
+            ))
+          }
+          {
+            retired.map((item) => (
+              <li class="tline" data-line data-retired data-slug={item.slug} data-price={item.price} hidden>
+                <span class="tline__name">{item.name}</span>
+                <span class="tline__qty">
+                  <span data-qty>0</span> &times; {price(item.price)}
                 </span>
                 <span class="tline__amount" data-line-total />
               </li>
