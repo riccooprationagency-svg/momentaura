@@ -1,5 +1,5 @@
 import site from "../data/site.json";
-import { price, products, type Product } from "./products";
+import { products } from "./products";
 
 /* The homepage hero's picture: one group render of existing products, written to
  * site.json "heroImage" by `node scripts/images.mjs --hero` and by nothing else.
@@ -62,37 +62,3 @@ const resolve = (): HeroImage | null => {
 };
 
 export const heroImage: HeroImage | null = resolve();
-
-/* The legend under the copy, built from the catalogue and never typed: a price
- * change or a stock change in products.json changes the legend on the next build.
- * A product with stock shows its price. A product we hold none of that is on
- * order reads "Not in stock yet", muted and unstamped. Anything else is sold out.
- * Every figure here is read from the product; none is written in a template. */
-export interface LegendLine {
-  lead: string;
-  /** The product page this line names. */
-  href: string;
-  name: string;
-  status: string;
-  muted: boolean;
-}
-
-const statusOf = (p: Product): { status: string; muted: boolean } =>
-  p.stock > 0
-    ? { status: price(p.price), muted: false }
-    : p.incoming !== undefined
-      ? { status: "Not in stock yet", muted: true }
-      : { status: "Sold out", muted: true };
-
-const LEAD: Record<Position, string> = {
-  left: "Left",
-  centre: "Centre",
-  right: "Right",
-  joggers: "Joggers: sold in the",
-};
-
-export const heroLegend = (): LegendLine[] =>
-  (heroImage?.garments ?? []).map((g) => {
-    const p = products.find((x) => x.slug === g.slug)!;
-    return { lead: LEAD[g.position], href: `/products/${p.slug}/`, name: p.name, ...statusOf(p) };
-  });

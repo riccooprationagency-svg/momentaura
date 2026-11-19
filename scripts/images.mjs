@@ -127,8 +127,8 @@ try {
  *     at the moment of writing and not only later by V14;
  *   - width and height are read back off the encoded WebP at the base width;
  *   - the result is written to site.json "heroImage", never by hand. The
- *     garments argument names which catalogue slug each position shows, so the
- *     legend under the picture is built from products.json and not typed.
+ *     garments argument names which catalogue slug each position shows, and
+ *     src/lib/hero.ts checks each one against products.json at build.
  *
  * Changing any number in HERO_RECIPE changes every URL, for the reason RECIPE
  * does above.
