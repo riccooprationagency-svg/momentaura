@@ -162,9 +162,15 @@ const afterPaid = afterPaymentLines();
 
         <p class="received__dispatch">Dispatched from Nairobi.</p>
 
-        <!-- Static, from site.json delivery.afterPayment. Each line is
-             conditional on the message being sent, not on this order's state, so
-             it is true whether the page is showing pending, paid or failed. -->
+        <!-- Safaricom's SMS, not ours: the site sends no message of any kind
+             today. Conditional wording, so it is true in pending, paid and
+             failed alike. -->
+        <p class="received__dispatch">
+          Safaricom sends an M-Pesa confirmation SMS when the payment goes through.
+        </p>
+
+        <!-- Static, from site.json delivery.afterPayment. Empty while both
+             channels are null, which is until something sends the message. -->
         {afterPaid.map((line) => <p class="received__dispatch">{line}</p>)}
 
         <!--
@@ -178,7 +184,7 @@ const afterPaid = afterPaymentLines();
         <p class="received__human">
           Something wrong, or a question about this order? Ask on the <a
             href="/contact">contact</a
-          > page with the reference above and a person will answer. Delivery fees and
+          > page with the reference above. Delivery fees and
           how payment works are on the <a href="/delivery">delivery terms</a> page.
         </p>
       </div>

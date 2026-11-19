@@ -164,6 +164,11 @@ export const known = (value: unknown): boolean =>
  * once and removed: nobody said one is sent, and a channel the validator
  * accepts is a sentence the site is one edit away from printing.
  *
+ * BOTH ARE null in site.json until code that sends the message exists. Setting
+ * one is a claim that something sends it; on 19 November 2026 a paid order
+ * showed both sentences and no message arrived. Safaricom's own M-Pesa SMS is
+ * not one of these: the site does not send it, so it is not a channel here.
+ *
  * `within` is Ric's own wording and goes through timingProblem() like every
  * delivery timing below.
  */
