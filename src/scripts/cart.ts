@@ -655,10 +655,15 @@ const promoApply = q("[data-promo-apply]");
 const promoNote = q("[data-promo-note]");
 
 if (promoField && promoApply) {
+  /* Set by a change of county while a code is applied or being checked: ask again,
+   * for the latest county, once nothing is in flight. */
+  let redo = false;
+
   const apply = async () => {
     const code = promoField.value.trim();
     if (!code || isOff(promoApply)) return;
 
+    redo = false;
     clearErrors();
     const mine = ++seq;
     const sent = await send(
@@ -670,6 +675,7 @@ if (promoField && promoApply) {
     );
     if (!sent) return;
     sent.restore();
+    if (redo) return apply();
 
     /* Superseded: the field changed, or the push refused the code, while this
      * was on its way. */
@@ -684,13 +690,15 @@ if (promoField && promoApply) {
   };
 
   on(promoApply, "click", apply);
-  /* The total is for one county, so a change of county asks again. The old total
-   * is dropped first rather than shown against the new fee. */
+  /* The total is for one county, so a change of county voids every answer, held or
+   * in flight, and asks again if there was one. Apply returns early while its
+   * button is busy; the request in flight sees redo and asks when it is done. */
   on(county, "change", () => {
-    if (!promo) return;
+    redo = !!promo || isOff(promoApply);
     promo = null;
+    seq++;
     paintOrder();
-    apply();
+    if (redo) apply();
   });
   on(promoField, "keydown", (event) => {
     if (event.key === "Enter") {
@@ -702,6 +710,7 @@ if (promoField && promoApply) {
    * answer. */
   on(promoField, "input", () => {
     promo = null;
+    redo = false;
     seq++;
     setFieldError("promo", null);
     paintOrder();
