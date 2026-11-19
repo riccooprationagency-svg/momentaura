@@ -108,8 +108,11 @@ const cta = stripLive
           <ul class="hero__legend">
             {legend.map((line) => (
               <li>
-                <span class="hero__legend-lead">{line.lead}</span> <a class="hero__legend-link" href={line.href}>{line.name}</a>{" "}
-                <span class:list={{ "hero__legend-pending": line.muted }}>{line.status}</span>
+                <span class="hero__legend-text">
+                  <span class="hero__legend-lead">{line.lead}</span>{" "}
+                  <a class="hero__legend-link" href={line.href}>{line.name}</a>{" "}
+                  <span class:list={["hero__legend-status", { "hero__legend-pending": line.muted }]}>{line.status}</span>
+                </span>
               </li>
             ))}
           </ul>
@@ -283,12 +286,29 @@ const cta = stripLive
     color: var(--fg-muted);
   }
 
-  /* The product name is the link: ink, underlined, so it reads as one without the
-     accent. Mono and the page's own tokens, the focus ring is global.css's. */
+  /* Each line is at least a tap target tall. The link is the product name, in
+     ink and underlined so it reads as a link without the accent, and its hit area
+     is stretched over the whole line by a pseudo-element: the li is the
+     positioning box, at least --tap-target tall, and the --s-8 gap between lines
+     keeps one line's area off the next. The text stays inline in mono at
+     --t-docket and wraps as before; the focus ring is global.css's. */
+  .hero__legend li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+
   .hero__legend-link {
     color: var(--fg);
     text-decoration: underline;
     text-underline-offset: var(--underline-offset);
+  }
+
+  .hero__legend-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
   }
 
   .hero__legend-link:hover {
@@ -296,7 +316,7 @@ const cta = stripLive
   }
 
   /* A status never breaks mid-figure: "KSh 6,200" stays one piece. */
-  .hero__legend li > span:last-child {
+  .hero__legend-status {
     white-space: nowrap;
   }
 
