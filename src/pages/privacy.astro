@@ -9,8 +9,8 @@
 //
 // CLAUDE.md requires this page and a working marketing opt-out with the first
 // deploy. The honest form of the opt-out here is that there is no marketing list
-// and nothing subscribes anyone to one: the only use of an email address is the
-// receipt the buyer asked for. That is a statement to keep true rather than a
+// and nothing subscribes anyone to one: an email address is kept with the order
+// and used for nothing else; no email is sent today. That is a statement to keep true rather than a
 // box to tick — if a mailing list is ever added, this page changes first.
 //
 // Deliberately NOT dated. A "last updated" line is a fact like any other and it
@@ -102,7 +102,7 @@ const networks = [known(site.social?.facebook) && "Facebook", known(site.social?
       <p class="page__body">
         Your name, your phone number, where the order is going — the county, the area or
         estate, and a landmark — and an email address if you choose to give one. The
-        email is optional and is not used for anything except a receipt. Nothing
+        email is optional, is kept with the order, and is not used for anything else. Nothing
         subscribes you to anything, because there is no mailing list to subscribe to.
       </p>
       <!-- functions/api/_daraja.js stkPush(): the request carries the phone number

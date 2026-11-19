@@ -112,8 +112,8 @@
       "Western": "1 to 2 working days after dispatch"
     },
     "afterPayment": {
-      "paid": "WhatsApp",
-      "leftNairobi": "WhatsApp",
+      "paid": null,
+      "leftNairobi": null,
       "within": null
     },
     "returnsWindowDays": null,
