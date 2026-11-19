@@ -1496,11 +1496,11 @@ await check("9b. maxUses of 0, 1001 and '5' make the record invalid; 1 and 1000 
 
 await check("10. the discount is clamped so a KSh 1 items total cannot reach zero", async () => {
   const { discountFor } = await loadPromo();
-  eq(discountFor(1, 100), 0, "1 at 100%");
-  eq(discountFor(2, 100), 1, "2 at 100%");
-  eq(discountFor(1, 15), 0, "1 at 15%");
-  eq(discountFor(0, 10), 0, "nothing to discount");
-  eq(discountFor(1200, 10), 120, "1,200 at 10%");
+  eq(discountFor(1, { percent: 100 }), 0, "1 at 100%");
+  eq(discountFor(2, { percent: 100 }), 1, "2 at 100%");
+  eq(discountFor(1, { percent: 15 }), 0, "1 at 15%: a percent code that rounds to nothing is not refused, as before");
+  eq(discountFor(0, { percent: 10 }), 0, "nothing to discount");
+  eq(discountFor(1200, { percent: 10 }), 120, "1,200 at 10%");
   await seedPromo("ALEX10");
   await push(tee({ promo: "ALEX10" }, "one-bob"));
   eq(pushes[0].Amount, 1, "the amount sent to Daraja");
@@ -1647,22 +1647,40 @@ await check("14b. oncePerPhone is not spent by a push that was never paid", asyn
   eq(pushes.map((p) => p.Amount), [1020, 1020], "both at the discounted figure: 15% off 1,200");
 });
 
-await check("15. the status endpoint returns the RECORDED percent and discount after the record is edited to 15% and after it is deleted", async () => {
+/* What an order that used a code looks like in KV, as the push writes it now and as
+   it was written before this change. Both carry the figures; neither may reach a
+   browser. */
+const LEGACY_FIELDS = { promoPercent: 10, discountKsh: 120, itemsSubtotal: 1200 };
+const NO_FIGURES = /discount|amountOff|percent|promoAmountOff|itemsSubtotal/i;
+
+await check("15. the status endpoint returns the code as recorded after the record is edited and after it is deleted, and never what it took off", async () => {
   await seedPromo("ALEX10");
   const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
   const ask = async () => (await (await askStatus(body)).json()).breakdown;
-  const recorded = { promoCode: "ALEX10", promoPercent: 10, discountKsh: 120, itemsSubtotal: 1200 };
-  const pick = (b) => ({ promoCode: b.promoCode, promoPercent: b.promoPercent, discountKsh: b.discountKsh, itemsSubtotal: b.itemsSubtotal });
 
-  eq(pick(await ask()), recorded, "as placed");
+  eq(Object.keys(await ask()).sort(), ["fee", "promoCode", "subtotal", "total"], "keys as placed");
+  eq((await ask()).promoCode, "ALEX10", "code as placed");
   await seedPromo("ALEX10", { percent: 15 });
-  eq(pick(await ask()), recorded, "after the record was edited to 15%");
+  eq((await ask()).promoCode, "ALEX10", "after the record was edited");
   kv.store.delete("promo:ALEX10");
-  eq(pick(await ask()), recorded, "after the record was deleted");
+  eq((await ask()).promoCode, "ALEX10", "after the record was deleted");
 
   /* Wrong reference: no promo fields, and nothing else either. */
   const wrong = await askStatus({ checkoutRequestId: body.checkoutRequestId, reference: "MA-WRON-GREF" });
   lacks(await wrong.text(), "ALEX10", "the code, to a caller without the reference");
+});
+
+await check("15d. a STORED order that carries promoPercent, discountKsh and itemsSubtotal (written before this change) is answered without them", async () => {
+  await seedPromo("ALEX10");
+  const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
+  const stored = await record();
+  Object.assign(stored, LEGACY_FIELDS, { promoAmountOff: 100 });
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  const res = await askStatus(body);
+  const text = await res.text();
+  eq(JSON.parse(text).breakdown.promoCode, "ALEX10", "the code is still there");
+  eq(Object.keys(JSON.parse(text).breakdown).sort(), ["fee", "promoCode", "subtotal", "total"], "and nothing else");
+  eq(NO_FIGURES.test(text), false, "no discount, percent, amountOff or itemsSubtotal anywhere in the body");
 });
 
 await check("15b. (a guard: passes before the change too) an order with no code answers with exactly the breakdown keys it always had", async () => {
@@ -1671,20 +1689,14 @@ await check("15b. (a guard: passes before the change too) an order with no code 
   eq(Object.keys(breakdown).sort(), ["fee", "subtotal", "total"], "keys");
 });
 
-await check("15c. a recorded discount of 0 is SENT, as the number 0 beside the code and percent, so the confirmation can say KSh 0 instead of hiding the row", async () => {
+await check("15c. a recorded discount of 0 is not sent either: the key does not exist in the answer", async () => {
   await seedPromo("ALEX10");
   const body = await pushPromoThenAge(tee({ promo: "ALEX10" }));
   const stored = await record();
   stored.discountKsh = 0;
   await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
-  const { breakdown } = await (await askStatus(body)).json();
-  eq(Object.hasOwn(breakdown, "discountKsh"), true, "the key is present");
-  eq(breakdown.discountKsh, 0, "and it is the number 0, not absent and not a string");
-  eq([breakdown.promoCode, breakdown.promoPercent], ["ALEX10", 10], "beside the code and percent");
-  /* The page's half: fill() in cart.ts hides a row on null or undefined and on
-     nothing else, so this 0 is written as "KSh 0" (data-pre) and an order with no
-     code, which has no such key at all, shows none of the promo rows. Checked in
-     a browser for this PR; nothing in this repo can run the cart. */
+  const text = await (await askStatus(body)).text();
+  eq(NO_FIGURES.test(text), false, "no discount key, not even as 0");
 });
 
 await check("16. no raw phone number appears in any KV key written during a full promo order", async () => {
@@ -1813,47 +1825,42 @@ const checkPromo = (body, env = baseEnv(), method = "POST") =>
     env,
   });
 const basket = (slug = "tee-1200", qty = 1) => [{ slug, qty }];
-/* What the checkout page shows as the total: the server's items, less the server's
-   discount, plus the delivery fee the page already holds for the county. */
-const previewedTotal = (answer, fee) => answer.itemsSubtotal - answer.discountKsh + fee;
+/* What the checkout page shows as the total: the server's own, for the county it
+   was asked about. The page does no arithmetic. */
+const previewedTotal = (answer) => answer.total;
 
-await check("P1. preview of ALEX10 on KSh 1,200: 10%, KSh 120 off, items 1,200 — and the push then sends exactly the previewed total", async () => {
+await check("P1. preview of ALEX10 on KSh 1,200 for Kirinyaga: the code and the total 1,330, and the push then sends exactly the previewed total", async () => {
   await seedPromo("ALEX10");
-  const res = await checkPromo({ promo: "ALEX10", lines: basket() });
+  const res = await checkPromo({ promo: "ALEX10", lines: basket(), county: "kirinyaga" });
   eq(res.status, 200, "status");
   const answer = await res.json();
-  eq(answer, { ok: true, percent: 10, itemsSubtotal: 1200, discountKsh: 120 }, "the preview, exactly these four keys");
-  /* Kirinyaga is 250: delivery is added after the discount and never discounted. */
-  const previewed = previewedTotal(answer, 250);
-  eq(previewed, 1330, "previewed total: 1,200 - 120 + 250");
+  eq(answer, { ok: true, code: "ALEX10", total: 1330 }, "the preview, exactly these three keys: 1,200 - 120 + 250");
   const pushed = await push(tee({ promo: "ALEX10", county: "kirinyaga" }));
   eq(pushed.status, 200, "the push");
-  eq(pushes[0].Amount, previewed, "amount sent to Daraja equals the previewed total");
-  eq((await pushed.json()).total, previewed, "total the push reports equals the previewed total");
-  const stored = await record();
-  eq([stored.discountKsh, stored.itemsSubtotal], [answer.discountKsh, answer.itemsSubtotal], "the push recorded the figures the preview showed");
+  eq(pushes[0].Amount, previewedTotal(answer), "amount sent to Daraja equals the previewed total");
+  eq((await pushed.json()).total, previewedTotal(answer), "total the push reports equals the previewed total");
 });
 
-await check("P2. preview and push agree on rounding too: KSh 1,399 at 10% is 139.9, discount 139 on both", async () => {
+await check("P2. preview and push agree on rounding too: KSh 1,399 at 10% is 139.9, discount 139 on both, total 1,260", async () => {
   await seedPromo("ALEX10");
-  const answer = await (await checkPromo({ promo: "ALEX10", lines: basket("tee-1399") })).json();
-  eq([answer.itemsSubtotal, answer.discountKsh], [1399, 139], "preview");
+  const answer = await (await checkPromo({ promo: "ALEX10", lines: basket("tee-1399"), county: "nairobi-cbd" })).json();
+  eq(answer.total, 1260, "preview");
   await push(tee({ promo: "ALEX10" }, "tee-1399"));
-  eq(pushes[0].Amount, previewedTotal(answer, 0), "Daraja amount, Nairobi CBD delivery free");
+  eq(pushes[0].Amount, previewedTotal(answer), "Daraja amount, Nairobi CBD delivery free");
 });
 
-await check("P3. a code typed in lower case with spaces previews like the code (the server normalises)", async () => {
+await check("P3. a code typed in lower case with spaces previews as the canonical code (the server normalises and returns it)", async () => {
   await seedPromo("ALEX10");
-  const answer = await (await checkPromo({ promo: "  alex10 ", lines: basket() })).json();
-  eq(answer.ok, true, "ok");
-  eq(answer.discountKsh, 120, "discount");
+  const answer = await (await checkPromo({ promo: "  alex10 ", lines: basket(), county: "nairobi-cbd" })).json();
+  eq(answer, { ok: true, code: "ALEX10", total: 1080 }, "the canonical code and the total");
 });
 
-await check("P4. a client price, percent or discount in the request is read past: the catalogue and the record decide", async () => {
+await check("P4. a client price, percent, discount or total in the request is read past: the catalogue and the record decide", async () => {
   await seedPromo("ALEX10");
   const answer = await (
     await checkPromo({
       promo: "ALEX10",
+      county: "nairobi-cbd",
       lines: [{ slug: "tee-1200", qty: 1, price: 1, amount: 1, discount: 999 }],
       price: 1,
       percent: 99,
@@ -1862,13 +1869,13 @@ await check("P4. a client price, percent or discount in the request is read past
       total: 1,
     })
   ).json();
-  eq(answer, { ok: true, percent: 10, itemsSubtotal: 1200, discountKsh: 120 }, "catalogue price 1,200 and the record's 10 percent");
+  eq(answer, { ok: true, code: "ALEX10", total: 1080 }, "catalogue price 1,200 and the record's 10 percent");
 });
 
 await check("P5. a quantity multiplies the catalogue price: 3 x 1,200 = 3,600, 10% = 360", async () => {
   await seedPromo("ALEX10");
-  const answer = await (await checkPromo({ promo: "ALEX10", lines: basket("tee-1200", 3) })).json();
-  eq([answer.itemsSubtotal, answer.discountKsh], [3600, 360], "figures");
+  const answer = await (await checkPromo({ promo: "ALEX10", lines: basket("tee-1200", 3), county: "nairobi-cbd" })).json();
+  eq(answer.total, 3240, "3,600 - 360, Nairobi CBD delivery free");
 });
 
 await check("P6. an unknown, ended, unstarted, switched-off and used-up code, and a malformed one, all answer with ONE body", async () => {
@@ -2437,4 +2444,158 @@ if (failures.length) {
   console.error("");
   process.exit(1);
 }
+
+/* ================= fixed-amount codes =================
+ *
+ * A record carries exactly one of percent and amountOff. The fake codes here are
+ * OFF100, OFF150 and OFF200; no real code appears in this file. The discount is
+ * min(amountOff, items - 1), delivery is never discounted, and no figure about
+ * what a code took off leaves the server toward a browser. */
+
+const amountRecord = (amountOff, over = {}) => ({ percent: undefined, amountOff, ...over });
+const CHECK_KEYS = /discount|amountOff|percent|itemsSubtotal/i;
+
+await check("A1. amountOff 100 on KSh 1,200: total is 1,200 - 100 = 1,100; the order keeps the figure for accounting and the response has none", async () => {
+  await seedPromo("OFF100", amountRecord(100));
+  const res = await push(tee({ promo: "OFF100" }));
+  eq(res.status, 200, "status");
+  eq(pushes[0].Amount, 1100, "amount to Daraja");
+  const text = await res.text();
+  eq(NO_FIGURES.test(text), false, "no discount, percent or amountOff in the push response");
+  const stored = await record();
+  eq([stored.promoCode, stored.promoPercent, stored.promoAmountOff, stored.discountKsh, stored.amount], ["OFF100", null, 100, 100, 1100], "recorded");
+});
+
+await check("A2. delivery is never discounted: KSh 1,200 + Kirinyaga 250 with amountOff 150 = 1,050 + 250 = 1,300", async () => {
+  await seedPromo("OFF150", amountRecord(150));
+  await push(tee({ promo: "OFF150", county: "kirinyaga" }));
+  eq(pushes[0].Amount, 1300, "amount to Daraja");
+  const stored = await record();
+  eq([stored.delivery.fee, stored.discountKsh, stored.amount], [250, 150, 1300], "fee, discount, amount");
+});
+
+await check("A3. amountOff above the items total: KSh 10 with amountOff 200 takes off 9, so the buyer pays 1 + delivery", async () => {
+  await seedPromo("OFF200", amountRecord(200));
+  await push(tee({ promo: "OFF200", county: "nairobi-cbd" }, "ten-bob"));
+  eq(pushes[0].Amount, 1, "KSh 1, the least an STK Push can ask for");
+  eq((await record()).discountKsh, 9, "discount is items - 1");
+  resetAll();
+  await seedPromo("OFF200", amountRecord(200));
+  await push(tee({ promo: "OFF200", county: "kirinyaga" }, "ten-bob"));
+  eq(pushes[0].Amount, 251, "1 + Kirinyaga 250");
+  eq((await record()).discountKsh, 9, "discount, delivery untouched");
+});
+
+await check("A4. an items total of KSh 1 is refused with the one body, nothing is pushed, and no use is counted", async () => {
+  await seedPromo("OFF100", amountRecord(100, { oncePerPhone: true, maxUses: 5 }));
+  const unknown = await push(tee({ promo: "NOSUCH" }));
+  const refused = await push(tee({ promo: "OFF100" }, "one-bob"));
+  eq(refused.status, 400, "status");
+  eq(await refused.text(), await unknown.text(), "byte-identical to an unknown code");
+  eq(pushes.length, 0, "nothing was pushed");
+  eq(markers("OFF100"), [], "no use marker");
+  eq([...kv.store.keys()].filter((k) => k.startsWith("promo-phone:")), [], "no phone key");
+  /* The preview says the same thing, in the same words. */
+  const previewUnknown = await (await checkPromo({ promo: "NOSUCH", lines: basket(), county: "nairobi-cbd" })).text();
+  const previewRefused = await (await checkPromo({ promo: "OFF100", lines: basket("one-bob"), county: "nairobi-cbd" })).text();
+  eq(previewRefused, previewUnknown, "preview of a code that takes nothing off is byte-identical to an unknown code");
+});
+
+await check("A5. a record with both fields, neither field, amountOff 201, 0, -5, 12.5, '100', null or a nested object behaves as unknown, on the push and the preview", async () => {
+  const unknownPush = await (await push(tee({ promo: "NOSUCH" }))).text();
+  const unknownCheck = await (await checkPromo({ promo: "NOSUCH", lines: basket(), county: "nairobi-cbd" })).text();
+  const bad = [
+    { percent: 10, amountOff: 100 },
+    { percent: undefined, amountOff: undefined },
+    { percent: undefined, amountOff: 201 },
+    { percent: undefined, amountOff: 0 },
+    { percent: undefined, amountOff: -5 },
+    { percent: undefined, amountOff: 12.5 },
+    { percent: undefined, amountOff: "100" },
+    { percent: undefined, amountOff: null },
+    { percent: undefined, amountOff: [100] },
+    { percent: null, amountOff: 100 },
+  ];
+  for (const over of bad) {
+    await seedPromo("BROKEN", over);
+    const label = JSON.stringify(over);
+    const res = await push(tee({ promo: "BROKEN" }));
+    eq(res.status, 400, `push status for ${label}`);
+    eq(await res.text(), unknownPush, `push body for ${label}`);
+    eq(await (await checkPromo({ promo: "BROKEN", lines: basket(), county: "nairobi-cbd" })).text(), unknownCheck, `preview body for ${label}`);
+  }
+  eq(pushes.length, 0, "nothing was pushed");
+});
+
+await check("A6. the edges of the typo guard are valid: amountOff 1 and 200 price, MAX_AMOUNT_OFF is 200", async () => {
+  const { MAX_AMOUNT_OFF } = await loadPromo();
+  eq(MAX_AMOUNT_OFF, 200, "the ceiling");
+  await seedPromo("OFF1", amountRecord(1));
+  await push(tee({ promo: "OFF1" }));
+  eq(pushes[0].Amount, 1199, "amountOff 1");
+  await seedPromo("OFF200", amountRecord(200));
+  await push(tee({ promo: "OFF200" }));
+  eq(pushes[1].Amount, 1000, "amountOff 200");
+});
+
+await check("A7. percent records still compute as before beside amount records: 10% of 1,200 is 120", async () => {
+  await seedPromo("ALEX10");
+  await push(tee({ promo: "ALEX10" }));
+  eq(pushes[0].Amount, 1080, "amount to Daraja");
+  const stored = await record();
+  eq([stored.promoPercent, stored.promoAmountOff, stored.discountKsh], [10, null, 120], "recorded");
+});
+
+await check("A8. the preview of an amount code answers { ok, code, total } and nothing else; the total is the push's Amount", async () => {
+  await seedPromo("OFF100", amountRecord(100));
+  const res = await checkPromo({ promo: " off100 ", lines: basket(), county: "kirinyaga" });
+  const text = await res.text();
+  eq(JSON.parse(text), { ok: true, code: "OFF100", total: 1350 }, "1,200 - 100 + 250");
+  eq(CHECK_KEYS.test(text), false, "no discount, amountOff, percent or itemsSubtotal key");
+  await push(tee({ promo: "OFF100", county: "kirinyaga" }));
+  eq(pushes[0].Amount, 1350, "the push asks for the same figure");
+});
+
+await check("A9. the preview with no county, or one that is not on the fee table, carries the code and no total", async () => {
+  await seedPromo("OFF100", amountRecord(100));
+  for (const county of [undefined, "", "atlantis", "__proto__", 7]) {
+    const answer = await (await checkPromo({ promo: "OFF100", lines: basket(), county })).json();
+    eq(answer, { ok: true, code: "OFF100" }, `county ${JSON.stringify(county)}`);
+  }
+});
+
+await check("A10. maxUses and oncePerPhone behave on an amount code exactly as on a percent code", async () => {
+  const { phoneKey } = await loadPromo();
+  await seedPromo("OFFCAP", amountRecord(100, { maxUses: 2 }));
+  await seedMarkers("OFFCAP", 2);
+  await seedPromo("OFFONCE", amountRecord(100, { oncePerPhone: true }));
+  await kv.put(`promo-phone:OFFONCE:${await phoneKey("254712345678")}`, "MA-OLD");
+  const unknown = await (await push(tee({ promo: "NOSUCH" }))).text();
+  for (const code of ["OFFCAP", "OFFONCE"]) {
+    const res = await push(tee({ promo: code }));
+    eq(res.status, 400, `${code} status`);
+    eq(await res.text(), unknown, `${code} body`);
+  }
+  eq(pushes.length, 0, "nothing pushed");
+  kv.store.delete("promo-use:OFFCAP:MA-SEED-1");
+  eq((await push(tee({ promo: "OFFCAP" }))).status, 200, "one use left");
+  eq(pushes[0].Amount, 1100, "and it prices");
+});
+
+await check("A11. a paid order with an amount code writes one marker, and the status answer still carries no figure", async () => {
+  await seedPromo("OFF100", amountRecord(100));
+  const body = await pushPromoThenAge(tee({ promo: "OFF100" }));
+  const res = await askStatus(body);
+  const text = await res.text();
+  eq(JSON.parse(text).breakdown.promoCode, "OFF100", "the code");
+  eq(NO_FIGURES.test(text), false, "no figure in the body");
+});
+
+await check("A12. a once-per-phone amount code is recorded as such, as a percent code is", async () => {
+  await seedPromo("OFFONCE", amountRecord(100, { oncePerPhone: true }));
+  await push(tee({ promo: "OFFONCE" }));
+  eq((await record()).promoOncePerPhone, true, "recorded on the order");
+});
+
+
 console.log(`  ${passed} checks pass.\n`);

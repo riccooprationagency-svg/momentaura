@@ -257,14 +257,14 @@ await check("a found order shows county, area, subtotal, delivery and total", as
   );
 });
 
-await check("a promo order shows the code, percent, discount and items as recorded", async () => {
-  await store({ ...DELIVERED, subtotal: 1200, amount: 1080 + 250, promoCode: "ALEX10", promoPercent: 10, discountKsh: 120, itemsSubtotal: 1200 });
-  const { breakdown } = await (await ask(GOOD)).json();
-  eq(
-    [breakdown.promoCode, breakdown.promoPercent, breakdown.discountKsh, breakdown.itemsSubtotal],
-    ["ALEX10", 10, 120, 1200],
-    "recorded promo"
-  );
+await check("a promo order shows the code as recorded and never what it took off, even from a stored order that holds the figures", async () => {
+  await store({ ...DELIVERED, subtotal: 1200, amount: 1080 + 250, promoCode: "ALEX10", promoPercent: 10, promoAmountOff: 100, discountKsh: 120, itemsSubtotal: 1200 });
+  const res = await ask(GOOD);
+  const text = await res.text();
+  const { breakdown } = JSON.parse(text);
+  eq(breakdown.promoCode, "ALEX10", "recorded code");
+  eq(Object.keys(breakdown).sort(), ["area", "county", "fee", "promoCode", "subtotal", "total"], "keys");
+  eq(/discount|amountOff|percent|itemsSubtotal/i.test(text), false, "no discount, amountOff, percent or itemsSubtotal anywhere in the body");
 });
 
 await check("(a guard: passes before the change too) an order without a code shows no promo keys", async () => {

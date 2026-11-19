@@ -101,9 +101,7 @@ const system = groups.every((g) => g.items.every((p) => systemFor(p) === "dark")
 
           {campaign.promoPublic && (
             <p class="page__code">
-              Use <span class="page__mono">{campaign.promoCode}</span> at checkout for{" "}
-              <span class="page__mono">{campaign.promoPercent}%</span> off the items, until {ends}.
-              Delivery is not discounted.
+              Use <span class="page__mono">{campaign.promoCode}</span> at checkout, until {ends}.
             </p>
           )}
 

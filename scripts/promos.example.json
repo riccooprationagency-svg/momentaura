@@ -1,6 +1,6 @@
 {
   "ALEX10": {
-    "percent": 10,
+    "amountOff": 100,
     "endsAt": "2026-11-30T23:59:59+03:00",
     "maxUses": null,
     "oncePerPhone": false,
@@ -8,7 +8,7 @@
     "channel": "alex"
   },
   "BLACK10": {
-    "percent": 10,
+    "amountOff": 100,
     "endsAt": "2026-11-30T23:59:59+03:00",
     "maxUses": null,
     "oncePerPhone": false,
