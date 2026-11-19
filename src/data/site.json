@@ -1,7 +1,31 @@
 {
   "url": "https://momentaurastores.co.ke",
   "ogImage": null,
-  "heroProduct": "hoodie-chest-logo",
+  "heroImage": {
+    "src": "/img/hero-trio-900.98e83cc6.webp",
+    "width": 900,
+    "height": 608,
+    "alt": "Render of three people in MOMENTAURA clothing: a beige cropped hoodie, a black hoodie with M stripes on the sleeves, and a white t-shirt with a yellow hands print, all with black joggers with a white M",
+    "kind": "render",
+    "garments": [
+      {
+        "position": "left",
+        "slug": "cropped-hoodie-chest-logo"
+      },
+      {
+        "position": "centre",
+        "slug": "hoodie-sleeve-stripes"
+      },
+      {
+        "position": "right",
+        "slug": "tee-white-yellow-hands"
+      },
+      {
+        "position": "joggers",
+        "slug": "tracksuit-m-logo"
+      }
+    ]
+  },
   "owner": {
     "name": null,
     "photo": null,

@@ -3,8 +3,9 @@
 //
 // Not present, each because the data behind it does not exist yet:
 //   hero video       no footage
-//   hero photograph  no real photography of stock we hold. A disclosed render
-//                    of one product (site.json heroProduct) stands in until there is
+//   hero photograph  no real photography of stock we hold. A disclosed group
+//                    render of existing products (site.json heroImage) stands in
+//                    until there is
 //   capacity notice  no production figure, no cut-off date
 //   dispatch ledger  zero orders dispatched
 //   testimonials     no reviews, and none until roughly twenty orders
@@ -19,9 +20,10 @@ import CampaignStrip from "../components/CampaignStrip.astro";
 import CategoryTile from "../components/CategoryTile.astro";
 import ProductReveal from "../components/ProductReveal.astro";
 import Gallery from "../components/Gallery.astro";
-import { heroProduct, heroCount } from "../lib/hero";
-import { campaignLive } from "../lib/campaign";
+import { heroImage, heroLegend } from "../lib/hero";
+import { campaign, campaignLive, fullDate } from "../lib/campaign";
 import { categories, firstIn, listed } from "../lib/products";
+import { site } from "../lib/site";
 
 // The categories are derived from products.json in one place now, so the tiles
 // here and the pages they link to cannot drift apart. A tile renders only for a
@@ -33,6 +35,13 @@ import { categories, firstIn, listed } from "../lib/products";
 // products in catalogue order; fewer than two listed renders fewer.
 const revealed = listed.slice(0, 2);
 const stripLive = campaignLive();
+const legend = heroLegend();
+
+// Where the hero's one button goes. While the campaign is live it is the page the
+// strip links to; otherwise the first category page. Never a typed product.
+const cta = stripLive
+  ? { href: "/black-november/", label: "Shop Black November" }
+  : { href: `/${categories[0].slug}/`, label: "See the range" };
 ---
 
 <Base
@@ -49,31 +58,64 @@ const stripLive = campaignLive();
   <div class="first">
   <CampaignStrip />
   <!--
-    The wordmark at --t-hero is the image. There is still no photograph of stock
-    we hold, and the three alternatives are each banned by name in CLAUDE.md —
-    supplier photographs, stock lifestyle, AI-generated product imagery — so
-    nothing legitimate could fill this frame. Type can, and the type is ours
-    outright.
-
-    That is why the hero is a full viewport again. The 70dvh it sat at was a
-    hedge against emptiness, and at this size the letterforms occupy the frame
-    edge to edge within the gutter, so there is no emptiness left to hedge
-    against.
-
-    One product's lead photograph sits ABOVE the line and the mark, never under
-    a letter: there is no scrim to be had (gradients are banned) and no gate can
-    read legibility over a picture, so the type stays on solid --bg. If the lead
-    is a render, its caption prints directly beneath it.
+    Copy, the picture, then the legend, in that order in the document and on a
+    phone. From 900px the copy and legend stack in the left column and the picture
+    takes the right. The picture is the one group render in site.json, through
+    Gallery, eager: it is the LCP element. Every figure in the legend is read from
+    products.json; none is typed here.
   -->
-  <section class:list={["hero", { "hero--strip": stripLive }]} data-system="dark">
+  <section class="hero" data-system="dark">
     <div class="wrap hero__inner">
-      <p class="hero__line">Nairobi — apparel and accessories</p>
-      <h1 class="hero__mark">MomentAura</h1>
+      <div class="hero__copy">
+        <p class="hero__label">Nairobi</p>
+        <h1 class="hero__title">Wear the<br /><span class="hero__title-muted">moment</span></h1>
+        <p class="hero__sentence">
+          T-shirts, hoodies, sweatshirts and tracksuits. Pay with M-Pesa. Dispatched from Nairobi.
+        </p>
+        <dl class="hero__facts">
+          {
+            site.delivery.dispatchFrom && (
+              <>
+                <dt class="docket__label">Dispatch</dt>
+                <dd class="docket__value--fact">{site.delivery.dispatchFrom}</dd>
+              </>
+            )
+          }
+          {
+            stripLive && (
+              <>
+                <dt class="docket__label">Black November ends</dt>
+                <dd>{fullDate(campaign.endsOn)}</dd>
+              </>
+            )
+          }
+        </dl>
+        <p class="hero__action">
+          <a class="hero__cta" href={cta.href}>{cta.label}<span aria-hidden="true"> &rarr;</span></a>
+        </p>
+      </div>
+
       {
-        heroProduct && (
-          <div class:list={["hero__image", { "hero__image--row": heroCount > 1 }]}>
-            <Gallery product={heroProduct} hero strip={stripLive} />
+        heroImage && (
+          <div class="hero__picture">
+            <Gallery image={heroImage} />
           </div>
+        )
+      }
+
+      {
+        legend.length > 0 && (
+          <ul class="hero__legend">
+            {legend.map((line) => (
+              <li>
+                <span class="hero__legend-text">
+                  <span class="hero__legend-lead">{line.lead}</span>{" "}
+                  <a class="hero__legend-link" href={line.href}>{line.name}</a>{" "}
+                  <span class:list={["hero__legend-status", { "hero__legend-pending": line.muted }]}>{line.status}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         )
       }
     </div>
@@ -123,69 +165,216 @@ const stripLive = campaignLive();
     flex: 1 0 auto;
     min-height: var(--hero-min);
     display: flex;
-    align-items: flex-end;
-    padding-block: var(--s-80);
     background-color: var(--bg);
     color: var(--fg);
+    padding-block-start: var(--s-56);
   }
 
-  /* One explicit column that cannot grow past the container. An implicit auto
-     column is sized by its widest item, so a child wider than the container
-     stretches the track and a percentage max-width on it resolves against the
-     stretched track, not the container: the cap does nothing. minmax(0, 1fr)
-     is the track the percentage needs. */
+  /* Under 900px: one column, copy then picture then legend. minmax(0, 1fr) is the
+     track that lets a child be capped by the container rather than stretching it. */
   .hero__inner {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-28);
+    align-content: start;
+    padding-block-end: var(--s-56);
+  }
+
+  .hero__label {
+    display: flex;
+    align-items: center;
     gap: var(--s-16);
-  }
-
-  /* Above the line and the mark: the markup puts it last so the text comes first
-     in the document, and order puts it first on the page. The width is the
-     token's, and max-width is what keeps it inside the column when the viewport
-     is tall and narrow: the token follows height, the column follows width, and
-     on a 390px phone 1000px tall the token alone is wider than the column. */
-  .hero--strip {
-    --hero-image-width: var(--hero-image-width-strip);
-  }
-
-  .hero__image {
-    order: -1;
-    width: var(--hero-image-width);
-    max-width: 100%;
-  }
-
-  /* Two or more photographs: the wrapper is the whole column and Gallery lays the
-     row out inside it, each slide the width the token gives one image. One
-     photograph keeps the token's width above, untouched. */
-  .hero__image--row {
-    width: 100%;
-  }
-
-  .hero__line {
     font-family: var(--font-mono);
     font-size: var(--t-docket);
+    line-height: var(--lh-docket);
     letter-spacing: var(--tr-docket);
     text-transform: uppercase;
     color: var(--fg-muted);
   }
 
-  /* Type as the image. Weight 500, not the 600 the nav wordmark carries: at
-     this size 600 closes the counters and the mark stops reading as letterforms
-     and starts reading as a mass. CLAUDE.md caps the logo at 600 — it does not
-     require it to be 600. Line-height 0.9 is what makes the stack read as solid
-     form, and it matters more here than anywhere else on the site. */
-  .hero__mark {
-    /* global.css lets headings break mid-word. The mark is one word set at 12vw,
-       so on a phone it is a few pixels wider than its column (339px in a 335px
-       column at 390) and the column used to stretch around it. With the column
-       fixed, break-word would split the name across two lines. It stays whole
-       and spends the difference in the gutter, as it always has. */
-    overflow-wrap: normal;
-    font-size: var(--t-hero);
+  /* The dashed hairline that follows the label. */
+  .hero__label::after {
+    content: "";
+    flex: 1;
+    border-block-start: 1px dashed var(--border);
+  }
+
+  .hero__title {
+    margin-block-start: var(--s-16);
+    font-size: var(--t-display);
     line-height: var(--lh-display);
     text-transform: uppercase;
     font-weight: var(--w-medium);
+  }
+
+  .hero__title-muted {
+    color: var(--fg-muted);
+  }
+
+  .hero__sentence {
+    margin-block-start: var(--s-20);
+    max-width: var(--hero-measure);
+    font-size: var(--t-body-sm);
+    line-height: var(--lh-ui);
+    color: var(--fg-muted);
+  }
+
+  /* Docket register, two columns of label and value. The Dispatch value wears the
+     docket's own fact class, the one V3 pins, so no new use of the accent exists
+     here. The campaign date is plain ink: it is not on CLAUDE.md's list of
+     checkable facts. */
+  .hero__facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s-8) var(--s-20);
+    margin-block-start: var(--s-20);
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    line-height: var(--lh-docket);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .hero__facts dd {
+    margin: 0;
+  }
+
+  .hero__facts .docket__label {
+    text-transform: uppercase;
+  }
+
+  .hero__action {
+    margin-block-start: var(--s-28);
+  }
+
+  /* One filled pill: Kraft Board fill, cream text, a 1px cream border. The hover
+     changes the border colour and nothing else. */
+  .hero__cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-target);
+    padding-inline: var(--s-28);
+    border-radius: var(--radius-button);
+    background-color: var(--surface);
+    color: var(--fg);
+    border: 1px solid var(--fg);
+    font-size: var(--t-label);
+    font-weight: var(--w-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tr-label);
+    text-decoration: none;
+    transition: border-color var(--hero-dur) var(--ease);
+  }
+
+  .hero__cta:hover {
+    border-color: var(--fg-muted);
+  }
+
+  .hero__legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--s-8);
+    font-family: var(--font-mono);
+    font-size: var(--t-docket);
+    line-height: var(--lh-docket);
+    letter-spacing: var(--tr-docket);
+  }
+
+  .hero__legend-lead,
+  .hero__legend-pending {
+    color: var(--fg-muted);
+  }
+
+  /* Each line is at least a tap target tall. The link is the product name, in
+     ink and underlined so it reads as a link without the accent, and its hit area
+     is stretched over the whole line by a pseudo-element: the li is the
+     positioning box, at least --tap-target tall, and the --s-8 gap between lines
+     keeps one line's area off the next. The text stays inline in mono at
+     --t-docket and wraps as before; the focus ring is global.css's. */
+  .hero__legend li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: var(--tap-target);
+  }
+
+  .hero__legend-link {
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+  }
+
+  .hero__legend-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .hero__legend-link:hover {
+    color: var(--fg-muted);
+  }
+
+  /* A status never breaks mid-figure: "KSh 6,200" stays one piece. */
+  .hero__legend-status {
+    white-space: nowrap;
+  }
+
+  /* From 900px: copy and legend in the left column, centred together against the
+     picture's full height by the two flexible rows around them; the picture spans
+     all four rows, bottom-aligned and bleeding one gutter past the column edge. */
+  @media (min-width: 900px) {
+    .hero {
+      padding-block-start: var(--s-80);
+    }
+
+    .hero__inner {
+      grid-template-columns: var(--hero-columns);
+      grid-template-rows: 1fr auto auto 1fr;
+      column-gap: var(--s-28);
+      row-gap: var(--s-28);
+      padding-block-end: 0;
+    }
+
+    .hero__copy {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .hero__legend {
+      grid-column: 1;
+      grid-row: 3;
+    }
+
+    .hero__picture {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      align-self: end;
+      margin-inline-end: calc(var(--gutter) * -1);
+    }
+  }
+
+  /* ---------- the entrance ----------
+     One fade, once, on load: the hero's content goes from transparent to opaque in
+     one step. Opacity only, no stagger, no transform, nothing tied to scroll. A
+     transition out of @starting-style, so no @keyframes (V6 bans them outside the
+     campaign). A browser without @starting-style shows the hero at rest. Reduced
+     motion zeroes --hero-dur in tokens.css, and the block below removes the
+     transition outright as well. */
+  .hero__inner {
+    transition: opacity var(--hero-dur) var(--ease);
+  }
+
+  @starting-style {
+    .hero__inner {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero__inner {
+      transition: none;
+    }
   }
 
   /* The bands alternate systems and the alternation is the page's rhythm.

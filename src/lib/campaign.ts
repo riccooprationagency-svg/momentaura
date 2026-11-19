@@ -117,6 +117,12 @@ export const longDate = (iso: string): string => {
   return `${day} ${MONTHS_LONG[month]}`;
 };
 
+/** "30 November 2026" */
+export const fullDate = (iso: string): string => {
+  const { year } = parts(iso);
+  return `${longDate(iso)} ${year}`;
+};
+
 /** The campaign's LISTED products in "slugs" order, grouped by category in the
  *  catalogue's declared category order. Nothing outside "slugs" appears, and a
  *  product without a photograph (isListed, src/lib/products.ts) does not: a slug

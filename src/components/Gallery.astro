@@ -27,20 +27,17 @@
 // metered connection, and nothing on the page would look wrong while it happened.
 // A surface that forgets to opt in shows one lazy image, which costs nothing.
 //
-// ---------- hero, and why it defaults to off ----------
+// ---------- image, the homepage hero ----------
 //
-// The homepage hero is the one place outside a product page where a photograph
-// is the largest element in the first screen, so it is the LCP candidate there
-// and has to load like one: eager, high fetch priority. `hero` asks for exactly
-// that and for a `sizes` that matches the hero's own box, and for nothing else.
-// It does not switch, it does not add a strip, and it never touches the caption:
-// a render under the hero prints the same line, in the same register, as it does
-// on every other surface.
+// The homepage hero is one group render of several products, which belongs to no
+// product's photos array. It still goes through here: `image` takes the hero
+// object from src/lib/hero.ts and renders it as one eager picture at high fetch
+// priority, because it is the largest thing in the first screen, with the
+// disclosure line beneath it. An <img> written straight into a page would bypass
+// the one file that owns the rule that a render is never shown unlabelled.
 //
-// Same reasoning as `detail`, and the same default. Off, the first photograph is
-// lazy. A surface that forgets to ask costs a late image; a surface that asks by
-// accident costs an eager full-width fetch on a page that did not need one. Only
-// src/pages/index.astro passes it.
+// Off unless a surface passes it, and only src/pages/index.astro does. A product
+// card or a product page never receives one, so nothing about them changes.
 //
 // ---------- the strip, and why it has no script ----------
 //
@@ -65,27 +62,24 @@
 // it until its thumbnail is chosen. The buyer pays for the photograph they look
 // at, plus a 400px thumbnail of each of the others.
 import { systemFor, type Product } from "../lib/products";
-import { HERO_MAX } from "../lib/hero";
+import { HERO_CAPTION, HERO_WIDTHS, type HeroImage } from "../lib/hero";
 
 interface Props {
-  product: Product;
+  product?: Product;
   detail?: boolean;
   /** The product page's second-row photograph: the last one, lazily, and
    *  nothing at all for a product with no photographs. */
   last?: boolean;
-  /** The homepage hero's lead photograph: eager, high priority, sized to the
-   *  hero's box. Off unless the hero asks. */
-  hero?: boolean;
-  /** The Black November strip renders above the hero, so the hero photograph
-   *  is the narrower --hero-image-width-strip. Off unless the homepage says so,
-   *  and only read together with `hero`. */
-  strip?: boolean;
+  /** The homepage hero's group render. Used instead of `product`. */
+  image?: HeroImage;
 }
 
-const { product, detail = false, last = false, hero = false, strip = false } = Astro.props;
+const { product, detail = false, last = false, image } = Astro.props;
 
-const system = systemFor(product);
-const photos = product.photos;
+if (!image && !product) throw new Error("Gallery: pass a product or an image.");
+
+const system = product ? systemFor(product) : "dark";
+const photos = product?.photos ?? [];
 
 /* Must match the number of selector rows in the <style> below. */
 const SWITCH_MAX = 6;
@@ -93,26 +87,13 @@ const switching = detail && !last && photos.length >= 2;
 
 if (switching && photos.length > SWITCH_MAX) {
   throw new Error(
-    `Gallery: "${product.slug}" has ${photos.length} photographs and the strip switches at most ` +
+    `Gallery: "${product!.slug}" has ${photos.length} photographs and the strip switches at most ` +
       `${SWITCH_MAX}. Add selector rows to src/components/Gallery.astro and raise SWITCH_MAX, or ` +
       `drop a photograph with scripts/images.mjs.`
   );
 }
 
-/* The hero shows up to HERO_MAX photographs, in order, and HERO_MAX is a ceiling,
-   not a target: one photograph is one image, exactly as before this prop learned
-   to show more. */
-const shown = last
-  ? photos.slice(-1)
-  : detail
-    ? photos
-    : hero
-      ? photos.slice(0, HERO_MAX)
-      : photos.slice(0, 1);
-
-/* Two or more hero photographs: a row of slides, each with its own caption. One
-   photograph keeps the plain markup below, so the one-image hero is unchanged. */
-const heroRow = hero && !detail && !last && shown.length > 1;
+const shown = last ? photos.slice(-1) : detail ? photos : photos.slice(0, 1);
 
 /* ---------- deriving the other five URLs ----------
  *
@@ -143,9 +124,9 @@ const parse = (src: string): [string, string] => {
   return [parsed[1], parsed[3]];
 };
 
-const srcsetFor = (src: string, ext: "avif" | "webp"): string => {
+const srcsetFor = (src: string, ext: "avif" | "webp", widths: number[] = RENDITIONS): string => {
   const [stem, hash] = parse(src);
-  return RENDITIONS.map((w) => `${stem}-${w}.${hash}.${ext} ${w}w`).join(", ");
+  return widths.map((w) => `${stem}-${w}.${hash}.${ext} ${w}w`).join(", ");
 };
 
 /* A desktop thumbnail is --thumb-width, 96px, 288 device pixels on a 3x screen,
@@ -184,22 +165,6 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * Below 900 it is not displayed, and a lazy image that is display: none is not
  * fetched, so the value there is never used.
  *
- * With the Black November strip above the hero the box is --hero-image-width-strip
- * instead, 2.75rem less tall, and `strip` selects the matching sizes.
- *
- * The hero's box is --hero-image-width in tokens.css, clamp(9rem, (100dvh -
- * 26rem) * 0.75, 28rem), held inside the column by max-width: 100%. sizes
- * follows the same box: from 640 the column is wider than the cap, so the clamp
- * alone is the width; below it the column, the viewport less two 1.25rem
- * gutters, can be narrower, so the smaller of the two is. sizes does not take
- * dvh, so it uses vh, which is never shorter than dvh: the slot it reports is the
- * box or a little larger, and an over-estimate costs bytes on one image where an
- * under-estimate would put a soft render at the top of the site. The condition
- * is the first declared breakpoint, and a media condition is what V2b exempts
- * the lengths beside it for; here it is also a real difference between the two
- * branches, not a decoration. The clamp is written twice because V2b reads a
- * string one line at a time.
- *
  * They round up. An over-estimate costs bytes on one image; an under-estimate
  * puts a soft photograph on the page where a buyer is deciding whether the shop
  * is real, and of the two only one of them is recoverable by looking harder.
@@ -209,62 +174,54 @@ const thumbOf = (src: string, ext: "avif" | "webp"): string => {
  * breakpoints are the three declared at the top of tokens.css — read and change
  * them there.
  */
-/* The hero row (two or more photographs). Each image is a slide of
-   --hero-image-width, the same height-derived box as the single photograph, so
-   the row costs the page no more height than one image did. Two regimes, using
-   only the declared breakpoints:
-     900px and up    `cols` equal columns in a column 100vw less two 2rem
-                     gutters, less `gaps` --s-16 gaps: (100vw - (4 + gaps)rem) / cols,
-                     with cols and gaps taken from shown.length, never from a fixed
-                     three. Above 1240px the real column stops growing at 1176px
-                     while 100vw keeps going, so this runs wide there. That is
-                     safe: the height clamp is the smaller of the two on any screen
-                     that wide, and an estimate that is too wide only fetches a
-                     larger file, never a softer one.
-     under 900px     one scrolling row, a slide at most 80% of the column
-                     (--hero-slide-share, here as 0.8), the column being 100vw less
-                     two gutters, 2rem from 640px and 1.25rem under it
-   Each is the smaller of that and the height clamp, which is the box the CSS
-   uses. Rounded up, for the reason above. */
-const cols = shown.length;
-const gaps = cols - 1;
-/* Both hero widths are written out in full, one string per line with its media
-   condition, because V2b reads a line at a time and exempts a length only beside
-   the condition it belongs to, and because sizes cannot read a custom property.
-   The strip's is --hero-image-width-strip: the same clamp with --tap-target (44px,
-   2.75rem) taken off the height. Keep the pair in step with tokens.css. */
+/* The hero picture is 7 of 12 columns from 900px, a little under 58vw once the
+   gutters and the column gap are taken off, and the full width below. It rounds
+   up, as above. The condition is a declared breakpoint, which is what V2b
+   exempts the length beside it for. */
+const HERO_SIZES = "(min-width: 900px) 58vw, 100vw";
+
 const SIZES = last
   ? "(min-width: 1240px) 541px, 60vw"
-  : heroRow && strip
-    ? `(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - ${4 + gaps}rem) / ${cols})), ` +
-      "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
-    : heroRow
-      ? `(min-width: 900px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - ${4 + gaps}rem) / ${cols})), ` +
-        "(min-width: 640px) min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 4rem) * 0.8)), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc((100vw - 2.5rem) * 0.8))"
-  : hero && strip
-    ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem - 2.75rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
-    : hero
-      ? "(min-width: 640px) clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), min(clamp(9rem, calc((100vh - 26rem) * 0.75), 28rem), calc(100vw - 2.5rem))"
-      : detail
-        ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
-        : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
+  : detail
+    ? "(min-width: 1240px) 471px, (min-width: 900px) 40vw, (min-width: 641px) calc(100vw - 4rem), calc(100vw - 2.5rem)"
+    : "(min-width: 1340px) 400px, (min-width: 900px) 30vw, (min-width: 641px) 46vw, calc(100vw - 2.5rem)";
 
-const group = `photo-${product.slug}`;
+const group = `photo-${product?.slug}`;
 
 /* A render is shown as a render. The line sits under the image on every surface
    that shows one, detail or not, and nothing about layout shortens or hides it
    (CLAUDE.md, Rendered imagery). Prose, so Archivo and never mono. */
-const render = product.photoKind === "render";
+const render = product?.photoKind === "render";
 const CAPTION = "Studio render. Not a photograph of the garment.";
 ---
 
 {
-  system === "light" ? (
+  image ? (
+    /* The hero's group render: eager, high priority, its own widths, and its own
+       disclosure line directly beneath. Width and height are the encoded file's. */
+    <div class="gallery">
+      <picture>
+        <source type="image/avif" srcset={srcsetFor(image.src, "avif", HERO_WIDTHS)} sizes={HERO_SIZES} />
+        <source type="image/webp" srcset={srcsetFor(image.src, "webp", HERO_WIDTHS)} sizes={HERO_SIZES} />
+        <img
+          class="gallery__hero-img"
+          src={image.src}
+          alt={image.alt}
+          width={image.width}
+          height={image.height}
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
+        />
+      </picture>
+      <p class="gallery__caption">{HERO_CAPTION}</p>
+    </div>
+  ) : system === "light" ? (
     /* One block, and none at all in the second row. See the note at the top. */
     !last && (
       <div class="gallery">
         <div class="photo-pending" aria-hidden="true">
-          {product.name}
+          {product!.name}
         </div>
       </div>
     )
@@ -329,37 +286,6 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
         ))}
       </div>
     </div>
-  ) : heroRow ? (
-    /* The scrolling element is the region: focusable so a keyboard can scroll it,
-       and named from the product so a screen reader says what it holds. It needs
-       no script. Only the first image is eager and high priority; the rest are
-       lazy, which on a phone is below the fold sideways. */
-    <div
-      class="gallery gallery--hero"
-      role="region"
-      aria-label={`Photographs of ${product.name}`}
-      tabindex="0"
-    >
-      {shown.map((photo, i) => (
-        <div class="gallery__hero-slide">
-          <picture>
-            <source type="image/avif" srcset={srcsetFor(photo.src, "avif")} sizes={SIZES} />
-            <source type="image/webp" srcset={srcsetFor(photo.src, "webp")} sizes={SIZES} />
-            <img
-              class="gallery__img"
-              src={photo.src}
-              alt={photo.alt}
-              width={photo.width}
-              height={photo.height}
-              loading={i === 0 ? "eager" : "lazy"}
-              fetchpriority={i === 0 ? "high" : undefined}
-              decoding="async"
-            />
-          </picture>
-          {render && <p class="gallery__caption">{CAPTION}</p>}
-        </div>
-      ))}
-    </div>
   ) : (
     <div class={last ? "gallery gallery--last" : "gallery"}>
       {shown.map((photo, i) => {
@@ -368,8 +294,8 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
            LCP candidate. Everything else is below the fold, which is where
            CLAUDE.md's lazy rule applies, and that includes the first image of a
            card or a homepage reveal: both sit under the hero. The hero's own
-           photograph is the exception, and it asks with `hero`. */
-        const lead = (detail || hero) && !last && i === 0;
+           picture is the exception, and it arrives as `image`. */
+        const lead = detail && !last && i === 0;
 
         return (
           <>
@@ -424,44 +350,13 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     text-align: left;
   }
 
-  /* ---------- the hero row ---------- */
-
-  /* Under 900px: one horizontal row that snaps. Mandatory snapping with each slide
-     aligned to the start puts one image square on the left edge and lets the next
-     one's edge show on the right, which is the only cue. The page never scrolls
-     sideways: the overflow is this element's own, and overscroll-behavior stops a
-     swipe at the end of the row from turning into a browser back gesture. */
-  .gallery--hero {
-    display: flex;
-    gap: var(--s-16);
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    overscroll-behavior-x: contain;
-  }
-
-  /* A slide is the hero box, never wider than its share of the row. The caption
-     sits directly beneath its own image and travels with it. */
-  .gallery__hero-slide {
-    flex: 0 0 min(var(--hero-image-width), var(--hero-slide-share));
-    display: grid;
-    gap: var(--s-12);
-    align-content: start;
-    scroll-snap-align: start;
-  }
-
-  /* From 900px: one row, equal widths, left-aligned. Each track is at most the
-     hero box and shrinks equally when the column is narrower than three of them,
-     so the row never overflows and never scrolls. minmax(0, ...) is what lets a
-     track go below its content's minimum. */
-  @media (min-width: 900px) {
-    .gallery--hero {
-      display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(0, var(--hero-image-width));
-      justify-content: start;
-      overflow: visible;
-      scroll-snap-type: none;
-    }
+  /* The hero picture keeps its own proportions: the width and height attributes
+     reserve the box, and the alpha cut-out sits on the section's ground. No crop,
+     no radius, since the edge of the picture is the edge of the people. */
+  .gallery__hero-img {
+    width: 100%;
+    height: auto;
+    display: block;
   }
 
   /* ---------- the switch ---------- */
