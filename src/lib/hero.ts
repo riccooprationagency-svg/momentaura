@@ -9,11 +9,7 @@ import { products } from "./products";
  * not in products.json, and on a kind that is not "render". Null is the supported
  * way to have no hero image, and the hero then renders its copy alone.
  *
- * The disclosure line is a constant here and not a field in the data, so no entry
- * can be written without it: Gallery.astro prints HERO_CAPTION beneath the picture
- * every time, and this file refuses a kind that would make the line untrue. */
-
-export const HERO_CAPTION = "Studio render. Not a photograph of the garments.";
+ * By the owner's decision on 19 November 2026 no caption prints under the picture. */
 
 /* Must match HERO_WIDTHS in scripts/images.mjs. V14 resolves every URL the page
  * emits against what is in dist/, so a width here that the script never wrote

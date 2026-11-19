@@ -32,9 +32,8 @@
 // The homepage hero is one group render of several products, which belongs to no
 // product's photos array. It still goes through here: `image` takes the hero
 // object from src/lib/hero.ts and renders it as one eager picture at high fetch
-// priority, because it is the largest thing in the first screen, with the
-// disclosure line beneath it. An <img> written straight into a page would bypass
-// the one file that owns the rule that a render is never shown unlabelled.
+// priority, because it is the largest thing in the first screen. An <img> written
+// straight into a page would bypass the one file that owns image rendering.
 //
 // Off unless a surface passes it, and only src/pages/index.astro does. A product
 // card or a product page never receives one, so nothing about them changes.
@@ -62,7 +61,7 @@
 // it until its thumbnail is chosen. The buyer pays for the photograph they look
 // at, plus a 400px thumbnail of each of the others.
 import { systemFor, type Product } from "../lib/products";
-import { HERO_CAPTION, HERO_WIDTHS, type HeroImage } from "../lib/hero";
+import { HERO_WIDTHS, type HeroImage } from "../lib/hero";
 
 interface Props {
   product?: Product;
@@ -188,11 +187,6 @@ const SIZES = last
 
 const group = `photo-${product?.slug}`;
 
-/* A render is shown as a render. The line sits under the image on every surface
-   that shows one, detail or not, and nothing about layout shortens or hides it
-   (CLAUDE.md, Rendered imagery). Prose, so Archivo and never mono. */
-const render = product?.photoKind === "render";
-const CAPTION = "Studio render. Not a photograph of the garment.";
 ---
 
 {
@@ -214,7 +208,6 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
           decoding="async"
         />
       </picture>
-      <p class="gallery__caption">{HERO_CAPTION}</p>
     </div>
   ) : system === "light" ? (
     /* One block, and none at all in the second row. See the note at the top. */
@@ -254,7 +247,6 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
                 decoding="async"
               />
             </picture>
-            {render && <p class="gallery__caption">{CAPTION}</p>}
             {/* A fact about the page, so mono and muted, never the accent. Each
                 frame carries its own, which is how the CSS switch changes it with
                 the picture: no script. Only here, so only with two or more. */}
@@ -313,7 +305,6 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
                 decoding="async"
               />
             </picture>
-            {render && <p class="gallery__caption">{CAPTION}</p>}
           </>
         );
       })}
@@ -342,14 +333,6 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     display: block;
   }
 
-  .gallery__caption {
-    margin: 0;
-    font-size: var(--t-caption);
-    line-height: 1.4;
-    color: var(--fg-muted);
-    text-align: left;
-  }
-
   /* The hero picture keeps its own proportions: the width and height attributes
      reserve the box, and the alpha cut-out sits on the section's ground. No crop,
      no radius, since the edge of the picture is the edge of the people. */
@@ -368,14 +351,13 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
     position: relative;
   }
 
-  /* The frame is what the radios show and hide: the photograph and its own
-     caption travel together, so each render is labelled when seen alone. */
+  /* The frame is what the radios show and hide: the photograph. */
   .gallery__frame {
     display: none;
     gap: var(--s-12);
   }
 
-  /* The count under the caption: a fact about the page, so docket type, muted. */
+  /* The count under the photograph: a fact about the page, so docket type, muted. */
   .gallery__count {
     margin: 0;
     font-family: var(--font-mono);
@@ -387,7 +369,7 @@ const CAPTION = "Studio render. Not a photograph of the garment.";
   }
 
   /* Below 900px the strip is equal-width tiles filling the row under the
-     photograph and its caption: three across, wrapping to a second row after
+     photograph: three across, wrapping to a second row after
      that, or two across for a two-photograph product so the pair fills the row
      rather than leaving half of it empty. A tile is a third of 350px less two
      gaps, about 110px wide and 147px tall at 390px, far over the 44px minimum

@@ -169,9 +169,8 @@ for (const product of products) {
     throw new Error(`products.json: "${product.slug}" photoKind ${JSON.stringify(product.photoKind)} is not "photograph" or "render".`);
   }
 
-  /* photoKind. A render shown without its disclosure is a banned dishonest
-     photograph, so a product with photos must say which kind they are, and the
-     build will not guess. */
+  /* photoKind. A product with photos must say which kind they are,
+     and the build will not guess. */
   const KINDS = ["photograph", "render"];
   if (product.photos.length > 0 && !KINDS.includes(product.photoKind as string)) {
     throw new Error(

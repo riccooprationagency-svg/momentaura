@@ -369,18 +369,16 @@ the owner, under every condition below. A condition that fails means the render 
 used. The placeholder rule above still applies to any product without one.
 
 - **Disclosed, always.** A product that uses a render carries `photoKind: "render"` in
-  `products.json`, and `Gallery.astro` prints the line "Studio render. Not a photograph
-  of the garment." beneath every render, on every surface that shows it, including the
-  homepage reveal and the hero. Archivo at `--t-caption` in `--fg-muted`. Never mono,
-  never hidden, never shortened. A render without the line is a banned dishonest
-  photograph under the rule above.
+  `products.json`. By the owner's decision on 19 November 2026 no caption prints under a
+  render on any surface, the hero included: the line "Studio render. Not a photograph of
+  the garment." is removed everywhere. The build still requires `photoKind`, which is how
+  the site knows which pictures are renders.
 - **The garment shown is the garment shipped.** Colour, print, placement and cut match
   what the buyer receives. A render of a design that is not being sold, or sold in a
   different colour, is not used. The owner confirms this per image before it is added.
 - **No invented people as evidence.** A person in a render is never described as a
   customer, never named, never quoted, never used as a testimonial or "worn by" claim.
-- **Each image stands alone.** The disclosure line prints under every render, never once
-  per gallery, so an image seen without its neighbours is still labelled. Renders of one
+- **Each image stands alone.** Renders of one
   product may differ in backdrop or setting. The lead image (`-1`) is a studio-backdrop or
   flat-on-white render, never a setting with a visible wall or floor.
 - **It expires per product.** The day a real photograph of that product goes through
@@ -397,9 +395,9 @@ used. The placeholder rule above still applies to any product without one.
 - **The build knows.** `src/lib/products.ts` throws on a product that has photos and no
   valid `photoKind`.
 
-One further extension, by the owner's decision on 18 November 2026: `tee-white-three-cats`, `tee-white-line-art-face`, `tee-white-yellow-hands`, `tee-white-woman-with-drink`, `hoodie-m-chest-logo` and `tracksuit-sleeve-stripes-m-logo` may use owner-supplied renders while `stock` is above 0, because the owner states he holds 20 of each. Every other condition in this section applies unchanged: the disclosure line under every render, the owner's per-image confirmation against what he holds, a studio-backdrop lead, and removal the day a real photograph of that product goes through `scripts/images.mjs`. The extension ends for each product on that day. It covers no other product.
+One further extension, by the owner's decision on 18 November 2026: `tee-white-three-cats`, `tee-white-line-art-face`, `tee-white-yellow-hands`, `tee-white-woman-with-drink`, `hoodie-m-chest-logo` and `tracksuit-sleeve-stripes-m-logo` may use owner-supplied renders while `stock` is above 0, because the owner states he holds 20 of each. Every other condition in this section applies unchanged: the owner's per-image confirmation against what he holds, a studio-backdrop lead, and removal the day a real photograph of that product goes through `scripts/images.mjs`. The extension ends for each product on that day. It covers no other product.
 
-One further extension, narrower than the rule it extends, for the homepage hero: **one** group render of several existing products may stand as the hero picture, written to `site.json` by `scripts/images.mjs --hero`. Every garment in it has a slug that exists in `products.json`, and `src/lib/hero.ts` throws at build on one that does not. The owner has confirmed each garment in it against its order specification, per garment, before it is added. The caption "Studio render. Not a photograph of the garments." prints directly beneath it, in Archivo at `--t-caption` in `--fg-muted`, never mono, never hidden. By the owner's decision on 19 November 2026 the hero carries no legend; the caption stays. People in it are never described as customers, never named, never quoted. There is no second hero render and no group render anywhere else. The extension ends the day a real photograph goes through `scripts/images.mjs` for the hero, and the render is removed that day.
+One further extension, narrower than the rule it extends, for the homepage hero: **one** group render of several existing products may stand as the hero picture, written to `site.json` by `scripts/images.mjs --hero`. Every garment in it has a slug that exists in `products.json`, and `src/lib/hero.ts` throws at build on one that does not. The owner has confirmed each garment in it against its order specification, per garment, before it is added. By the owner's decision on 19 November 2026 the hero carries no legend and no caption. People in it are never described as customers, never named, never quoted. There is no second hero render and no group render anywhere else. The extension ends the day a real photograph goes through `scripts/images.mjs` for the hero, and the render is removed that day.
 
 Everything else in this section stands, including: the pipeline through
 `scripts/images.mjs`, the 200KB file limit, explicit width and height, and the rule
