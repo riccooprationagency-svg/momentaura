@@ -108,7 +108,7 @@ const cta = stripLive
           <ul class="hero__legend">
             {legend.map((line) => (
               <li>
-                <span class="hero__legend-lead">{line.lead}</span> {line.name}{" "}
+                <span class="hero__legend-lead">{line.lead}</span> <a class="hero__legend-link" href={line.href}>{line.name}</a>{" "}
                 <span class:list={{ "hero__legend-pending": line.muted }}>{line.status}</span>
               </li>
             ))}
@@ -280,6 +280,18 @@ const cta = stripLive
 
   .hero__legend-lead,
   .hero__legend-pending {
+    color: var(--fg-muted);
+  }
+
+  /* The product name is the link: ink, underlined, so it reads as one without the
+     accent. Mono and the page's own tokens, the focus ring is global.css's. */
+  .hero__legend-link {
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: var(--underline-offset);
+  }
+
+  .hero__legend-link:hover {
     color: var(--fg-muted);
   }
 

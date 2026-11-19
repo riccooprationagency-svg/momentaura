@@ -70,6 +70,8 @@ export const heroImage: HeroImage | null = resolve();
  * Every figure here is read from the product; none is written in a template. */
 export interface LegendLine {
   lead: string;
+  /** The product page this line names. */
+  href: string;
   name: string;
   status: string;
   muted: boolean;
@@ -92,5 +94,5 @@ const LEAD: Record<Position, string> = {
 export const heroLegend = (): LegendLine[] =>
   (heroImage?.garments ?? []).map((g) => {
     const p = products.find((x) => x.slug === g.slug)!;
-    return { lead: LEAD[g.position], name: p.name, ...statusOf(p) };
+    return { lead: LEAD[g.position], href: `/products/${p.slug}/`, name: p.name, ...statusOf(p) };
   });
