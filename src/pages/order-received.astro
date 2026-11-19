@@ -131,14 +131,15 @@ const afterPaid = afterPaymentLines();
         </p>
         <!--
           The promo code, as the order recorded it and only if it used one: the row
-          hides itself when the status answer has no such key. The sentence is
-          written here and the cart fills in only the code. What the code took off
+          hides itself when the status answer has no such key. The label is
+          written here and the cart fills in only the code, into the value span; fill() hides the parent of what it fills, so that parent must be this row. What the code took off
           is not shown and is not sent, so Subtotal plus Delivery will not equal
           Total on an order that used one. A code edited or deleted after the order
           was placed changes nothing here.
         -->
         <p class="received__row" hidden>
-          <span class="received__total-label">Promo code <span data-fill="promoCode"></span> applied</span>
+          <span class="received__total-label">Promo code applied</span>
+          <span class="received__total-value" data-fill="promoCode"></span>
         </p>
         <p class="received__row" hidden>
           <span class="received__total-label">Delivery</span>
