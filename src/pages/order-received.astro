@@ -30,6 +30,7 @@
 // be a made-up commitment on the one screen a buyer keeps.
 import Base from "../layouts/Base.astro";
 import { products, price } from "../lib/products";
+import { retired } from "../lib/retired";
 import { afterPaymentLines } from "../lib/site";
 
 const afterPaid = afterPaymentLines();
@@ -106,6 +107,15 @@ const afterPaid = afterPaymentLines();
               >
                 <span class="rline__name">{product.name}</span>
                 <span class="rline__qty"><span data-qty>0</span> &times; {price(product.price)}</span>
+                <span class="rline__amount" data-line-total />
+              </li>
+            ))
+          }
+          {
+            retired.map((item) => (
+              <li class="rline" data-line data-retired data-slug={item.slug} data-name={item.name} data-price={item.price} data-lead="" hidden>
+                <span class="rline__name">{item.name}</span>
+                <span class="rline__qty"><span data-qty>0</span> &times; {price(item.price)}</span>
                 <span class="rline__amount" data-line-total />
               </li>
             ))

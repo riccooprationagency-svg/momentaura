@@ -378,7 +378,7 @@ function paintOrder(): void {
  * would hold the nav count above the number of lines the order page can show,
  * which is the count quietly lying. */
 if (lines.length) {
-  const known = new Set(lines.map((line) => line.dataset.slug));
+  const known = new Set(lines.filter((line) => !line.dataset.retired).map((line) => line.dataset.slug));
   for (const slug of Object.keys(order)) {
     if (!known.has(slug)) {
       delete order[slug];

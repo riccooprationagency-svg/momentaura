@@ -68,23 +68,6 @@
     "sizes": []
   },
   {
-    "slug": "t-shirt",
-    "name": "T-shirt",
-    "category": "t-shirts",
-    "audience": [],
-    "price": 10,
-    "material": null,
-    "fabricWeight": null,
-    "fit": null,
-    "printMethod": null,
-    "leadTimeDays": null,
-    "dispatch": "Nairobi",
-    "stock": 5,
-    "stockCountedAt": "2026-11-17T19:42:00+03:00",
-    "photos": [],
-    "sizes": []
-  },
-  {
     "slug": "tee-chest-logo",
     "name": "Black t-shirt, MOMENTAURA chest logo",
     "category": "t-shirts",
