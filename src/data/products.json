@@ -432,7 +432,15 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-18T22:59:07+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-white-woman-with-drink-1-800.d76fe0a9.webp",
+        "alt": "White t-shirt, flat on white and knotted at the hem, with a small MOMENTAURA mark at the chest and a print of a woman in sunglasses holding a glass and making a peace sign, wearing a hoodie that says DRAMATIC",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -470,7 +478,21 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-18T22:59:07+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-white-three-cats-1-800.3bcefd09.webp",
+        "alt": "White t-shirt, flat on a grey backdrop, with a small MOMENTAURA mark at the chest and a print of three stacked cartoon cats at the lower hem with the words Wow and Hi",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-white-three-cats-2-800.41e37c81.webp",
+        "alt": "Studio render of a woman in the white t-shirt with the cat print and brown wide-leg trousers, standing against a beige wall",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -508,7 +530,21 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-18T22:59:07+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-white-line-art-face-1-800.711c96b2.webp",
+        "alt": "White t-shirt, flat on white, with a small MOMENTAURA mark at the chest and a line drawing of a woman's face with closed eyes and red lips",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-white-line-art-face-2-800.0d817307.webp",
+        "alt": "Studio render of a woman in the white line-art face t-shirt and brown wide-leg trousers, standing against a beige wall",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
@@ -546,7 +582,21 @@
     "dispatch": "Nairobi",
     "stock": 20,
     "stockCountedAt": "2026-11-18T22:59:07+03:00",
-    "photos": [],
+    "photos": [
+      {
+        "src": "/img/tee-white-yellow-hands-1-800.4b6e4c20.webp",
+        "alt": "White t-shirt, flat on a grey backdrop, with a small MOMENTAURA mark at the chest and a print of two large yellow cartoon hands gripping the shirt, one from the left and a second at the right edge",
+        "width": 800,
+        "height": 1067
+      },
+      {
+        "src": "/img/tee-white-yellow-hands-2-800.290e0727.webp",
+        "alt": "Studio render of a woman in the white t-shirt with the yellow hands print and brown wide-leg trousers, standing against a beige wall",
+        "width": 800,
+        "height": 1067
+      }
+    ],
+    "photoKind": "render",
     "sizes": [
       {
         "label": "S",
