@@ -3,6 +3,7 @@
  * serve. Run by hand, when a shoot lands. Never part of `npm run build`.
  *
  *   node scripts/images.mjs <slug> <source> <alt> [<source> <alt> ...]
+ *   node scripts/images.mjs --hero <source> <alt> <left=slug,centre=slug,right=slug,joggers=slug>
  *
  *   node scripts/images.mjs crew-tee \
  *     "D:/shoot/2026-09/crew-tee-front.CR3" "Crew tee laid flat, front" \
@@ -111,9 +112,139 @@ try {
   );
 }
 
+/* ---------- hero mode ----------
+ *
+ * The homepage hero is one group render of several products, not a product's
+ * photograph, so it does not take the 3:4 crop and does not write products.json.
+ * It is the same discipline with a different recipe:
+ *
+ *   - the fully transparent margin is trimmed and nothing else is cropped. The
+ *     bounding box is read off the alpha channel here rather than left to
+ *     sharp.trim(), whose idea of "background" is the top-left pixel;
+ *   - alpha is kept, so the picture sits on the page's own ground;
+ *   - AVIF and WebP at 600, 900 and 1200 wide, one aspect ratio;
+ *   - no upscaling, no empty alt text, and no file over the ceiling, said here
+ *     at the moment of writing and not only later by V14;
+ *   - width and height are read back off the encoded WebP at the base width;
+ *   - the result is written to site.json "heroImage", never by hand. The
+ *     garments argument names which catalogue slug each position shows, so the
+ *     legend under the picture is built from products.json and not typed.
+ *
+ * Changing any number in HERO_RECIPE changes every URL, for the reason RECIPE
+ * does above.
+ */
+const HERO_WIDTHS = [600, 900, 1200];
+const HERO_BASE = 900;
+const HERO_RECIPE = `hero-v1|${HERO_WIDTHS.join(",")}|trim-alpha|avif${AVIF.quality}/${AVIF.effort}|webp${WEBP.quality}/${WEBP.effort}`;
+const POSITIONS = ["left", "centre", "right", "joggers"];
+
+const heroMode = async (args) => {
+  if (args.length !== 3) {
+    die(
+      "Usage:\n\n  node scripts/images.mjs --hero <source> <alt> <left=slug,centre=slug,right=slug,joggers=slug>\n\n" +
+        "  The alt text is not optional and the script will not invent it. Each position\n" +
+        "  must name a slug that exists in src/data/products.json."
+    );
+  }
+  const [file, rawAlt, rawGarments] = args;
+  const alt = rawAlt.trim();
+  if (alt === "") die("No alt text. Say what the picture shows.");
+  if (!existsSync(file)) die(`No such file: ${file}`);
+
+  const garments = rawGarments.split(",").map((pair) => {
+    const [position, slug] = pair.split("=").map((x) => (x ?? "").trim());
+    return { position, slug };
+  });
+  if (garments.map((g) => g.position).join() !== POSITIONS.join()) {
+    die(`Garments must be ${POSITIONS.map((p) => `${p}=slug`).join(",")}, in that order.`);
+  }
+  const known = new Set(JSON.parse(readFileSync(CATALOGUE, "utf8")).map((p) => p.slug));
+  for (const g of garments) if (!known.has(g.slug)) die(`"${g.slug}" is not in src/data/products.json.`);
+
+  const bytes = readFileSync(file);
+  const hash = createHash("sha256").update(bytes).update(HERO_RECIPE).digest("hex").slice(0, 8);
+
+  /* Trim to the alpha bounding box. Anything above zero counts as picture, so a
+     faint edge is kept rather than cut. */
+  const { data, info } = await sharp(bytes).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let x0 = info.width, y0 = info.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * info.channels + 3] > 0) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) die(`${basename(file)} is fully transparent.`);
+  const box = { left: x0, top: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+
+  const top = HERO_WIDTHS[HERO_WIDTHS.length - 1];
+  if (box.width < top) {
+    die(
+      `${basename(file)} trims to ${box.width}x${box.height}. The largest rendition is ${top} wide.\n` +
+        `  Upscaling would invent detail. Supply a larger render.`
+    );
+  }
+
+  const report = [`  ${basename(file)}  ${info.width}x${info.height} -> trimmed to ${box.width}x${box.height} (alpha bounding box)`];
+  mkdirSync(OUT, { recursive: true });
+  const written = new Set();
+  let base = null;
+
+  for (const width of HERO_WIDTHS) {
+    const height = Math.round((width * box.height) / box.width);
+    for (const [ext, encode] of [
+      ["avif", (p) => p.avif(AVIF)],
+      ["webp", (p) => p.webp(WEBP)],
+    ]) {
+      const name = `hero-trio-${width}.${hash}.${ext}`;
+      const out = await encode(sharp(bytes).rotate().extract(box).resize(width, height)).toFile(join(OUT, name));
+      written.add(name);
+      const size = statSync(join(OUT, name)).size;
+      report.push(`    /img/${name.padEnd(36)} ${String(size).padStart(7)} bytes  ${out.width}x${out.height}`);
+      if (size > CEILING) {
+        rmSync(join(OUT, name));
+        die(
+          `/img/${name} is ${size} bytes, over the ${CEILING}-byte ceiling.\n` +
+            `  Lower the quality in AVIF/WEBP above, and change HERO_RECIPE with it.`
+        );
+      }
+      if (width === HERO_BASE && ext === "webp") base = { src: `/img/${name}`, width: out.width, height: out.height };
+    }
+  }
+
+  for (const f of readdirSync(OUT)) {
+    if (/^hero-trio-\d+\.[0-9a-f]{8}\.(avif|webp)$/.test(f) && !written.has(f)) rmSync(join(OUT, f));
+  }
+
+  /* Written as text into the one line the file reserves for it. Re-serialising
+     the whole of site.json would reflow every delivery zone onto its own lines
+     and bury this change in a diff nobody can read. */
+  const entry = { ...base, alt, kind: "render", garments };
+  const SITE = join(ROOT, "src", "data", "site.json");
+  const text = readFileSync(SITE, "utf8");
+  const block = JSON.stringify(entry, null, 2).replace(/\n/g, "\n  ");
+  const pattern = /^(  "heroImage": )(null|\{[\s\S]*?\n  \})(,?)$/m;
+  if (!pattern.test(text)) die('src/data/site.json has no "heroImage" key to write into.');
+  const next = text.replace(pattern, (_m, key, _old, comma) => `${key}${block}${comma}`);
+  JSON.parse(next);
+  writeFileSync(SITE, next, "utf8");
+
+  console.log("\n  Hero image\n");
+  for (const line of report) console.log(line);
+  console.log(`\n  src/data/site.json  heroImage: ${base.src}  ${base.width}x${base.height}\n`);
+};
+
 /* ---------- arguments ---------- */
 
 const argv = process.argv.slice(2);
+if (argv[0] === "--hero") {
+  await heroMode(argv.slice(1));
+  process.exit(0);
+}
 const USAGE =
   "node scripts/images.mjs <slug> <source> <alt> [<source> <alt> ...]\n\n" +
   "  Sources and alt text come in pairs. Alt text is not optional and the script\n" +
