@@ -908,6 +908,28 @@ await check("a successful callback settles the order paid, with the receipt", as
   eq(stored.via, "callback", "settled by the callback");
 });
 
+/* A product removed from the catalogue after an order was pushed for it. settle()
+   and markSold() work from the slug and quantity stored on the order and never
+   look the product up, so the order must still settle, still be counted against
+   stock, and still report its recorded amounts. */
+await check("AN ORDER FOR A SLUG THAT HAS LEFT THE CATALOGUE STILL SETTLES, IS COUNTED, AND READS AS RECORDED", async () => {
+  const body = await (await push()).json();
+  const stored = await record();
+  stored.items = [{ slug: "retired-tee", qty: 1 }];
+  await kv.put("ws_CO_TEST_1", JSON.stringify(stored));
+  await kv.put(`ref:${stored.reference}`, JSON.stringify(stored));
+
+  const res = await hit(callbackBody());
+  eq(res.status, 200, "callback acknowledged");
+  eq((await record()).status, "paid", "settled paid");
+  eq((await kv.get(`ref:${stored.reference}`, "json")).status, "paid", "the reference copy too");
+  eq(await kv.get(`sold:retired-tee:${stored.reference}`), "1", "the sale is still counted");
+
+  const out = await (await askStatus(body)).json();
+  eq(out.status, "paid", "reported status");
+  eq(out.breakdown.total, `KSh ${stored.amount.toLocaleString("en-KE")}`, "total as recorded");
+});
+
 /* The record lives under two keys and /api/track only ever sees one of them.
    Settling the CheckoutRequestID copy alone leaves a buyer who has paid reading
    "payment not confirmed" on the tracking page until the record expires. */

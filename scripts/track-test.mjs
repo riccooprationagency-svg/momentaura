@@ -297,6 +297,29 @@ await check("an order from before delivery fees shows its total and nothing it l
   eq(body.breakdown, { total: "KSh 1,300" }, "breakdown");
 });
 
+/* A product can leave the catalogue while paid orders for it stay in KV: the
+   KSh 10 test product was removed after three live orders were placed against
+   it. The slug below is in no fixture catalogue on purpose. The order must still
+   be found and its money read as recorded; the line must neither throw nor be
+   replaced by a figure recomputed from a catalogue that no longer has it. */
+await check("A PAID ORDER WHOSE LINE NAMES A RETIRED SLUG IS STILL FOUND, WITH ITS AMOUNTS AS RECORDED", async () => {
+  await store({
+    items: [{ slug: "retired-tee", qty: 1 }],
+    status: "paid",
+    settledAt: Date.UTC(2026, 8, 2),
+    subtotal: 10,
+    delivery: { county: "nairobi-cbd", label: "Nairobi CBD", area: "Kilimani", landmark: "Blue gate", fee: 0 },
+    amount: 10,
+  });
+  const res = await ask(GOOD);
+  eq(res.status, 200, "found, not hidden and not a 500");
+  const body = await res.json();
+  eq(body.status, "paid", "status");
+  eq(body.items, [{ slug: "retired-tee", qty: 1 }], "the line as recorded");
+  eq(body.breakdown, { county: "Nairobi CBD", area: "Kilimani", fee: "Free", subtotal: "KSh 10", total: "KSh 10" }, "amounts as recorded");
+  eq("dispatchDate" in body, false, "no date promised for a line with no lead time on file");
+});
+
 /* ---------- the dispatch date ---------- */
 
 await check("a settled order whose lines all have a lead time gets A DATE", async () => {
