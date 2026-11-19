@@ -1,14 +1,18 @@
 /* Promo codes: reading one, judging one, and pricing with one.
  *
- * MONEY-PATH CODE. A code takes a percentage off the ITEMS SUBTOTAL of an order,
- * once, and nothing else. Delivery is never discounted. The browser sends a code
- * string and nothing else about money; the percentage, the discount and the
+ * MONEY-PATH CODE. A code takes a percentage, or a fixed amount, off the ITEMS
+ * SUBTOTAL of an order, once, and nothing else. Delivery is never discounted. The
+ * browser sends a code string and nothing else about money; the discount and the
  * amount sent to Daraja are all decided here and in stk.js, and stored on the
- * order as recorded.
+ * order as recorded. None of those figures is ever sent back to a browser: the
+ * buyer is told the code that was applied and the total, and nothing in between.
  *
  * A record lives in the same KV namespace as the orders, under promo:<CODE>:
  *
- *   { percent, endsAt, startsAt?, maxUses, oncePerPhone, active, channel }
+ *   { percent | amountOff, endsAt, startsAt?, maxUses, oncePerPhone, active, channel }
+ *
+ * EXACTLY ONE of percent and amountOff. A record with both, or with neither, is
+ * invalid and refused like any other failure.
  *
  * It is written by hand with `wrangler kv key put`. Nothing in this repo writes
  * one, and NOTHING EVER WRITES TO IT AFTER THAT: a record has no counter. Use is
@@ -25,7 +29,9 @@
  * was used by this phone already, or is a malformed record. A caller that could
  * tell them apart could probe for codes, and a guessable code is a public price.
  *
- * NO FLOATS IN THE MONEY PATH. discountFor() is integer arithmetic on whole KSh.
+ * NO FLOATS IN THE MONEY PATH. discountFor() is integer arithmetic on whole KSh, and
+ * it is the ONE function that says what a code takes off: the push and the preview
+ * both call it, so they cannot disagree about a basket.
  *
  * This module imports nothing, so the test harness loads it unpatched.
  */
@@ -33,6 +39,10 @@
 /* The hard ceiling. In shipped code, not data: a record saying 150 is invalid,
    not honoured and not clamped. */
 export const MAX_PERCENT = 15;
+
+/* The same job for a fixed amount, in whole KSh: a typo guard, not a business
+   rule. A record saying 2000 is invalid, not honoured and not clamped. */
+export const MAX_AMOUNT_OFF = 200;
 
 /* The largest cap a record may carry. The cap is counted by listing marker keys
    at push time, following the cursor to the end, and a cap this size keeps that
@@ -66,7 +76,14 @@ const instant = (value) => (typeof value === "string" && STAMP.test(value) ? Dat
    off. */
 function isValid(r) {
   if (r === null || typeof r !== "object" || Array.isArray(r)) return false;
-  if (!Number.isInteger(r.percent) || r.percent < 1 || r.percent > MAX_PERCENT) return false;
+  /* Exactly one of the two, each a whole number in range. A key that is present
+     counts as present whatever its value, so { percent: null, amountOff: 100 } has
+     both and is refused rather than read as "amountOff". */
+  const hasPercent = r.percent !== undefined;
+  const hasAmount = r.amountOff !== undefined;
+  if (hasPercent === hasAmount) return false;
+  if (hasPercent && (!Number.isInteger(r.percent) || r.percent < 1 || r.percent > MAX_PERCENT)) return false;
+  if (hasAmount && (!Number.isInteger(r.amountOff) || r.amountOff < 1 || r.amountOff > MAX_AMOUNT_OFF)) return false;
   if (Number.isNaN(instant(r.endsAt))) return false;
   if (r.startsAt !== undefined && r.startsAt !== null && Number.isNaN(instant(r.startsAt))) return false;
   if (r.maxUses !== undefined && r.maxUses !== null) {
@@ -140,7 +157,7 @@ async function usesOf(kv, code) {
  * @param input     whatever the browser sent as `promo`
  * @param now       ms since epoch; the instant the push is requested
  * @param phoneHash phoneKey() of the buyer's number
- * @returns {Promise<{ok: true, code: string, percent: number, record: object} | {ok: false}>}
+ * @returns {Promise<{ok: true, code: string, record: object} | {ok: false}>}
  */
 export async function resolvePromo(kv, input, now, phoneHash) {
   const code = normaliseCode(input);
@@ -172,21 +189,35 @@ export async function resolvePromo(kv, input, now, phoneHash) {
     if ((await kv.get(promoPhoneKey(code, phoneHash))) !== null) return { ok: false };
   }
 
-  return { ok: true, code, percent: record.percent, record };
+  return { ok: true, code, record };
 }
 
 /**
- * The discount in whole KSh: floor(items * percent / 100).
+ * What a code takes off, in whole KSh, or null when the code must be REFUSED.
  *
- * Both operands are integers, so the product is exact and the division is
- * correctly rounded; a quotient that is a whole number is exact, and one that is
- * not is at least 0.01 from the next whole number, so floor cannot land wrong.
- * Clamped so the items never reach zero — unreachable at the 15 percent cap,
- * kept because it is the guarantee that no amount sent to Daraja is below 1
- * whatever the cap becomes.
+ * A percent record: floor(items * percent / 100), clamped so the items never
+ * reach zero. Both operands are integers, so the product is exact and the
+ * division is correctly rounded; a quotient that is a whole number is exact, and
+ * one that is not is at least 0.01 from the next whole number, so floor cannot
+ * land wrong. Unreachable at the 15 percent cap, kept as the guarantee that no
+ * amount sent to Daraja is below 1 whatever the cap becomes. A percent code that
+ * rounds to 0 is not refused, as it never was.
+ *
+ * An amountOff record: min(amountOff, items - 1), so the buyer always pays at
+ * least KSh 1, which is the least an STK Push can ask for. There is no
+ * percentage ceiling; the full amount applies on any basket. When that comes to
+ * 0 (items of KSh 1) the code takes nothing off, and a code that does nothing is
+ * refused with the same one answer as every other failure, before a use can be
+ * counted. null means exactly that, and a caller that treats it as 0 would
+ * charge a buyer full price who thought they had a discount.
  */
-export function discountFor(itemsSubtotal, percent) {
-  if (!Number.isInteger(itemsSubtotal) || itemsSubtotal < 1) return 0;
-  if (!Number.isInteger(percent) || percent < 1) return 0;
+export function discountFor(itemsSubtotal, record) {
+  const whole = Number.isInteger(itemsSubtotal) && itemsSubtotal >= 1;
+  if (record.amountOff !== undefined) {
+    const off = whole ? Math.min(record.amountOff, itemsSubtotal - 1) : 0;
+    return Number.isInteger(off) && off >= 1 ? off : null;
+  }
+  const { percent } = record;
+  if (!whole || !Number.isInteger(percent) || percent < 1) return 0;
   return Math.max(0, Math.min(Math.floor((itemsSubtotal * percent) / 100), itemsSubtotal - 1));
 }

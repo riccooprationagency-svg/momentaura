@@ -1,9 +1,16 @@
-/* POST /api/promo/check — what a code would take off THIS basket, before anyone pays.
+/* POST /api/promo/check — whether a code applies to THIS basket, and what the order
+ * would then total, before anyone pays.
  *
  * ADVISORY, AND IT IS NOT THE PRICE. /api/mpesa/stk judges the code again, at the
  * moment the push is requested, and recomputes every figure; nothing here is
  * remembered or trusted by it. This exists so the checkout page can show the
- * discount before the buyer is asked for money, and for nothing else.
+ * buyer the code that was applied and the total before the buyer is asked for money,
+ * and for nothing else.
+ *
+ * THE DISCOUNT IS NEVER IN THE ANSWER. The body is { ok, code, total? }: the
+ * canonical code (trimmed, upper-cased) and the payable total, items less the
+ * discount plus delivery, from the same discountFor() the push uses. No discount,
+ * amountOff or percent key. The page computes nothing: it shows what it is sent.
  *
  * WHAT IT NEVER DOES
  *
@@ -15,8 +22,11 @@
  *     limiting rule on /api/promo/*), not in this file.
  *   - count a use. A use is a marker written by settle() when an order is paid.
  *   - read a price, a percentage or a total from the request. The body is
- *     { promo, lines: [{ slug, qty }] } and a `price`, `discount` or `percent`
- *     beside them is not destructured and not looked at.
+ *     { promo, lines: [{ slug, qty }], county } and a `price`, `discount` or
+ *     `percent` beside them is not destructured and not looked at. `county` is a
+ *     key from the fee table, looked up in ZONES exactly as _order.js looks it up.
+ *     Without a county that is on the table there is no delivery to add, so the
+ *     answer carries the code and no total, and the page waits for a county.
  *
  * ONE ANSWER FOR EVERY REFUSED CODE, same rule and same reason as the push: a
  * code that does not exist, has ended, has not started, is switched off or is used
@@ -43,7 +53,7 @@
 import catalogue from "../../../src/data/products.json";
 import { MAX_LINES, MAX_QTY } from "../_order.js";
 import { discountFor, resolvePromo } from "../_promo.js";
-import { REACH, Reach } from "../_site.js";
+import { REACH, Reach, ZONES } from "../_site.js";
 
 const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
 
@@ -106,12 +116,11 @@ export async function onRequest({ request, env }) {
       message: `The code cannot be checked right now. You can still pay, and it is checked again then. ${Reach}.`,
     });
   }
-  if (!promo.ok) return json(200, { ok: false, message: REFUSED });
+  /* A code that is refused and a code that would take nothing off this basket
+     (discountFor() says null) answer with the same body, byte for byte. */
+  const discount = promo.ok ? discountFor(subtotal, promo.record) : null;
+  if (discount === null) return json(200, { ok: false, message: REFUSED });
 
-  return json(200, {
-    ok: true,
-    percent: promo.percent,
-    itemsSubtotal: subtotal,
-    discountKsh: discountFor(subtotal, promo.percent),
-  });
+  const zone = typeof payload.county === "string" ? ZONES.get(payload.county) : undefined;
+  return json(200, zone ? { ok: true, code: promo.code, total: subtotal - discount + zone.cost } : { ok: true, code: promo.code });
 }

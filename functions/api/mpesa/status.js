@@ -18,8 +18,8 @@
  *
  * WHAT IT RETURNS TO THE BROWSER IS THE STATUS, OUR REFERENCE AND THE AMOUNTS
  * AS RECORDED — subtotal, delivery fee and total, formatted by _amounts.js, and
- * for an order that used a promo code also that code, its percent, the discount
- * and the items subtotal as recorded (unformatted) — and nothing else. All of it
+ * for an order that used a promo code also that code as recorded, and never what
+ * it took off — and nothing else. All of it
  * sits under `breakdown`. No phone number, no county, area or landmark, no
  * Daraja payload, no receipt, no amount a callback claimed.
  *

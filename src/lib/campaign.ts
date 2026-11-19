@@ -25,8 +25,8 @@ export interface Campaign {
   showcase: string[];
   /** Whether the page may state the code. Off until the discount really exists. */
   promoPublic: boolean;
+  /** The code, for the page to name. What it takes off lives in KV, never here. */
   promoCode: string;
-  promoPercent: number;
   /** Real production figure, or null. Null means no capacity notice renders. */
   runSize: number | null;
 }
@@ -74,8 +74,8 @@ for (const slug of raw.showcase) {
 }
 
 if (typeof raw.promoPublic !== "boolean") fail(`"promoPublic" must be true or false.`);
-if (!Number.isInteger(raw.promoPercent) || raw.promoPercent < 1 || raw.promoPercent > 15) {
-  fail(`"promoPercent" is ${JSON.stringify(raw.promoPercent)} — a whole number from 1 to 15.`);
+if ("promoPercent" in raw || "promoAmountOff" in raw) {
+  fail(`what a code takes off is decided by its KV record alone. Remove "promoPercent" and "promoAmountOff" from campaign.json.`);
 }
 if (typeof raw.promoCode !== "string") fail(`"promoCode" must be a string.`);
 if (raw.promoPublic && raw.promoCode.trim() === "") fail(`"promoPublic" is true but "promoCode" is empty.`);

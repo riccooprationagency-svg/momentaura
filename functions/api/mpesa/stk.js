@@ -127,7 +127,10 @@ export async function onRequest({ request, env }) {
 
   /* The figures. Delivery is added AFTER the discount and is never discounted.
      Whole KSh throughout; stkPush() refuses anything that is not an integer. */
-  const discount = promo ? discountFor(order.subtotal, promo.percent) : 0;
+  const discount = promo ? discountFor(order.subtotal, promo.record) : 0;
+  /* null is a code that would take nothing off this basket: refused with the one
+     answer, and nothing has been written, so no use can have been counted. */
+  if (discount === null) return fail(400, PROMO_REFUSED, "promo");
   const total = order.subtotal - discount + order.delivery.fee;
 
   const ref = reference();
@@ -166,13 +169,16 @@ export async function onRequest({ request, env }) {
        fee table that may have changed since. */
     subtotal: order.subtotal,
     /* The promo, as THIS handler resolved it and never as the request claimed
-       it. The same four fields on every order, null and 0 when there was no code,
-       so an old order and a new one have one shape. `itemsSubtotal` repeats
-       `subtotal` on purpose: it is the figure the percentage was taken from, named
+       it. Kept for accounting and NEVER returned to a browser: _amounts.js does
+       not copy promoPercent, promoAmountOff or discountKsh onto any response. The
+       same fields on every order, null and 0 when there was no code, so an old
+       order and a new one have one shape. `itemsSubtotal` repeats
+       `subtotal` on purpose: it is the figure the discount was taken from, named
        for that. `promoOncePerPhone` is what settle() needs to know about the code
        and is recorded here so it never has to read the promo record again. */
     promoCode: promo ? promo.code : null,
-    promoPercent: promo ? promo.percent : null,
+    promoPercent: promo ? (promo.record.percent ?? null) : null,
+    promoAmountOff: promo ? (promo.record.amountOff ?? null) : null,
     promoOncePerPhone: promo ? promo.record.oncePerPhone === true : null,
     discountKsh: discount,
     itemsSubtotal: order.subtotal,

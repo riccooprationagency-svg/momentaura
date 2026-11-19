@@ -9,8 +9,10 @@
 // again by functions/api/_order.js from the county key, and the M-Pesa prompt
 // on the buyer's phone shows that one.
 //
-// THE PROMO CODE IS ADVISORY HERE. Apply asks /api/promo/check what the code would
-// take off and the summary shows it; the pay button posts whatever is in the
+// THE PROMO CODE IS ADVISORY HERE. Apply asks /api/promo/check whether the code
+// applies; the summary then names the code and shows the total the server gave for
+// the chosen county. No amount off is shown, by the owner's decision of 19 November
+// 2026, and none is sent to this page. The pay button posts whatever is in the
 // field, and /api/mpesa/stk judges the code again and recomputes every figure. Its
 // answer is final. The code lives in the field and nowhere else: not in storage,
 // not in the placed-order snapshot, so a tampered value has nothing to inflate.
@@ -256,14 +258,14 @@ const groups = timingGroups();
             <span class="summary__total-value" data-order-total>KSh 0</span>
           </p>
           <!--
-            The discount, between the items and the delivery, because that is the
-            order it is taken in: off the items, then delivery added, undiscounted.
-            Hidden until Apply has an answer from the server, and cleared by any
-            edit to the code. The cart fills both slots; the minus is only here.
+            Which code was applied, and nothing about what it took off. The sentence
+            is written here; the cart fills in only the code, through textContent,
+            from the answer the server gave. Hidden until Apply has an answer, and
+            cleared by any edit to the code. Subtotal plus Delivery will not equal
+            Total while a code is applied, because the amount off is not shown.
           -->
-          <p class="summary__row summary__promo" data-promo hidden>
-            <span class="summary__total-label" data-promo-label></span>
-            <span class="summary__total-value">&minus;<span data-promo-off></span></span>
+          <p class="summary__row" data-promo hidden>
+            <span class="summary__total-label">Promo code <span data-promo-code></span> applied</span>
           </p>
           <p class="summary__row">
             <span class="summary__total-label">Delivery</span>
@@ -486,12 +488,6 @@ const groups = timingGroups();
   .summary__total {
     border-block-start: 1px dashed var(--border);
     padding-block-start: var(--s-8);
-  }
-
-  /* The discount line is a note on the subtotal above it, in the docket's own
-     size, so the three figures that matter keep the larger setting. */
-  .summary__promo .summary__total-value {
-    font-size: var(--t-docket);
   }
 
   .summary__total-label {

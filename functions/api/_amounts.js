@@ -15,9 +15,9 @@
  * that is absent hides its line, which is how an order placed before delivery
  * fees existed shows a total and nothing it does not have.
  *
- * An order that used a promo code adds four more keys, promoCode, promoPercent,
- * discountKsh and itemsSubtotal, and those four are NOT formatted: the code is a
- * string and the rest are raw integers. An order without a code has none of them.
+ * An order that used a promo code adds one more key, promoCode, a string. An order
+ * without a code has none. The discount is NEVER among them, whatever the stored
+ * order holds: see the end of amounts().
  */
 
 /* Matches price() in src/lib/products.ts and money() in the cart: integer KSh,
@@ -32,19 +32,15 @@ export function amounts(record) {
   if (Number.isInteger(record.subtotal)) out.subtotal = money(record.subtotal);
   if (Number.isInteger(record.amount)) out.total = money(record.amount);
 
-  /* The promo, as the order recorded it — never looked up again. A code edited
-   * or deleted after the order was placed must not rewrite what that order was
-   * charged. Present only on an order that used a code, so an order without one
-   * answers with exactly the keys it always did.
+  /* The code, as the order recorded it — never looked up again. Present only on
+   * an order that used one, so an order without one answers with exactly the keys
+   * it always did.
    *
-   * RAW INTEGERS, unlike the three above, because the names carry the unit
-   * (promoPercent, discountKsh, itemsSubtotal) and the cart script has no byte
-   * budget to format them. Whatever shows them formats them. */
-  if (typeof record.promoCode === "string" && record.promoCode) {
-    out.promoCode = record.promoCode;
-    if (Number.isInteger(record.promoPercent)) out.promoPercent = record.promoPercent;
-    if (Number.isInteger(record.discountKsh)) out.discountKsh = record.discountKsh;
-    if (Number.isInteger(record.itemsSubtotal)) out.itemsSubtotal = record.itemsSubtotal;
-  }
+   * THE DISCOUNT IS NOT SENT. Orders stored before this change carry promoPercent,
+   * discountKsh and itemsSubtotal, and orders stored after it carry discountKsh and
+   * promoAmountOff for accounting. This function builds `out` by naming the keys it
+   * copies, so none of those can reach a browser; there is deliberately no
+   * allow-by-default spread of the record here. */
+  if (typeof record.promoCode === "string" && record.promoCode) out.promoCode = record.promoCode;
   return out;
 }

@@ -2423,6 +2423,31 @@ function timingViolations(regions, delivery, checkout) {
   }
 }
 
+/* ---------- V19 — fill() hides the parent of what it fills ----------
+ *
+ * cart.ts fill() writes into every [data-fill] element on /order-received and sets
+ * `parentElement.hidden` from whether the server sent that key. So the parent must
+ * be the row that carries `hidden`, with the slot as a direct child. A slot buried
+ * in a label span hid the label and left the row's own `hidden` in place, and the
+ * promo code never showed. The one visible-by-design row is the Total, which says
+ * "Shown on the M-Pesa prompt" until the poll answers and is named below. */
+
+const RECEIVED = join(DIST, "order-received", "index.html");
+if (existsSync(RECEIVED)) {
+  const html = readFileSync(RECEIVED, "utf8");
+  const ROW = /<(\w+)\b([^>]*)>((?:\s*<span\b[^>]*>[^<]*<\/span>)+)\s*<\/\1>/g;
+  let placed = 0;
+  for (const [, , attrs, kids] of html.matchAll(ROW)) {
+    for (const [, key] of kids.matchAll(/\sdata-fill="(\w+)"/g)) {
+      placed++;
+      if (!/\shidden[\s>]/.test(`${attrs}>`) && !/received__total"/.test(attrs)) fail("V19", `data-fill="${key}" sits in a row that is not hidden`);
+    }
+  }
+  const all = (html.match(/\sdata-fill=/g) || []).length;
+  if (placed !== all) fail("V19", `${all - placed} data-fill slot(s) on /order-received are not direct children of their row`);
+  console.log(`  V19 fill slots        ${all} on /order-received, each a direct child of the row fill() hides`);
+}
+
 /* ---------- report ---------- */
 
 for (const n of notes) console.log(`\n  note: ${n}`);

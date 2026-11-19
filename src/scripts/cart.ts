@@ -136,16 +136,13 @@ function showStatus(outcome: string): void {
  * Each [data-fill] names its key; one the server did not send hides its line,
  * which is how an order placed before delivery fees shows a total and nothing
  * it does not have. textContent, so an area typed as markup arrives as text. */
-function fill(breakdown?: Record<string, string | number>): void {
+function fill(breakdown?: Record<string, string>): void {
   for (const slot of qa("[data-fill]")) {
     const value = breakdown?.[slot.dataset.fill!];
-    const { pre = "", post = "" } = slot.dataset;
-    /* A number is one of the promo figures, which the server sends raw. The
-     * markup says how each is dressed (data-pre="KSh ", data-post="%"), so no
-     * formatting rule about a particular key lives in here. */
-    slot.textContent = typeof value === "number" ? pre + value.toLocaleString("en-KE") + post : (value ?? "");
-    /* Missing hides the row; zero does not. A recorded discount of 0 is a fact
-     * the order has, and an order that lacks the key is one that never had it. */
+    slot.textContent = value ?? "";
+    /* Missing hides the row, which is how an order without a promo code shows no
+     * promo line. The sentence around the code is the page's; only the code is
+     * written here. */
     slot.parentElement!.hidden = value == null;
   }
 }
@@ -238,13 +235,14 @@ const checkout = q("[data-checkout]");
  * shows the fee the order recorded, from /api/mpesa/status. */
 const county = q<HTMLSelectElement>("[name=county]");
 
-/* A promo code the server has just priced for THIS order, held for the life of
+/* A promo code the server has just accepted for THIS order, held for the life of
  * the page and never written anywhere: not to the order key, not to the placed
- * snapshot. Every number in it came back from /api/promo/check, and the code is
- * the text in the field. `itemsSubtotal` is the server's own, so the figures on
- * screen are the ones it computed even if this page's catalogue has aged.
- * Cleared on any edit to the field (below), and by a refusal from the push. */
-let promo: { code: string; percent: number; itemsSubtotal: number; discountKsh: number } | null = null;
+ * snapshot. Both values came back from /api/promo/check: the canonical code, and
+ * the total payable for the county chosen when it was asked. This page never
+ * learns what the code takes off and computes none of it. `total` is absent when
+ * no county was chosen. Cleared on any edit to the field (below), on a change of
+ * county, and by a refusal from the push. */
+let promo: { code: string; total?: number } | null = null;
 const promoRow = q("[data-promo]");
 
 /* Which answer may still be applied. Bumped when Apply starts, on every edit to
@@ -305,14 +303,10 @@ function paintLines(quantities: Order): HTMLElement[] {
     text("[data-line-total]", money(sum), line);
   }
 
-  if (promo) total = promo.itemsSubtotal;
   if (totalValue) totalValue.textContent = money(total);
   if (promoRow) {
     promoRow.hidden = !promo;
-    if (promo) {
-      text("[data-promo-label]", `${promo.code} — ${promo.percent}% off`, promoRow);
-      text("[data-promo-off]", money(promo.discountKsh), promoRow);
-    }
+    if (promo) text("[data-promo-code]", promo.code, promoRow);
   }
 
   /* DELIVERY, AS A PREVIEW. Only once a county is chosen — the placeholder
@@ -322,9 +316,9 @@ function paintLines(quantities: Order): HTMLElement[] {
    * the county key, never read from here. Free is written as Free. */
   const fee = county?.selectedOptions[0]?.dataset.fee;
   if (fee) {
-    /* Delivery is added AFTER the discount and never discounted, the same order
-     * the push computes it in. */
-    const due = money(total - (promo?.discountKsh ?? 0) + +fee);
+    /* With a code, the server's total for this county; without one, the items
+     * and the fee. */
+    const due = money(promo?.total ?? total + +fee);
     text("[data-order-fee]", +fee ? money(+fee) : "Free");
     text("[data-order-due]", due);
     /* Not while a submit is in flight: the button is saying "Sending the
@@ -648,9 +642,10 @@ if (form && submitButton) {
 
 /* ---------- the promo field ----------
  *
- * ADVISORY. /api/promo/check says what the code would take off; the push judges
- * it again and its answer is final. This paints what the check returned and
- * computes nothing of its own beyond the subtraction in paintLines().
+ * ADVISORY. /api/promo/check says whether the code applies and what the order
+ * would total; the push judges it again and its answer is final. This paints
+ * what the check returned and computes nothing of its own: there is no discount
+ * in the answer to compute with.
  *
  * ENTER APPLIES. Left alone, Enter in this field would submit the whole form,
  * and that sends the M-Pesa prompt: someone typing a code and pressing Go would
@@ -660,35 +655,51 @@ const promoApply = q("[data-promo-apply]");
 const promoNote = q("[data-promo-note]");
 
 if (promoField && promoApply) {
+  /* Set by a change of county while a code is applied or being checked: ask again,
+   * for the latest county, once nothing is in flight. */
+  let redo = false;
+
   const apply = async () => {
     const code = promoField.value.trim();
     if (!code || isOff(promoApply)) return;
 
+    redo = false;
     clearErrors();
     const mine = ++seq;
     const sent = await send(
       promoApply,
       "Checking the code",
       "/api/promo/check",
-      { promo: code, lines: basket() },
+      { promo: code, lines: basket(), county: county?.value },
       promoNote
     );
     if (!sent) return;
     sent.restore();
+    if (redo) return apply();
 
     /* Superseded: the field changed, or the push refused the code, while this
      * was on its way. */
     if (mine !== seq) return;
 
     /* A refusal removes whatever was previewed BEFORE the message goes up: a
-     * code that has just been refused must not leave its discount on screen. */
+     * code that has just been refused must not leave its label on screen. */
     const body = sent.body as NonNullable<typeof promo> & { ok?: boolean; message?: string };
-    promo = body.ok ? { ...body, code } : null;
+    promo = body.ok ? body : null;
     paintOrder();
     if (!body.ok) setFieldError("promo", body.message ?? null);
   };
 
   on(promoApply, "click", apply);
+  /* The total is for one county, so a change of county voids every answer, held or
+   * in flight, and asks again if there was one. Apply returns early while its
+   * button is busy; the request in flight sees redo and asks when it is done. */
+  on(county, "change", () => {
+    redo = !!promo || isOff(promoApply);
+    promo = null;
+    seq++;
+    paintOrder();
+    if (redo) apply();
+  });
   on(promoField, "keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -699,6 +710,7 @@ if (promoField && promoApply) {
    * answer. */
   on(promoField, "input", () => {
     promo = null;
+    redo = false;
     seq++;
     setFieldError("promo", null);
     paintOrder();
