@@ -26,6 +26,7 @@ import {
   phoneDisplay,
   site,
   telHref,
+  whatsappDisplay,
   whatsappHref,
 } from "../lib/site";
 
@@ -35,7 +36,7 @@ const hasHours = known(hours);
 
 <Base
   title="Contact — MomentAura"
-  description="WhatsApp and phone 0753 181 901, and email for general questions and order problems."
+  description="WhatsApp 0180 983 085, phone 0753 181 901, and email for general questions and order problems."
   system="light"
 >
   <section class="page">
@@ -53,14 +54,14 @@ const hasHours = known(hours);
           Message MomentAura on WhatsApp
         </Button>
         <p class="reach__for">
-          For anything — a product, an order, or delivery. The number is {phoneDisplay()}.
+          For anything — a product, an order, or delivery. The WhatsApp number is {whatsappDisplay()}.
         </p>
       </div>
 
       <div class="reach">
         <p class="reach__label">Phone</p>
         <a class="reach__value" href={telHref()}>Call {phoneDisplay()}</a>
-        <p class="reach__for">The same number as WhatsApp, for a call instead of a message.</p>
+        <p class="reach__for">For a call.</p>
       </div>
 
       <div class="reach">
