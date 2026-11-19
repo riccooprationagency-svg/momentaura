@@ -2435,16 +2435,6 @@ await check("no key, passkey or shortcode is written into the source", async () 
   }
 });
 
-/* ---------- report ---------- */
-
-console.log("");
-if (failures.length) {
-  console.error(`  ${failures.length} failure(s), ${passed} passed:\n`);
-  for (const f of failures) console.error(`    ${f}`);
-  console.error("");
-  process.exit(1);
-}
-
 /* ================= fixed-amount codes =================
  *
  * A record carries exactly one of percent and amountOff. The fake codes here are
@@ -2597,5 +2587,14 @@ await check("A12. a once-per-phone amount code is recorded as such, as a percent
   eq((await record()).promoOncePerPhone, true, "recorded on the order");
 });
 
+/* ---------- report ---------- */
+
+console.log("");
+if (failures.length) {
+  console.error(`  ${failures.length} failure(s), ${passed} passed:\n`);
+  for (const f of failures) console.error(`    ${f}`);
+  console.error("");
+  process.exit(1);
+}
 
 console.log(`  ${passed} checks pass.\n`);
