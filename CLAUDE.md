@@ -451,6 +451,7 @@ Test on a real phone on mobile data before every deploy. Not on wifi.
 
 - No licensed characters, no third-party trademarks, in imagery or copy. Ever
 - Naming a service in plain text to say where a link goes or how a payment is made (M-Pesa, WhatsApp, Facebook, Instagram) is allowed. Logos, wordmarks, icons and branded products are not.
+- Footer and contact-page links to the shop's own WhatsApp, Facebook and Instagram profiles may carry that platform's own mark, unmodified, drawn in `currentColor`, beside the visible text label, inside a 44px touch target. No brand colours, no other third-party mark anywhere, no mark used decoratively. This is the only exception to the logo ban. An icon that is a labelled link is functional; the "decorative icons" ban is about the other kind.
 - Privacy policy and a working marketing opt-out ship with the first deploy
 - Never state a stock figure, capacity, date or lead time that is not true
 
