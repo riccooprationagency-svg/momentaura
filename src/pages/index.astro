@@ -67,7 +67,7 @@ const cta = stripLive
   <section class="hero" data-system="dark">
     <div class="wrap hero__inner">
       <div class="hero__copy">
-        <p class="hero__label">Nairobi &middot; Est 2026</p>
+        <p class="hero__label">Nairobi</p>
         <h1 class="hero__title">Wear the<br /><span class="hero__title-muted">moment</span></h1>
         <p class="hero__sentence">
           T-shirts, hoodies, sweatshirts and tracksuits. Pay with M-Pesa. Dispatched from Nairobi.
@@ -335,61 +335,24 @@ const cta = stripLive
   }
 
   /* ---------- the entrance ----------
-     Once, on load, no script and nothing tied to scroll. A transition out of
-     @starting-style, so no @keyframes (V6 bans them outside the campaign). Copy
-     fades in 60ms apart: label, title, sentence, facts, button, legend. The
-     picture fades and slides 16px in from the right. Opacity and transform only.
-     A browser without @starting-style shows everything at rest. Reduced motion
-     zeroes every duration, delay and shift in tokens.css, and the block below
-     removes the transition outright as well. */
-  .hero__copy > *,
-  .hero__legend {
+     One fade, once, on load: the hero's content goes from transparent to opaque in
+     one step. Opacity only, no stagger, no transform, nothing tied to scroll. A
+     transition out of @starting-style, so no @keyframes (V6 bans them outside the
+     campaign). A browser without @starting-style shows the hero at rest. Reduced
+     motion zeroes --hero-dur in tokens.css, and the block below removes the
+     transition outright as well. */
+  .hero__inner {
     transition: opacity var(--hero-dur) var(--ease);
   }
 
-  .hero__copy > :nth-child(2) {
-    transition-delay: calc(var(--hero-step) * 1);
-  }
-
-  .hero__copy > :nth-child(3) {
-    transition-delay: calc(var(--hero-step) * 2);
-  }
-
-  .hero__copy > :nth-child(4) {
-    transition-delay: calc(var(--hero-step) * 3);
-  }
-
-  .hero__copy > :nth-child(5) {
-    transition-delay: calc(var(--hero-step) * 4);
-  }
-
-  .hero__legend {
-    transition-delay: calc(var(--hero-step) * 5);
-  }
-
-  .hero__picture {
-    transition:
-      opacity var(--hero-image-dur) var(--ease),
-      transform var(--hero-image-dur) var(--ease);
-    transition-delay: var(--hero-image-delay);
-  }
-
   @starting-style {
-    .hero__copy > *,
-    .hero__legend {
+    .hero__inner {
       opacity: 0;
-    }
-
-    .hero__picture {
-      opacity: 0;
-      transform: translateX(var(--hero-image-shift));
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero__copy > *,
-    .hero__legend,
-    .hero__picture {
+    .hero__inner {
       transition: none;
     }
   }

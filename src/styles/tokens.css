@@ -162,17 +162,11 @@
   --ease: cubic-bezier(0.625, 0.05, 0, 1);
 
   /* ---------- HERO ENTRANCE ----------
-     The homepage hero, once, on load. Opacity and transform only, on --ease,
-     with no keyframes: V6 bans @keyframes outside the campaign, and a transition
-     from an @starting-style needs none. A browser without @starting-style simply
-     shows the hero at rest. Copy steps in 60ms apart; the picture adds a 16px
-     slide from the right. Nothing here is over 300ms. Reduced motion zeroes the
-     lot below, so nothing moves and nothing waits. */
+     The homepage hero fades in once on load: opacity only, on --ease, no
+     keyframes (V6 bans @keyframes outside the campaign, and a transition from an
+     @starting-style needs none). A browser without @starting-style shows the hero
+     at rest. Reduced motion zeroes it below. Also the hero button's hover time. */
   --hero-dur: 250ms;
-  --hero-step: 60ms;
-  --hero-image-dur: 300ms;
-  --hero-image-delay: 120ms;
-  --hero-image-shift: 16px;
 
   /* ---------- CAMPAIGN MOTION ----------
      CLAUDE.md "Campaign motion": /black-november only, while campaign.json says
@@ -207,10 +201,6 @@
   :root {
     --dur: 0ms;
     --hero-dur: 0ms;
-    --hero-step: 0ms;
-    --hero-image-dur: 0ms;
-    --hero-image-delay: 0ms;
-    --hero-image-shift: 0px;
   }
 }
 
