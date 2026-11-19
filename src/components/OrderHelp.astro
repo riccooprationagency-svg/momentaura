@@ -10,7 +10,7 @@
 //
 // Prose in Archivo, not mono: it is a sentence. The two links are each a full
 // 44px target, because a thumb is what taps them.
-import { emailParts, mailtoHref, phoneDisplay, whatsappHref, type WhatsappSource } from "../lib/site";
+import { emailParts, mailtoHref, whatsappDisplay, whatsappHref, type WhatsappSource } from "../lib/site";
 
 interface Props {
   source: Extract<WhatsappSource, "WEB-ORDER" | "WEB-CHECKOUT" | "WEB-TRACK">;
@@ -21,7 +21,7 @@ const { source } = Astro.props;
 
 <p class="order-help">
   <span>Problem with an order?</span>
-  <a href={whatsappHref(source)}>WhatsApp {phoneDisplay()}</a>
+  <a href={whatsappHref(source)}>WhatsApp {whatsappDisplay()}</a>
   <span>or</span>
   <a class="order-help__email" href={mailtoHref("orders")}
     >{emailParts("orders")[0]}<wbr />{emailParts("orders")[1]}</a
