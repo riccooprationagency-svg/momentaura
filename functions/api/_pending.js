@@ -33,6 +33,7 @@
 
 import { phoneKey, promoPhoneKey, promoUseKey } from "./_promo.js";
 import { soldKey } from "./_stock.js";
+import { sendAlerts } from "./_alert.js";
 
 /** How long a pending order stays readable. */
 const TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -206,7 +207,7 @@ async function markSold(env, record) {
  *
  * @returns {Promise<{outcome: "settled"|"already"|"unknown"|"mismatch", record?: object}>}
  */
-export async function settle(env, checkoutRequestId, result) {
+export async function settle(env, checkoutRequestId, result, context) {
   const record = await getPending(env, checkoutRequestId);
 
   /* No record: a callback for a push we never made, or one whose record has
@@ -245,6 +246,30 @@ export async function settle(env, checkoutRequestId, result) {
       via: result.via,
     };
     await persist(env, checkoutRequestId, paid);
+
+    /* THE ORDER ALERT. Fires when an order moves from pending to paid, and
+     * only there. Reached from both the callback and the status query, so an
+     * order that settles twice or settles by either path first alerts once.
+     *
+     * A NOTE ON THE RACE: KV has no compare-and-set, so two concurrent settles
+     * can both observe "pending". A duplicate alert in that rare case is
+     * acceptable; a lost alert is not.
+     *
+     * NEVER BREAK THE MONEY PATH: any alert failure, timeout or missing secret
+     * must not change what settle() returns, must not delay the callback
+     * acknowledgement to Safaricom, and must not throw. Runs in waitUntil.
+     */
+    try {
+      const alertPromise = sendAlerts(env, paid);
+      if (context && typeof context.waitUntil === "function") {
+        context.waitUntil(alertPromise);
+      } else if (typeof context === "function") {
+        context(alertPromise);
+      }
+    } catch {
+      console.log(JSON.stringify({ at: "alert", reference: paid.reference, code: "dispatch_failed" }));
+    }
+
     return { outcome: "settled", record: paid };
   }
 

@@ -141,7 +141,9 @@ const networks = [known(site.social?.facebook) && "Facebook", known(site.social?
 
       <h2 class="page__sub">Who else sees it</h2>
       <p class="page__body">
-        The person who runs MomentAura. {GATEWAY_NAME}, which sees the payment details
+        The person who runs MomentAura. When an order is paid its details, meaning name,
+        phone number, items and delivery address, are sent to the shop owner by Telegram
+        and by email. {GATEWAY_NAME}, which sees the payment details
         listed above because it is taking the payment. The company hosting this site, because the pages and the order have
         to pass through it. Your delivery details are used to get the order to you.
         {afterPaid.length > 0 && " WhatsApp, which carries the order messages described above, and so sees your phone number and those messages. "}

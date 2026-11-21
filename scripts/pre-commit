@@ -58,5 +58,10 @@ node scripts/track-test.mjs
 # that never settles a payment that really arrived.
 node scripts/redirect-test.mjs
 
+# Admin orders page & paid order alerts. Guards Cloudflare Access verification,
+# fail-closed access to buyer data, order listing, and alert dispatch to
+# Telegram and email.
+node scripts/admin-test.mjs
+
 echo "  gates passed."
 echo ""
