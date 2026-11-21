@@ -28,6 +28,7 @@ import { formatEastAfricaTime } from "../api/_alert.js";
 import { paidIndexKey, putPending, refKey } from "../api/_pending.js";
 
 const PAGE_SIZE = 20;
+const TTL_SECONDS = 60 * 60 * 24 * 7;
 
 const HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
@@ -56,9 +57,16 @@ export function _resetBackfillCache() {
  *
  * Orders placed before the introduction of paid-at: index only have ref:<ref> keys.
  * To ensure these orders remain visible alongside newly paid orders throughout the
- * seven-day transition window, this scans existing ref: keys once, creates any missing
- * paid-at:<invertedTimestamp>:<ref> index keys, and records that the index has been
- * backfilled.
+ * seven-day transition window, this scans existing ref: keys once and creates any missing
+ * paid-at:<invertedTimestamp>:<ref> index keys.
+ *
+ * EXPIRY PRESERVATION:
+ * To avoid extending existing entries or creating orphaned index entries that outlive
+ * their source records and pollute pagination with phantom/empty slots:
+ * 1. If an index entry already exists for a record, it is never overwritten or extended.
+ * 2. Each new index entry inherits the exact expiration timestamp of its source ref:
+ *    record (or its remaining lifetime based on creation/settlement time).
+ * 3. Expired or near-expiry (<60s remaining) records are skipped.
  */
 export async function ensurePaidIndex(env) {
   const kv = env.ORDERS;
@@ -73,6 +81,7 @@ export async function ensurePaidIndex(env) {
       return;
     }
 
+    const nowSec = Math.floor(Date.now() / 1000);
     let cursor = undefined;
     while (true) {
       const res = await kv.list({ prefix: "ref:", cursor, limit: 100 });
@@ -82,7 +91,24 @@ export async function ensurePaidIndex(env) {
             const record = await kv.get(k.name, "json");
             if (record && record.status === "paid" && typeof record.reference === "string" && record.reference) {
               const indexKey = paidIndexKey(record.createdAt || record.settledAt, record.reference);
-              await putPending(env, indexKey, record.reference);
+
+              // Avoid extending existing index entries
+              const existing = await kv.get(indexKey);
+              if (existing !== null) continue;
+
+              // Preserve source record's expiry
+              const sourceExp = Number.isFinite(k.expiration) ? k.expiration : undefined;
+              const recordTime = record.settledAt || record.createdAt;
+              const fallbackExp =
+                Number.isFinite(recordTime) && recordTime >= 1_000_000_000_000
+                  ? Math.floor(recordTime / 1000) + TTL_SECONDS
+                  : nowSec + TTL_SECONDS;
+              const expiration = sourceExp ?? fallbackExp;
+
+              // Skip if already expired or within 60s of expiring (Cloudflare KV limit)
+              if (expiration <= nowSec + 60) continue;
+
+              await kv.put(indexKey, JSON.stringify(record.reference), { expiration });
             }
           } catch {
             // Individual key read/write failure does not abort migration

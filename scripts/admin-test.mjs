@@ -156,24 +156,41 @@ async function makeToken({
 
 function createMockKv() {
   const map = new Map();
+  const expirations = new Map();
   return {
     map,
+    expirations,
     async get(key, type) {
+      const exp = expirations.get(key);
+      if (exp !== undefined && exp <= Math.floor(Date.now() / 1000)) return null;
       const val = map.get(key);
       if (val === undefined) return null;
       return type === "json" ? JSON.parse(val) : val;
     },
     async getWithMetadata(key) {
+      const exp = expirations.get(key);
+      if (exp !== undefined && exp <= Math.floor(Date.now() / 1000)) return { value: null, metadata: null };
       const val = map.get(key);
       if (val === undefined) return { value: null, metadata: null };
       return { value: val, metadata: null };
     },
     async put(key, value, opts) {
       map.set(key, typeof value === "string" ? value : JSON.stringify(value));
+      const exp = opts?.expiration
+        ? opts.expiration
+        : (opts?.expirationTtl ? Math.floor(Date.now() / 1000) + opts.expirationTtl : undefined);
+      if (exp !== undefined) {
+        expirations.set(key, exp);
+      }
     },
     async list({ prefix = "", cursor, limit = 1000 } = {}) {
+      const nowSec = Math.floor(Date.now() / 1000);
       const allKeys = Array.from(map.keys())
         .filter((k) => k.startsWith(prefix))
+        .filter((k) => {
+          const exp = expirations.get(k);
+          return exp === undefined || exp > nowSec;
+        })
         .sort();
       let startIndex = 0;
       if (cursor) {
@@ -186,7 +203,7 @@ function createMockKv() {
           ? pageKeys[pageKeys.length - 1]
           : undefined;
       return {
-        keys: pageKeys.map((name) => ({ name })),
+        keys: pageKeys.map((name) => ({ name, expiration: expirations.get(name) })),
         list_complete: !nextCursor,
         cursor: nextCursor,
       };
@@ -763,6 +780,72 @@ console.log("\n  Order listing tests\n");
   // Marker is set so backfill only runs once
   const marker = await testKv.get("meta:paid-index-backfilled");
   eq(marker, "1", "meta:paid-index-backfilled is recorded in KV");
+}
+
+/* 22. Backfill preserves source record's expiry and avoids extending existing entries */
+{
+  const testKv = createMockKv();
+  _resetBackfillCache();
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const targetExpiry = nowSec + 3600; // 1 hour remaining
+
+  // Pre-deployment order with 1 hour remaining
+  const preOrder = {
+    reference: "MA-PRE-TTL",
+    status: "paid",
+    amount: 1200,
+    createdAt: (nowSec - 86400 * 6) * 1000,
+    items: [{ slug: "crew-tee", qty: 1 }],
+    name: "Expiry Buyer",
+    msisdn: "254711999999",
+  };
+  await testKv.put(refKey(preOrder.reference), preOrder, { expiration: targetExpiry });
+
+  // Post-deployment order already in index with 24 hours remaining
+  const postOrder = {
+    reference: "MA-POST-TTL",
+    status: "paid",
+    amount: 2200,
+    createdAt: (nowSec - 3600) * 1000,
+    items: [{ slug: "faith-hoodie", qty: 1 }],
+    name: "Existing Buyer",
+    msisdn: "254722888888",
+  };
+  const postExistingExpiry = nowSec + 86400;
+  const postIndexKey = paidIndexKey(postOrder.createdAt, postOrder.reference);
+  await testKv.put(refKey(postOrder.reference), postOrder, { expiration: postExistingExpiry });
+  await testKv.put(postIndexKey, postOrder.reference, { expiration: postExistingExpiry });
+
+  // Pre-deployment order expiring in 10s (should be skipped, not resurrected)
+  const expiredOrder = {
+    reference: "MA-DEAD-TTL",
+    status: "paid",
+    amount: 500,
+    createdAt: (nowSec - 86400 * 7) * 1000,
+    items: [{ slug: "crew-tee", qty: 1 }],
+    name: "Dead Buyer",
+    msisdn: "254733777777",
+  };
+  await testKv.put(refKey(expiredOrder.reference), expiredOrder, { expiration: nowSec + 10 });
+
+  await ensurePaidIndex(defaultEnv(testKv));
+
+  // 1. Pre-order index key was created with the source record's expiry
+  const preIndexKey = paidIndexKey(preOrder.createdAt, preOrder.reference);
+  const preVal = await testKv.get(preIndexKey, "json");
+  eq(preVal, preOrder.reference, "pre-deployment order index was created");
+  const preExp = testKv.expirations.get(preIndexKey);
+  eq(preExp, targetExpiry, "pre-deployment index entry inherited exact source expiry (not fresh 7-day)");
+
+  // 2. Existing post-order index key was NOT extended
+  const postExp = testKv.expirations.get(postIndexKey);
+  eq(postExp, postExistingExpiry, "existing index entry expiry was not extended");
+
+  // 3. Expired/near-expiry record was skipped
+  const deadIndexKey = paidIndexKey(expiredOrder.createdAt, expiredOrder.reference);
+  const deadVal = await testKv.get(deadIndexKey);
+  eq(deadVal, null, "near-expiry record was skipped and not indexed");
 }
 
 console.log("\n  Order alert tests (Telegram & Resend email)\n");
