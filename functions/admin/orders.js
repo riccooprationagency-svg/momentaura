@@ -25,7 +25,7 @@
 
 import { nameForSlug } from "../api/_order.js";
 import { formatEastAfricaTime } from "../api/_alert.js";
-import { refKey } from "../api/_pending.js";
+import { paidIndexKey, putPending, refKey } from "../api/_pending.js";
 
 const PAGE_SIZE = 20;
 
@@ -43,6 +43,61 @@ const JWKS_TTL_MS = 60 * 60 * 1000;
 export function _resetJwksCache() {
   cachedJwks = null;
   jwksCachedAt = 0;
+}
+
+const backfilledKvs = new Set();
+
+export function _resetBackfillCache() {
+  backfilledKvs.clear();
+}
+
+/**
+ * Backfills existing paid orders from ref: keys into the paid-at: time-ordered index.
+ *
+ * Orders placed before the introduction of paid-at: index only have ref:<ref> keys.
+ * To ensure these orders remain visible alongside newly paid orders throughout the
+ * seven-day transition window, this scans existing ref: keys once, creates any missing
+ * paid-at:<invertedTimestamp>:<ref> index keys, and records that the index has been
+ * backfilled.
+ */
+export async function ensurePaidIndex(env) {
+  const kv = env.ORDERS;
+  if (!kv) return;
+
+  if (backfilledKvs.has(kv)) return;
+
+  try {
+    const marker = await kv.get("meta:paid-index-backfilled");
+    if (marker) {
+      backfilledKvs.add(kv);
+      return;
+    }
+
+    let cursor = undefined;
+    while (true) {
+      const res = await kv.list({ prefix: "ref:", cursor, limit: 100 });
+      if (Array.isArray(res?.keys)) {
+        for (const k of res.keys) {
+          try {
+            const record = await kv.get(k.name, "json");
+            if (record && record.status === "paid" && typeof record.reference === "string" && record.reference) {
+              const indexKey = paidIndexKey(record.createdAt || record.settledAt, record.reference);
+              await putPending(env, indexKey, record.reference);
+            }
+          } catch {
+            // Individual key read/write failure does not abort migration
+          }
+        }
+      }
+      if (!res || res.list_complete || !res.cursor) break;
+      cursor = res.cursor;
+    }
+
+    await kv.put("meta:paid-index-backfilled", "1");
+    backfilledKvs.add(kv);
+  } catch {
+    // Failure in backfill should not crash the orders page
+  }
 }
 
 function base64UrlDecode(str) {
@@ -261,6 +316,9 @@ export async function onRequest(context) {
     );
   }
 
+  /* Fill the time-ordered index with any paid orders that predate paid-at: */
+  await ensurePaidIndex(env);
+
   const url = new URL(request.url);
   const cursor = url.searchParams.get("cursor") || undefined;
   const prevParam = url.searchParams.get("prev") || "";
@@ -289,22 +347,6 @@ export async function onRequest(context) {
       } catch {
         // Individual key read failure does not abort other orders
       }
-    }
-  }
-
-  /* Fallback for environments or tests where only ref: keys were seeded */
-  if (!cursor && records.length === 0 && (!listRes?.keys || listRes.keys.length === 0)) {
-    try {
-      const fallbackRes = await kv.list({ prefix: "ref:", limit: PAGE_SIZE });
-      if (Array.isArray(fallbackRes?.keys)) {
-        for (const k of fallbackRes.keys) {
-          const rec = await kv.get(k.name, "json");
-          if (rec && rec.status === "paid") records.push(rec);
-        }
-        records.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      }
-    } catch {
-      // Ignore fallback errors
     }
   }
 

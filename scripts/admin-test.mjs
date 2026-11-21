@@ -51,7 +51,7 @@ globalThis.__catalogue = [
   { slug: "sized-tee", name: "Sized tee", price: 900, stock: 4, sizes: [{ label: "M" }, { label: "L" }] },
 ];
 
-const { onRequest: adminOrders, _resetJwksCache } = await import(
+const { onRequest: adminOrders, _resetJwksCache, _resetBackfillCache, ensurePaidIndex } = await import(
   pathToFileURL(join(scratch, "admin", "orders.js")).href
 );
 const { settle, putPending, refKey, paidIndexKey } = await import(
@@ -690,6 +690,79 @@ console.log("\n  Order listing tests\n");
   contains(body, "NEXT PAGE", "pagination link is uppercase");
   contains(body, "Buyer Upper 25", "buyer name retains original case");
   contains(body, "Crew tee", "product name retains original case");
+}
+
+/* 21. Pre-deployment paid orders without paid-at: index are backfilled and remain visible alongside new orders */
+{
+  const testKv = createMockKv();
+  _resetBackfillCache();
+
+  // 1. Pre-deployment orders: stored only under ref:, NO paid-at: key
+  const oldPaid1 = {
+    reference: "MA-PRE1-PAID",
+    status: "paid",
+    amount: 1500,
+    createdAt: 100000,
+    items: [{ slug: "crew-tee", qty: 1 }],
+    name: "Pre-deploy Buyer One",
+    msisdn: "254711000001",
+  };
+  const oldPaid2 = {
+    reference: "MA-PRE2-PAID",
+    status: "paid",
+    amount: 2500,
+    createdAt: 200000,
+    items: [{ slug: "faith-hoodie", qty: 1 }],
+    name: "Pre-deploy Buyer Two",
+    msisdn: "254711000002",
+  };
+  const oldPending = {
+    reference: "MA-PRE3-PEND",
+    status: "pending",
+    amount: 3500,
+    createdAt: 300000,
+    items: [{ slug: "crew-tee", qty: 1 }],
+    name: "Pre-deploy Pending",
+    msisdn: "254711000003",
+  };
+  await testKv.put(refKey(oldPaid1.reference), oldPaid1);
+  await testKv.put(refKey(oldPaid2.reference), oldPaid2);
+  await testKv.put(refKey(oldPending.reference), oldPending);
+
+  // 2. Post-deployment order: created with paid-at: index key
+  const newPaid = {
+    reference: "MA-POST-PAID",
+    status: "paid",
+    amount: 900,
+    createdAt: 400000,
+    items: [{ slug: "sized-tee", qty: 1, size: "M" }],
+    name: "Post-deploy Buyer",
+    msisdn: "254722000000",
+  };
+  await testKv.put(refKey(newPaid.reference), newPaid);
+  await testKv.put(paidIndexKey(newPaid.createdAt, newPaid.reference), newPaid.reference);
+
+  const token = await makeToken();
+  const res = await runAdmin(token, defaultEnv(testKv));
+  eq(res.status, 200, "orders listing returns 200 with older + newer paid orders");
+  const body = await res.text();
+
+  // All paid orders must appear
+  contains(body, "MA-POST-PAID", "newly paid order is shown");
+  contains(body, "MA-PRE2-PAID", "pre-deployment paid order 2 is shown");
+  contains(body, "MA-PRE1-PAID", "pre-deployment paid order 1 is shown");
+  lacks(body, "MA-PRE3-PEND", "pending pre-deployment order is not shown");
+
+  // Newest first ordering: POST (400k) -> PRE2 (200k) -> PRE1 (100k)
+  const idxPost = body.indexOf("MA-POST-PAID");
+  const idxPre2 = body.indexOf("MA-PRE2-PAID");
+  const idxPre1 = body.indexOf("MA-PRE1-PAID");
+  check(idxPost !== -1 && idxPre2 !== -1 && idxPre1 !== -1, "all 3 paid orders found in body");
+  check(idxPost < idxPre2 && idxPre2 < idxPre1, "orders sorted newest first across pre- and post-deployment orders");
+
+  // Marker is set so backfill only runs once
+  const marker = await testKv.get("meta:paid-index-backfilled");
+  eq(marker, "1", "meta:paid-index-backfilled is recorded in KV");
 }
 
 console.log("\n  Order alert tests (Telegram & Resend email)\n");
