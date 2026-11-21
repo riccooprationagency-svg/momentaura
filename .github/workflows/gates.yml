@@ -52,3 +52,7 @@ jobs:
       # The host redirect in functions/_middleware.js, and its two exemptions:
       # preview hosts and /api/, where the M-Pesa callback lands.
       - run: node scripts/redirect-test.mjs
+      # Admin orders page & paid order alerts. Guards Cloudflare Access verification,
+      # fail-closed access to buyer data, order listing, and alert dispatch to
+      # Telegram and email.
+      - run: node scripts/admin-test.mjs

@@ -2283,7 +2283,7 @@ await check("S15. an uncapped promo code never lists its own prefix; the only li
   eq(kv.listed.filter((p) => p.startsWith("sold:")), ["sold:tee-1:"], "the stock list");
 });
 
-const EXPECT_OPS = { accepted: { list: 1, get: 2, put: 5 }, refused: { list: 1, get: 0, put: 0 }, promo: { list: 1, get: 3, put: 6 } };
+const EXPECT_OPS = { accepted: { list: 1, get: 2, put: 6 }, refused: { list: 1, get: 0, put: 0 }, promo: { list: 1, get: 3, put: 7 } };
 
 await check("S20. a sale keeps its first time: markers land, the paid write fails, the count is moved later, the retry succeeds, and the sale is NOT subtracted from the new count", async () => {
   const { reference } = await (await push(stockOrder([{ slug: "tee-1", qty: 2 }]))).json();

@@ -33,6 +33,7 @@
 
 import { phoneKey, promoPhoneKey, promoUseKey } from "./_promo.js";
 import { soldKey } from "./_stock.js";
+import { sendAlerts } from "./_alert.js";
 
 /** How long a pending order stays readable. */
 const TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -67,6 +68,24 @@ export async function getPending(env, checkoutRequestId) {
  * misspelled on one side only. */
 export const refKey = (reference) => `ref:${reference}`;
 
+/* Time-ordered index for paid orders.
+ *
+ * KV list() sorts keys lexicographically in ascending order. To list paid orders
+ * newest-first without fetching and sorting every record in memory, the key
+ * inverts the creation timestamp: (9999999999999 - createdAt), zero-padded to
+ * 13 digits.
+ *
+ * A newer order produces a smaller inverted number, so it sorts first in KV
+ * list(). Key format: paid-at:<invertedTimestamp>:<reference>.
+ *
+ * Stored with the same TTL as pending/paid orders (TTL_SECONDS = 7 days).
+ */
+export const paidIndexKey = (createdAt, reference) => {
+  const at = Number.isFinite(createdAt) ? createdAt : Date.now();
+  const inverted = String(9999999999999 - at).padStart(13, "0");
+  return `paid-at:${inverted}:${reference}`;
+};
+
 /**
  * Writes a settled record under both names it is known by.
  *
@@ -86,6 +105,9 @@ export const refKey = (reference) => `ref:${reference}`;
 async function persist(env, checkoutRequestId, record) {
   if (typeof record.reference === "string" && record.reference) {
     await putPending(env, refKey(record.reference), record);
+    if (record.status === "paid") {
+      await putPending(env, paidIndexKey(record.createdAt, record.reference), record.reference);
+    }
   }
   await putPending(env, checkoutRequestId, record);
 }
@@ -206,7 +228,7 @@ async function markSold(env, record) {
  *
  * @returns {Promise<{outcome: "settled"|"already"|"unknown"|"mismatch", record?: object}>}
  */
-export async function settle(env, checkoutRequestId, result) {
+export async function settle(env, checkoutRequestId, result, context) {
   const record = await getPending(env, checkoutRequestId);
 
   /* No record: a callback for a push we never made, or one whose record has
@@ -245,6 +267,30 @@ export async function settle(env, checkoutRequestId, result) {
       via: result.via,
     };
     await persist(env, checkoutRequestId, paid);
+
+    /* THE ORDER ALERT. Fires when an order moves from pending to paid, and
+     * only there. Reached from both the callback and the status query, so an
+     * order that settles twice or settles by either path first alerts once.
+     *
+     * A NOTE ON THE RACE: KV has no compare-and-set, so two concurrent settles
+     * can both observe "pending". A duplicate alert in that rare case is
+     * acceptable; a lost alert is not.
+     *
+     * NEVER BREAK THE MONEY PATH: any alert failure, timeout or missing secret
+     * must not change what settle() returns, must not delay the callback
+     * acknowledgement to Safaricom, and must not throw. Runs in waitUntil.
+     */
+    try {
+      const alertPromise = sendAlerts(env, paid);
+      if (context && typeof context.waitUntil === "function") {
+        context.waitUntil(alertPromise);
+      } else if (typeof context === "function") {
+        context(alertPromise);
+      }
+    } catch {
+      console.log(JSON.stringify({ at: "alert", reference: paid.reference, code: "dispatch_failed" }));
+    }
+
     return { outcome: "settled", record: paid };
   }
 

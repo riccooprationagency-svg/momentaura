@@ -50,7 +50,8 @@ const json = (status, body) =>
     },
   });
 
-export async function onRequest({ request, env }) {
+export async function onRequest(context) {
+  const { request, env } = context;
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
   }
@@ -153,7 +154,7 @@ export async function onRequest({ request, env }) {
       desc: result.desc,
       code: result.code,
       via: "query",
-    });
+    }, context);
   } catch (error) {
     console.log(JSON.stringify({ at: "status", checkoutRequestId, code: "settle_failed", detail: String(error) }));
     return answer("pending");

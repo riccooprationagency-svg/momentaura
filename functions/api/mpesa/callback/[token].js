@@ -65,7 +65,8 @@ const ack = () =>
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 
-export async function onRequest({ request, env, params }) {
+export async function onRequest(context) {
+  const { request, env, params } = context;
   /* A GET is a probe or a crawler. It learns nothing, not even that the path is
      right — the 404 is what any wrong path returns. */
   if (request.method !== "POST") return new Response("Not found", { status: 404 });
@@ -140,7 +141,7 @@ export async function onRequest({ request, env, params }) {
       desc: stk.ResultDesc,
       code: resultCode,
       via: "callback",
-    });
+    }, context);
   } catch (error) {
     /* KV failed. Do NOT acknowledge — this is the one case a retry can fix, and
        Safaricom retrying is exactly what we want. */

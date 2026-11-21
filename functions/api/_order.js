@@ -41,6 +41,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const BY_SLUG = new Map(catalogue.map((p) => [p.slug, p]));
 
+export const nameForSlug = (slug) => BY_SLUG.get(slug)?.name ?? slug;
+
 /* Where it is going. Long enough for "Kahawa Sukari, off Thika Road" and for a
  * landmark a rider can find, short enough that nothing absurd is stored against
  * an order or read out over the phone. */
