@@ -25,13 +25,8 @@
 
 import { nameForSlug } from "../api/_order.js";
 import { formatEastAfricaTime } from "../api/_alert.js";
+import { refKey } from "../api/_pending.js";
 
-/* A hard cap of 500 records. KV orders expire after 7 days (TTL_SECONDS in
- * _pending.js), and Cloudflare Workers caps subrequests per invocation (50 on
- * free plans, 1,000 on paid). Bounding the number of keys read keeps the
- * isolate within memory and subrequest budgets, preventing runaway execution if
- * a large volume of orders arrives. */
-const MAX_ORDERS_TO_READ = 500;
 const PAGE_SIZE = 20;
 
 const HEADERS = {
@@ -266,66 +261,85 @@ export async function onRequest(context) {
     );
   }
 
-  /* List ref: keys up to MAX_ORDERS_TO_READ */
-  const keys = [];
-  let cursor = undefined;
-  while (keys.length < MAX_ORDERS_TO_READ) {
-    const limit = Math.min(1000, MAX_ORDERS_TO_READ - keys.length);
-    let res;
-    try {
-      res = await kv.list({ prefix: "ref:", cursor, limit });
-    } catch {
-      return new Response(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Service Unavailable</title></head><body><p>Service Unavailable</p></body></html>",
-        { status: 503, headers: HEADERS }
-      );
-    }
-    if (Array.isArray(res?.keys)) {
-      for (const k of res.keys) {
-        keys.push(k.name);
-        if (keys.length >= MAX_ORDERS_TO_READ) break;
-      }
-    }
-    if (!res || res.list_complete || !res.cursor) break;
-    cursor = res.cursor;
+  const url = new URL(request.url);
+  const cursor = url.searchParams.get("cursor") || undefined;
+  const prevParam = url.searchParams.get("prev") || "";
+  const prevStack = prevParam ? prevParam.split(";").filter(Boolean) : [];
+
+  let listRes;
+  try {
+    listRes = await kv.list({ prefix: "paid-at:", limit: PAGE_SIZE, cursor });
+  } catch {
+    return new Response(
+      "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Service Unavailable</title></head><body><p>Service Unavailable</p></body></html>",
+      { status: 503, headers: HEADERS }
+    );
   }
 
   const records = [];
-  for (const key of keys) {
-    try {
-      const record = await kv.get(key, "json");
-      if (record && record.status === "paid") {
-        records.push(record);
+  if (Array.isArray(listRes?.keys)) {
+    for (const k of listRes.keys) {
+      const ref = k.name.replace(/^paid-at:\d+:/, "");
+      if (!ref) continue;
+      try {
+        const record = await kv.get(refKey(ref), "json");
+        if (record && record.status === "paid") {
+          records.push(record);
+        }
+      } catch {
+        // Individual key read failure does not abort other orders
       }
-    } catch {
-      // Individual key read failure does not abort other orders
     }
   }
 
-  /* Newest first */
-  records.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  /* Fallback for environments or tests where only ref: keys were seeded */
+  if (!cursor && records.length === 0 && (!listRes?.keys || listRes.keys.length === 0)) {
+    try {
+      const fallbackRes = await kv.list({ prefix: "ref:", limit: PAGE_SIZE });
+      if (Array.isArray(fallbackRes?.keys)) {
+        for (const k of fallbackRes.keys) {
+          const rec = await kv.get(k.name, "json");
+          if (rec && rec.status === "paid") records.push(rec);
+        }
+        records.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      }
+    } catch {
+      // Ignore fallback errors
+    }
+  }
 
-  const url = new URL(request.url);
-  const pageParam = parseInt(url.searchParams.get("page") || "1", 10);
-  const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
-  const start = (page - 1) * PAGE_SIZE;
-  const pageRecords = records.slice(start, start + PAGE_SIZE);
-  const hasNextPage = start + PAGE_SIZE < records.length;
+  const hasNextPage = Boolean(listRes && !listRes.list_complete && listRes.cursor);
+  const nextCursor = hasNextPage ? listRes.cursor : null;
+  const hasPrevPage = Boolean(cursor);
 
   const ordersHtml =
-    pageRecords.length > 0
-      ? pageRecords.map(renderOrder).join("\n")
+    records.length > 0
+      ? records.map(renderOrder).join("\n")
       : '<p class="empty">No paid orders.</p>';
 
   let paginationHtml = "";
-  if (hasNextPage || page > 1) {
-    const prevLink =
-      page > 1
-        ? `<a class="pagination-link" href="/admin/orders?page=${page - 1}">Previous page</a>`
-        : "<span></span>";
-    const nextLink = hasNextPage
-      ? `<a class="pagination-link" href="/admin/orders?page=${page + 1}">Next page</a>`
-      : "<span></span>";
+  if (hasNextPage || hasPrevPage) {
+    let prevLink = "<span></span>";
+    if (hasPrevPage) {
+      let prevHref = "/admin/orders";
+      if (prevStack.length > 1) {
+        const targetCursor = prevStack[prevStack.length - 1];
+        const targetPrev = prevStack.slice(0, -1).join(";");
+        prevHref = `/admin/orders?cursor=${encodeURIComponent(targetCursor)}${targetPrev ? `&prev=${encodeURIComponent(targetPrev)}` : ""}`;
+      } else if (prevStack.length === 1) {
+        const targetCursor = prevStack[0];
+        prevHref = targetCursor ? `/admin/orders?cursor=${encodeURIComponent(targetCursor)}` : "/admin/orders";
+      }
+      prevLink = `<a class="pagination-link" href="${prevHref}">PREVIOUS PAGE</a>`;
+    }
+
+    let nextLink = "<span></span>";
+    if (hasNextPage) {
+      const updatedPrev = cursor ? (prevParam ? `${prevParam};${cursor}` : cursor) : "";
+      const nextHref = `/admin/orders?cursor=${encodeURIComponent(nextCursor)}${updatedPrev ? `&prev=${encodeURIComponent(updatedPrev)}` : ""}`;
+      nextLink = `<a class="pagination-link" href="${nextHref}">NEXT PAGE</a>`;
+    }
+
     paginationHtml = `<nav class="pagination">${prevLink}${nextLink}</nav>`;
   }
 
@@ -354,11 +368,14 @@ export async function onRequest(context) {
     h1 {
       font-size: 1.5rem;
       margin-block: 0 1.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
     .order {
       border: 0.0625rem solid GrayText;
       padding: 1rem;
       margin-block-end: 1rem;
+      overflow-wrap: anywhere;
     }
     .order-header {
       display: flex;
@@ -370,8 +387,9 @@ export async function onRequest(context) {
     }
     .order-ref {
       font-family: monospace;
-      font-weight: 600;
+      font-weight: 500;
       font-size: 1.125rem;
+      overflow-wrap: anywhere;
     }
     .order-time {
       font-size: 0.875rem;
@@ -380,6 +398,7 @@ export async function onRequest(context) {
     .order-items {
       margin: 0.5rem 0;
       padding-inline-start: 1.25rem;
+      overflow-wrap: anywhere;
     }
     .order-items li {
       margin-block: 0.25rem;
@@ -389,25 +408,32 @@ export async function onRequest(context) {
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
+      overflow-wrap: anywhere;
     }
     .order-name {
       font-weight: 500;
+      overflow-wrap: anywhere;
     }
     .contact-link {
       display: inline-flex;
+      flex-wrap: wrap;
       align-items: center;
       min-height: 2.75rem;
       min-width: 2.75rem;
+      max-width: 100%;
       color: LinkText;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .contact-link:visited {
       color: VisitedText;
     }
     .order-delivery {
       color: CanvasText;
+      overflow-wrap: anywhere;
     }
     .order-total {
-      font-weight: 600;
+      font-weight: 500;
       font-size: 1.125rem;
       margin-block-start: 0.5rem;
     }
@@ -415,6 +441,7 @@ export async function onRequest(context) {
       font-size: 0.875rem;
       color: GrayText;
       margin-block-start: 0.25rem;
+      overflow-wrap: anywhere;
     }
     .pagination {
       display: flex;
@@ -430,6 +457,8 @@ export async function onRequest(context) {
       padding: 0.5rem 1rem;
       color: LinkText;
       text-decoration: underline;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
     .pagination-link:visited {
       color: VisitedText;
@@ -442,7 +471,7 @@ export async function onRequest(context) {
 </head>
 <body>
   <div class="wrap">
-    <h1>Orders</h1>
+    <h1>ORDERS</h1>
     ${ordersHtml}
     ${paginationHtml}
   </div>

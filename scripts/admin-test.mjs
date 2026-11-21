@@ -54,7 +54,7 @@ globalThis.__catalogue = [
 const { onRequest: adminOrders, _resetJwksCache } = await import(
   pathToFileURL(join(scratch, "admin", "orders.js")).href
 );
-const { settle, putPending, refKey } = await import(
+const { settle, putPending, refKey, paidIndexKey } = await import(
   pathToFileURL(join(scratch, "api", "_pending.js")).href
 );
 const { formatAlertMessage, sendAlerts } = await import(
@@ -296,6 +296,7 @@ console.log("\n  Admin /orders — Cloudflare Access & fail-closed gates\n");
 /* Seed KV with the fixture order */
 const kv = createMockKv();
 await kv.put(refKey(FIXTURE_ORDER.reference), FIXTURE_ORDER);
+await kv.put(paidIndexKey(FIXTURE_ORDER.createdAt, FIXTURE_ORDER.reference), FIXTURE_ORDER.reference);
 
 /* 1. Missing ACCESS_TEAM_DOMAIN -> 503 */
 {
@@ -450,7 +451,9 @@ console.log("\n  Order listing tests\n");
   };
 
   await testKv.put(refKey(olderPaid.reference), olderPaid);
+  await testKv.put(paidIndexKey(olderPaid.createdAt, olderPaid.reference), olderPaid.reference);
   await testKv.put(refKey(newerPaid.reference), newerPaid);
+  await testKv.put(paidIndexKey(newerPaid.createdAt, newerPaid.reference), newerPaid.reference);
   await testKv.put(refKey(pendingOrder.reference), pendingOrder);
 
   const token = await makeToken();
@@ -488,6 +491,7 @@ console.log("\n  Order listing tests\n");
     },
   };
   await testKv.put(refKey(xssOrder.reference), xssOrder);
+  await testKv.put(paidIndexKey(xssOrder.createdAt, xssOrder.reference), xssOrder.reference);
 
   const token = await makeToken();
   const res = await runAdmin(token, defaultEnv(testKv));
@@ -513,6 +517,7 @@ console.log("\n  Order listing tests\n");
     /* no email, no area, no landmark, no promoCode */
   };
   await testKv.put(refKey(bareOrder.reference), bareOrder);
+  await testKv.put(paidIndexKey(bareOrder.createdAt, bareOrder.reference), bareOrder.reference);
 
   const token = await makeToken();
   const res = await runAdmin(token, defaultEnv(testKv));
@@ -523,7 +528,7 @@ console.log("\n  Order listing tests\n");
   lacks(body, "Promo:", "no promo block when promo is absent");
 }
 
-/* 16. Pagination link works */
+/* 16. Cursor-based pagination works */
 {
   const testKv = createMockKv();
   for (let i = 1; i <= 25; i++) {
@@ -538,6 +543,7 @@ console.log("\n  Order listing tests\n");
       msisdn: `2547000000${pad}`,
     };
     await testKv.put(refKey(ord.reference), ord);
+    await testKv.put(paidIndexKey(ord.createdAt, ord.reference), ord.reference);
   }
 
   const token = await makeToken();
@@ -547,16 +553,143 @@ console.log("\n  Order listing tests\n");
   contains(body1, "MA-PAGE-25", "page 1 contains newest order");
   contains(body1, "MA-PAGE-06", "page 1 contains 20th order");
   lacks(body1, "MA-PAGE-05", "page 1 does not contain 21st order");
-  contains(body1, 'href="/admin/orders?page=2"', "page 1 links to next page");
+  contains(body1, "NEXT PAGE", "page 1 links to next page");
+  const nextMatch = body1.match(/href="(\/admin\/orders\?cursor=[^"]+)"/);
+  check(Boolean(nextMatch), "page 1 carries next cursor URL");
 
   /* Page 2 */
-  const res2 = await runAdmin(token, defaultEnv(testKv), "/admin/orders?page=2");
+  const nextPageUrl = nextMatch ? nextMatch[1] : "/admin/orders";
+  const res2 = await runAdmin(token, defaultEnv(testKv), nextPageUrl);
   const body2 = await res2.text();
   contains(body2, "MA-PAGE-05", "page 2 contains 21st order");
   contains(body2, "MA-PAGE-01", "page 2 contains 25th order");
   lacks(body2, "MA-PAGE-25", "page 2 does not contain page 1 orders");
-  contains(body2, 'href="/admin/orders?page=1"', "page 2 links to previous page");
-  lacks(body2, 'href="/admin/orders?page=3"', "page 2 has no next link when at end");
+  contains(body2, "PREVIOUS PAGE", "page 2 links to previous page");
+  contains(body2, 'href="/admin/orders"', "page 2 links back to page 1");
+  lacks(body2, "NEXT PAGE", "page 2 has no next link when at end");
+}
+
+/* 17. Time-ordered index survives >500 total keys without losing paid orders */
+{
+  const testKv = createMockKv();
+  /* Seed 520 pending orders */
+  for (let i = 1; i <= 520; i++) {
+    const pad = String(i).padStart(4, "0");
+    const ord = {
+      reference: `MA-PEND-${pad}`,
+      status: "pending",
+      amount: 1000,
+      createdAt: 50000 + i,
+      items: [{ slug: "crew-tee", qty: 1 }],
+      name: `Pending ${pad}`,
+      msisdn: `25470000${pad}`,
+    };
+    await testKv.put(refKey(ord.reference), ord);
+  }
+  /* Seed 30 paid orders */
+  for (let i = 1; i <= 30; i++) {
+    const pad = String(i).padStart(2, "0");
+    const ord = {
+      reference: `MA-PAID-${pad}`,
+      status: "paid",
+      amount: 2000,
+      createdAt: 500000 + i * 1000,
+      items: [{ slug: "crew-tee", qty: 1 }],
+      name: `Paid ${pad}`,
+      msisdn: `2547111100${pad}`,
+    };
+    await testKv.put(refKey(ord.reference), ord);
+    await testKv.put(paidIndexKey(ord.createdAt, ord.reference), ord.reference);
+  }
+
+  const token = await makeToken();
+  const res1 = await runAdmin(token, defaultEnv(testKv), "/admin/orders");
+  const body1 = await res1.text();
+  contains(body1, "MA-PAID-30", "newest paid order is visible despite >500 keys in KV");
+  contains(body1, "MA-PAID-11", "20th paid order is visible on page 1");
+  lacks(body1, "MA-PEND-", "pending orders are never shown in admin");
+
+  const nextMatch = body1.match(/href="(\/admin\/orders\?cursor=[^"]+)"/);
+  check(Boolean(nextMatch), "page 1 has next cursor link for remaining paid orders");
+  if (nextMatch) {
+    const res2 = await runAdmin(token, defaultEnv(testKv), nextMatch[1]);
+    const body2 = await res2.text();
+    contains(body2, "MA-PAID-10", "page 2 contains 21st paid order");
+    contains(body2, "MA-PAID-01", "page 2 contains 30th paid order");
+  }
+}
+
+/* 18. Long unbroken buyer email (250 chars) wraps without overflow */
+{
+  const testKv = createMockKv();
+  const longEmail = "a".repeat(64) + "@" + "subdomain.".repeat(15) + "example.com";
+  const longOrder = {
+    reference: "MA-LONG-MAIL",
+    status: "paid",
+    amount: 1500,
+    createdAt: 600000,
+    items: [{ slug: "crew-tee", qty: 1 }],
+    name: "Long Address Buyer",
+    msisdn: "254700998877",
+    email: longEmail,
+    delivery: {
+      county: "nairobi",
+      label: "Nairobi",
+      area: "UnbrokenLongAreaNameThatCouldOverflowWithoutAnywhereWrappingRule",
+      landmark: "NearTheVeryLongLandmarkNameDescribedByBuyer",
+    },
+  };
+  await testKv.put(refKey(longOrder.reference), longOrder);
+  await testKv.put(paidIndexKey(longOrder.createdAt, longOrder.reference), longOrder.reference);
+
+  const token = await makeToken();
+  const res = await runAdmin(token, defaultEnv(testKv));
+  const body = await res.text();
+  contains(body, longEmail, "250-character email is rendered");
+  contains(body, "overflow-wrap: anywhere", "stylesheet specifies overflow-wrap: anywhere");
+  contains(body, "word-break: break-word", "contact-link specifies word-break: break-word");
+  contains(body, "max-width: 100%", "contact-link specifies max-width: 100%");
+}
+
+/* 19. Typography limits: no font-weight 600 outside logo */
+{
+  const testKv = createMockKv();
+  await testKv.put(refKey(FIXTURE_ORDER.reference), FIXTURE_ORDER);
+  await testKv.put(paidIndexKey(FIXTURE_ORDER.createdAt, FIXTURE_ORDER.reference), FIXTURE_ORDER.reference);
+
+  const token = await makeToken();
+  const res = await runAdmin(token, defaultEnv(testKv));
+  const body = await res.text();
+  lacks(body, "font-weight: 600", "font-weight: 600 is forbidden outside logo per CLAUDE.md");
+  contains(body, "font-weight: 500", "font-weight 500 is used instead");
+}
+
+/* 20. Headings and navigation have uppercase styling */
+{
+  const testKv = createMockKv();
+  for (let i = 1; i <= 25; i++) {
+    const pad = String(i).padStart(2, "0");
+    const ord = {
+      reference: `MA-UPPER-${pad}`,
+      status: "paid",
+      amount: 1000,
+      createdAt: 700000 + i * 1000,
+      items: [{ slug: "crew-tee", qty: 1 }],
+      name: `Buyer Upper ${pad}`,
+      msisdn: `2547990000${pad}`,
+    };
+    await testKv.put(refKey(ord.reference), ord);
+    await testKv.put(paidIndexKey(ord.createdAt, ord.reference), ord.reference);
+  }
+
+  const token = await makeToken();
+  const res = await runAdmin(token, defaultEnv(testKv));
+  const body = await res.text();
+  contains(body, "<h1>ORDERS</h1>", "heading is uppercase");
+  contains(body, "text-transform: uppercase", "CSS applies text-transform: uppercase");
+  contains(body, "NEXT PAGE", "pagination link is uppercase");
+  contains(body, "Buyer Upper 25", "buyer name retains original case");
+  contains(body, "Crew tee", "product name retains original case");
 }
 
 console.log("\n  Order alert tests (Telegram & Resend email)\n");
